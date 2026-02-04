@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local virtual environment
+.venv/
+
+# macOS finder metadata
+.DS_Store
+
+# Generated outputs: keep folder, ignore contents
+outputs/*
+!outputs/.gitkeep

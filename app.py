@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import random
 import re
@@ -12,6 +13,122 @@ from typing import Dict, List
 import streamlit as st
 
 import sound_inventory_generator as generator
+
+IPA_SOUND_ALIKES: Dict[str, Dict[str, str]] = {
+    "a": {"sound_like": "ah", "example": "father"},
+    "ɑ": {"sound_like": "ah", "example": "father"},
+    "ɐ": {"sound_like": "uh/ah", "example": "about (stressed)"},
+    "æ": {"sound_like": "a", "example": "cat"},
+    "e": {"sound_like": "eh", "example": "French ete"},
+    "eɪ": {"sound_like": "ay", "example": "say"},
+    "ɛ": {"sound_like": "eh", "example": "bet"},
+    "ə": {"sound_like": "uh", "example": "sofa"},
+    "ɜ": {"sound_like": "er", "example": "bird"},
+    "ɪ": {"sound_like": "ih", "example": "bit"},
+    "i": {"sound_like": "ee", "example": "machine"},
+    "o": {"sound_like": "oh", "example": "Italian sole"},
+    "oʊ": {"sound_like": "oh", "example": "go"},
+    "ɔ": {"sound_like": "aw", "example": "thought"},
+    "ɒ": {"sound_like": "o", "example": "British lot"},
+    "ʊ": {"sound_like": "oo", "example": "book"},
+    "u": {"sound_like": "oo", "example": "flute"},
+    "ʌ": {"sound_like": "uh", "example": "strut"},
+    "y": {"sound_like": "ee with rounded lips", "example": "French tu"},
+    "ø": {"sound_like": "ay with rounded lips", "example": "French deux"},
+    "œ": {"sound_like": "eh with rounded lips", "example": "French soeur"},
+    "ɨ": {"sound_like": "central ee", "example": "Russian y"},
+    "ʉ": {"sound_like": "central oo", "example": "Swedish du"},
+    "ɯ": {"sound_like": "unrounded oo", "example": "Korean eu"},
+    "p": {"sound_like": "p", "example": "spin"},
+    "pʰ": {"sound_like": "p (breathy)", "example": "pin"},
+    "b": {"sound_like": "b", "example": "bat"},
+    "t": {"sound_like": "t", "example": "stop"},
+    "tʰ": {"sound_like": "t (breathy)", "example": "top"},
+    "d": {"sound_like": "d", "example": "dog"},
+    "ʈ": {"sound_like": "retroflex t", "example": "Indian-type t"},
+    "ɖ": {"sound_like": "retroflex d", "example": "Indian-type d"},
+    "k": {"sound_like": "k", "example": "skill"},
+    "kʰ": {"sound_like": "k (breathy)", "example": "kill"},
+    "g": {"sound_like": "g", "example": "go"},
+    "q": {"sound_like": "deep k", "example": "uvular k"},
+    "ɢ": {"sound_like": "deep g", "example": "uvular g"},
+    "ʔ": {"sound_like": "glottal stop", "example": "uh-oh (middle)"},
+    "c": {"sound_like": "ky", "example": "palatal k"},
+    "ɟ": {"sound_like": "gy", "example": "palatal g"},
+    "m": {"sound_like": "m", "example": "man"},
+    "n": {"sound_like": "n", "example": "no"},
+    "ŋ": {"sound_like": "ng", "example": "sing"},
+    "ɲ": {"sound_like": "ny", "example": "canyon"},
+    "ɳ": {"sound_like": "retroflex n", "example": "Indian-type n"},
+    "f": {"sound_like": "f", "example": "fan"},
+    "v": {"sound_like": "v", "example": "van"},
+    "ɸ": {"sound_like": "soft f", "example": "Japanese fu"},
+    "β": {"sound_like": "soft b/v", "example": "Spanish b between vowels"},
+    "θ": {"sound_like": "th", "example": "thin"},
+    "ð": {"sound_like": "th", "example": "this"},
+    "s": {"sound_like": "s", "example": "see"},
+    "z": {"sound_like": "z", "example": "zoo"},
+    "ʃ": {"sound_like": "sh", "example": "ship"},
+    "ʒ": {"sound_like": "zh", "example": "measure"},
+    "ʂ": {"sound_like": "retroflex sh", "example": "Russian sh"},
+    "ʐ": {"sound_like": "retroflex zh", "example": "Russian zh"},
+    "x": {"sound_like": "kh", "example": "Bach"},
+    "χ": {"sound_like": "deeper kh", "example": "uvular fricative"},
+    "ɣ": {"sound_like": "soft g", "example": "Spanish g between vowels"},
+    "h": {"sound_like": "h", "example": "hat"},
+    "ʁ": {"sound_like": "French r", "example": "Paris r"},
+    "r": {"sound_like": "trilled r", "example": "Spanish perro"},
+    "ɾ": {"sound_like": "tap r", "example": "American t in water"},
+    "ɽ": {"sound_like": "retroflex flap", "example": "Indian-type r"},
+    "ɻ": {"sound_like": "retroflex r", "example": "American r-ish"},
+    "l": {"sound_like": "l", "example": "leaf"},
+    "ɭ": {"sound_like": "retroflex l", "example": "Indian-type l"},
+    "ʋ": {"sound_like": "between v and w", "example": "Hindi v/w"},
+    "w": {"sound_like": "w", "example": "we"},
+    "j": {"sound_like": "y", "example": "yes"},
+    "tʃ": {"sound_like": "ch", "example": "church"},
+    "dʒ": {"sound_like": "j", "example": "judge"},
+    "tɕ": {"sound_like": "soft ch", "example": "Korean j-ish"},
+    "tɕʰ": {"sound_like": "soft ch (breathy)", "example": "Korean ch-ish"},
+    "ʙ": {"sound_like": "bilabial trill", "example": "trilled lips"},
+}
+
+
+def hint_for_segment(segment: str) -> Dict[str, str]:
+    """Return a user-friendly pronunciation hint for an IPA segment."""
+    hint = IPA_SOUND_ALIKES.get(segment)
+    if hint:
+        return hint
+    return {"sound_like": "(no hint yet)", "example": "keep IPA as source of truth"}
+
+
+def build_segment_rows(segments: List[str], include_hints: bool) -> List[Dict[str, str]]:
+    """Build table rows for segment display."""
+    rows: List[Dict[str, str]] = []
+    for segment in segments:
+        if include_hints:
+            hint = hint_for_segment(segment)
+            rows.append(
+                {
+                    "IPA": segment,
+                    "Sound-alike": hint["sound_like"],
+                    "Example": hint["example"],
+                }
+            )
+        else:
+            rows.append({"IPA": segment})
+    return rows
+
+
+def build_pronunciation_csv(vowels: List[str], consonants: List[str]) -> str:
+    """Build a downloadable CSV pronunciation guide for the latest result."""
+    output = io.StringIO()
+    output.write("Type,IPA,Sound-alike,Example\n")
+    for segment_type, segments in [("vowel", vowels), ("consonant", consonants)]:
+        for segment in segments:
+            hint = hint_for_segment(segment)
+            output.write(f"{segment_type},{segment},{hint['sound_like']},{hint['example']}\n")
+    return output.getvalue()
 
 
 def list_json_names(directory: str) -> List[str]:
@@ -54,10 +171,10 @@ def inventory_as_preset_payload(inventory: Dict[str, List[str]], language_name: 
     }
 
 
-def display_segment_table(title: str, segments: List[str]) -> None:
+def display_segment_table(title: str, segments: List[str], include_hints: bool) -> None:
     """Render a segment list in a compact table."""
     st.markdown(f"**{title} ({len(segments)})**")
-    rows = [{"Segment": seg} for seg in segments]
+    rows = build_segment_rows(segments, include_hints=include_hints)
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
@@ -116,6 +233,11 @@ def main() -> None:
         options=rule_names,
         help="Rules are applied in order, from top to bottom.",
     )
+    show_sound_alikes = st.checkbox(
+        "Show sound-alike hints",
+        value=True,
+        help="Keeps IPA exact, but adds rough English-leaning pronunciation hints in result tables.",
+    )
 
     language_name = st.text_input("Generated language name", value="GeneratedLanguage")
     output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
@@ -171,12 +293,17 @@ def main() -> None:
         st.subheader("Latest Result")
         col_a, col_b = st.columns(2)
         with col_a:
-            display_segment_table("Vowels", latest_inventory.get("vowels", []))
+            display_segment_table("Vowels", latest_inventory.get("vowels", []), include_hints=show_sound_alikes)
         with col_b:
-            display_segment_table("Consonants", latest_inventory.get("consonants", []))
+            display_segment_table(
+                "Consonants",
+                latest_inventory.get("consonants", []),
+                include_hints=show_sound_alikes,
+            )
 
         output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
         st.caption(f"Latest files were written to: {output_dir_label}")
+        st.caption("Sound-alikes are approximation helpers; IPA stays the canonical data.")
 
         preset_payload = inventory_as_preset_payload(latest_inventory, latest_language_name)
         st.download_button(
@@ -184,6 +311,16 @@ def main() -> None:
             data=json.dumps(preset_payload, ensure_ascii=False, indent=2),
             file_name=f"{sanitize_name(latest_language_name)}.json",
             mime="application/json",
+        )
+        guide_csv = build_pronunciation_csv(
+            latest_inventory.get("vowels", []),
+            latest_inventory.get("consonants", []),
+        )
+        st.download_button(
+            label="Download pronunciation guide CSV",
+            data=guide_csv,
+            file_name=f"{sanitize_name(latest_language_name)}_pronunciation_guide.csv",
+            mime="text/csv",
         )
 
         st.subheader("Save Latest Result as Preset")

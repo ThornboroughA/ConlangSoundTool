@@ -17,7 +17,7 @@ import sound_inventory_generator as generator
 IPA_SOUND_ALIKES: Dict[str, Dict[str, str]] = {
     "a": {"sound_like": "ah", "example": "father"},
     "ɑ": {"sound_like": "ah", "example": "father"},
-    "ɐ": {"sound_like": "uh/ah", "example": "about (stressed)"},
+    "ɐ": {"sound_like": "uh", "example": "about (stressed)"},
     "æ": {"sound_like": "a", "example": "cat"},
     "e": {"sound_like": "eh", "example": "French ete"},
     "eɪ": {"sound_like": "ay", "example": "say"},
@@ -33,64 +33,64 @@ IPA_SOUND_ALIKES: Dict[str, Dict[str, str]] = {
     "ʊ": {"sound_like": "oo", "example": "book"},
     "u": {"sound_like": "oo", "example": "flute"},
     "ʌ": {"sound_like": "uh", "example": "strut"},
-    "y": {"sound_like": "ee with rounded lips", "example": "French tu"},
-    "ø": {"sound_like": "ay with rounded lips", "example": "French deux"},
-    "œ": {"sound_like": "eh with rounded lips", "example": "French soeur"},
-    "ɨ": {"sound_like": "central ee", "example": "Russian y"},
-    "ʉ": {"sound_like": "central oo", "example": "Swedish du"},
-    "ɯ": {"sound_like": "unrounded oo", "example": "Korean eu"},
+    "y": {"sound_like": "ee", "example": "French tu"},
+    "ø": {"sound_like": "ay", "example": "French deux"},
+    "œ": {"sound_like": "eh", "example": "French soeur"},
+    "ɨ": {"sound_like": "ee", "example": "Russian y"},
+    "ʉ": {"sound_like": "oo", "example": "Swedish du"},
+    "ɯ": {"sound_like": "eu", "example": "Korean eu"},
     "p": {"sound_like": "p", "example": "spin"},
-    "pʰ": {"sound_like": "p (breathy)", "example": "pin"},
+    "pʰ": {"sound_like": "ph", "example": "pin"},
     "b": {"sound_like": "b", "example": "bat"},
     "t": {"sound_like": "t", "example": "stop"},
-    "tʰ": {"sound_like": "t (breathy)", "example": "top"},
+    "tʰ": {"sound_like": "tt", "example": "top"},
     "d": {"sound_like": "d", "example": "dog"},
-    "ʈ": {"sound_like": "retroflex t", "example": "Indian-type t"},
-    "ɖ": {"sound_like": "retroflex d", "example": "Indian-type d"},
+    "ʈ": {"sound_like": "th", "example": "Indian-type t"},
+    "ɖ": {"sound_like": "dh", "example": "Indian-type d"},
     "k": {"sound_like": "k", "example": "skill"},
-    "kʰ": {"sound_like": "k (breathy)", "example": "kill"},
+    "kʰ": {"sound_like": "kh", "example": "kill"},
     "g": {"sound_like": "g", "example": "go"},
-    "q": {"sound_like": "deep k", "example": "uvular k"},
-    "ɢ": {"sound_like": "deep g", "example": "uvular g"},
-    "ʔ": {"sound_like": "glottal stop", "example": "uh-oh (middle)"},
+    "q": {"sound_like": "kk", "example": "uvular k"},
+    "ɢ": {"sound_like": "gg", "example": "uvular g"},
+    "ʔ": {"sound_like": "h", "example": "uh-oh (middle)"},
     "c": {"sound_like": "ky", "example": "palatal k"},
     "ɟ": {"sound_like": "gy", "example": "palatal g"},
     "m": {"sound_like": "m", "example": "man"},
     "n": {"sound_like": "n", "example": "no"},
     "ŋ": {"sound_like": "ng", "example": "sing"},
     "ɲ": {"sound_like": "ny", "example": "canyon"},
-    "ɳ": {"sound_like": "retroflex n", "example": "Indian-type n"},
+    "ɳ": {"sound_like": "nn", "example": "Indian-type n"},
     "f": {"sound_like": "f", "example": "fan"},
     "v": {"sound_like": "v", "example": "van"},
-    "ɸ": {"sound_like": "soft f", "example": "Japanese fu"},
-    "β": {"sound_like": "soft b/v", "example": "Spanish b between vowels"},
+    "ɸ": {"sound_like": "sf", "example": "Japanese fu"},
+    "β": {"sound_like": "ph", "example": "Spanish b between vowels"},
     "θ": {"sound_like": "th", "example": "thin"},
     "ð": {"sound_like": "th", "example": "this"},
     "s": {"sound_like": "s", "example": "see"},
     "z": {"sound_like": "z", "example": "zoo"},
     "ʃ": {"sound_like": "sh", "example": "ship"},
     "ʒ": {"sound_like": "zh", "example": "measure"},
-    "ʂ": {"sound_like": "retroflex sh", "example": "Russian sh"},
-    "ʐ": {"sound_like": "retroflex zh", "example": "Russian zh"},
+    "ʂ": {"sound_like": "sh", "example": "Russian sh"},
+    "ʐ": {"sound_like": "zh", "example": "Russian zh"},
     "x": {"sound_like": "kh", "example": "Bach"},
-    "χ": {"sound_like": "deeper kh", "example": "uvular fricative"},
-    "ɣ": {"sound_like": "soft g", "example": "Spanish g between vowels"},
+    "χ": {"sound_like": "kkh", "example": "uvular fricative"},
+    "ɣ": {"sound_like": "gh", "example": "Spanish g between vowels"},
     "h": {"sound_like": "h", "example": "hat"},
-    "ʁ": {"sound_like": "French r", "example": "Paris r"},
-    "r": {"sound_like": "trilled r", "example": "Spanish perro"},
-    "ɾ": {"sound_like": "tap r", "example": "American t in water"},
-    "ɽ": {"sound_like": "retroflex flap", "example": "Indian-type r"},
-    "ɻ": {"sound_like": "retroflex r", "example": "American r-ish"},
+    "ʁ": {"sound_like": "r", "example": "Paris r"},
+    "r": {"sound_like": "rr", "example": "Spanish perro"},
+    "ɾ": {"sound_like": "d", "example": "American t in water"},
+    "ɽ": {"sound_like": "rh", "example": "Indian-type r"},
+    "ɻ": {"sound_like": "r", "example": "American r-ish"},
     "l": {"sound_like": "l", "example": "leaf"},
-    "ɭ": {"sound_like": "retroflex l", "example": "Indian-type l"},
-    "ʋ": {"sound_like": "between v and w", "example": "Hindi v/w"},
+    "ɭ": {"sound_like": "l", "example": "Indian-type l"},
+    "ʋ": {"sound_like": "v", "example": "Hindi v/w"},
     "w": {"sound_like": "w", "example": "we"},
     "j": {"sound_like": "y", "example": "yes"},
     "tʃ": {"sound_like": "ch", "example": "church"},
     "dʒ": {"sound_like": "j", "example": "judge"},
-    "tɕ": {"sound_like": "soft ch", "example": "Korean j-ish"},
-    "tɕʰ": {"sound_like": "soft ch (breathy)", "example": "Korean ch-ish"},
-    "ʙ": {"sound_like": "bilabial trill", "example": "trilled lips"},
+    "tɕ": {"sound_like": "dj", "example": "Korean j-ish"},
+    "tɕʰ": {"sound_like": "ch", "example": "Korean ch-ish"},
+    "ʙ": {"sound_like": "r", "example": "trilled lips"},
 }
 
 STYLE_PRESETS: Dict[str, Dict[str, object]] = {
@@ -154,7 +154,7 @@ def tokenize_ipa_text(text: str) -> List[Tuple[str, str]]:
     return tokens
 
 
-def ipa_text_to_sound_like(text: str) -> str:
+def ipa_text_to_sound_like(text: str, use_segment_separators: bool = False) -> str:
     """Render a rough sound-like guide from IPA text."""
     parts: List[str] = []
     previous_was_segment = False
@@ -162,7 +162,7 @@ def ipa_text_to_sound_like(text: str) -> str:
     for token_type, value in tokenize_ipa_text(text):
         if token_type == "segment":
             mapped = hint_for_segment(value)["sound_like"]
-            if previous_was_segment:
+            if previous_was_segment and use_segment_separators:
                 parts.append("-")
             parts.append(mapped)
             previous_was_segment = True
@@ -684,6 +684,11 @@ def main() -> None:
             value=False,
             key="sample_show_syllable_breaks",
         )
+        show_segment_separators = st.checkbox(
+            "Show segment separators (-) in sound-like text",
+            value=False,
+            key="sample_show_segment_separators",
+        )
         syllable_separator = "." if show_syllable_breaks else ""
 
         samples_button_col_1, samples_button_col_2, samples_button_col_3 = st.columns(3)
@@ -725,7 +730,12 @@ def main() -> None:
             st.markdown("**Word samples**")
             st.dataframe(
                 [
-                    {"IPA": word, "Sound-like": ipa_text_to_sound_like(word)}
+                    {
+                        "IPA": word,
+                        "Sound-like": ipa_text_to_sound_like(
+                            word, use_segment_separators=show_segment_separators
+                        ),
+                    }
                     for word in sample_words
                 ],
                 hide_index=True,
@@ -738,7 +748,12 @@ def main() -> None:
             st.markdown("**Sentence samples**")
             st.dataframe(
                 [
-                    {"IPA": sentence, "Sound-like": ipa_text_to_sound_like(sentence)}
+                    {
+                        "IPA": sentence,
+                        "Sound-like": ipa_text_to_sound_like(
+                            sentence, use_segment_separators=show_segment_separators
+                        ),
+                    }
                     for sentence in sample_sentences
                 ],
                 hide_index=True,

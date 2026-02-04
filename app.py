@@ -15,84 +15,181 @@ import streamlit as st
 
 import sound_inventory_generator as generator
 
-IPA_SOUND_ALIKES: Dict[str, Dict[str, str]] = {
-    "a": {"sound_like": "ah", "example": "father"},
-    "ɑ": {"sound_like": "ah", "example": "father"},
-    "ɐ": {"sound_like": "uh", "example": "about (stressed)"},
-    "æ": {"sound_like": "a", "example": "cat"},
-    "e": {"sound_like": "eh", "example": "French ete"},
-    "eɪ": {"sound_like": "ay", "example": "say"},
-    "ɛ": {"sound_like": "eh", "example": "bet"},
-    "ə": {"sound_like": "uh", "example": "sofa"},
-    "ɜ": {"sound_like": "er", "example": "bird"},
-    "ɪ": {"sound_like": "ih", "example": "bit"},
-    "i": {"sound_like": "ee", "example": "machine"},
-    "o": {"sound_like": "oh", "example": "Italian sole"},
-    "oʊ": {"sound_like": "oh", "example": "go"},
-    "ɔ": {"sound_like": "aw", "example": "thought"},
-    "ɒ": {"sound_like": "o", "example": "British lot"},
-    "ʊ": {"sound_like": "oo", "example": "book"},
-    "u": {"sound_like": "oo", "example": "flute"},
-    "ʌ": {"sound_like": "uh", "example": "strut"},
-    "y": {"sound_like": "ee", "example": "French tu"},
-    "ø": {"sound_like": "ay", "example": "French deux"},
-    "œ": {"sound_like": "eh", "example": "French soeur"},
-    "ɨ": {"sound_like": "ee", "example": "Russian y"},
-    "ʉ": {"sound_like": "oo", "example": "Swedish du"},
-    "ɯ": {"sound_like": "eu", "example": "Korean eu"},
-    "p": {"sound_like": "p", "example": "spin"},
-    "pʰ": {"sound_like": "ph", "example": "pin"},
-    "b": {"sound_like": "b", "example": "bat"},
-    "t": {"sound_like": "t", "example": "stop"},
-    "tʰ": {"sound_like": "tt", "example": "top"},
-    "d": {"sound_like": "d", "example": "dog"},
-    "ʈ": {"sound_like": "th", "example": "Indian-type t"},
-    "ɖ": {"sound_like": "dh", "example": "Indian-type d"},
-    "k": {"sound_like": "k", "example": "skill"},
-    "kʰ": {"sound_like": "kh", "example": "kill"},
-    "g": {"sound_like": "g", "example": "go"},
-    "q": {"sound_like": "kk", "example": "uvular k"},
-    "ɢ": {"sound_like": "gg", "example": "uvular g"},
-    "ʔ": {"sound_like": "h", "example": "uh-oh (middle)"},
-    "c": {"sound_like": "ky", "example": "palatal k"},
-    "ɟ": {"sound_like": "gy", "example": "palatal g"},
-    "m": {"sound_like": "m", "example": "man"},
-    "n": {"sound_like": "n", "example": "no"},
-    "ŋ": {"sound_like": "ng", "example": "sing"},
-    "ɲ": {"sound_like": "ny", "example": "canyon"},
-    "ɳ": {"sound_like": "nn", "example": "Indian-type n"},
-    "f": {"sound_like": "f", "example": "fan"},
-    "v": {"sound_like": "v", "example": "van"},
-    "ɸ": {"sound_like": "sf", "example": "Japanese fu"},
-    "β": {"sound_like": "ph", "example": "Spanish b between vowels"},
-    "θ": {"sound_like": "th", "example": "thin"},
-    "ð": {"sound_like": "th", "example": "this"},
-    "s": {"sound_like": "s", "example": "see"},
-    "z": {"sound_like": "z", "example": "zoo"},
-    "ʃ": {"sound_like": "sh", "example": "ship"},
-    "ʒ": {"sound_like": "zh", "example": "measure"},
-    "ʂ": {"sound_like": "sh", "example": "Russian sh"},
-    "ʐ": {"sound_like": "zh", "example": "Russian zh"},
-    "x": {"sound_like": "kh", "example": "Bach"},
-    "χ": {"sound_like": "kkh", "example": "uvular fricative"},
-    "ɣ": {"sound_like": "gh", "example": "Spanish g between vowels"},
-    "h": {"sound_like": "h", "example": "hat"},
-    "ʁ": {"sound_like": "r", "example": "Paris r"},
-    "r": {"sound_like": "rr", "example": "Spanish perro"},
-    "ɾ": {"sound_like": "d", "example": "American t in water"},
-    "ɽ": {"sound_like": "rh", "example": "Indian-type r"},
-    "ɻ": {"sound_like": "r", "example": "American r-ish"},
-    "l": {"sound_like": "l", "example": "leaf"},
-    "ɭ": {"sound_like": "l", "example": "Indian-type l"},
-    "ʋ": {"sound_like": "v", "example": "Hindi v/w"},
-    "w": {"sound_like": "w", "example": "we"},
-    "j": {"sound_like": "y", "example": "yes"},
-    "tʃ": {"sound_like": "ch", "example": "church"},
-    "dʒ": {"sound_like": "j", "example": "judge"},
-    "tɕ": {"sound_like": "dj", "example": "Korean j-ish"},
-    "tɕʰ": {"sound_like": "ch", "example": "Korean ch-ish"},
-    "ʙ": {"sound_like": "r", "example": "trilled lips"},
+IPA_TO_ROMAN_DIACRITICS: Dict[str, str] = {
+    # Vowels
+    "a": "a",
+    "ɑ": "ā",
+    "ɐ": "ă",
+    "æ": "ae",
+    "e": "e",
+    "eɪ": "ei",
+    "ɛ": "e",
+    "ə": "ə",
+    "ɜ": "er",
+    "ɪ": "ĭ",
+    "i": "i",
+    "o": "o",
+    "oʊ": "ou",
+    "ɔ": "ô",
+    "ɒ": "ŏ",
+    "ʊ": "ŭ",
+    "u": "u",
+    "ʌ": "ŭ",
+    "y": "ü",
+    "ø": "ö",
+    "œ": "œ",
+    "ɨ": "ɨ",
+    "ʉ": "ǖ",
+    "ɯ": "eu",
+    # Stops / affricates
+    "p": "p",
+    "pʰ": "ph",
+    "b": "b",
+    "t": "t",
+    "tʰ": "th",
+    "d": "d",
+    "ʈ": "ṭ",
+    "ɖ": "ḍ",
+    "k": "k",
+    "kʰ": "kh",
+    "g": "g",
+    "q": "q",
+    "ɢ": "ġ",
+    "ʔ": "’",
+    "c": "ky",
+    "ɟ": "gy",
+    "tʃ": "ch",
+    "dʒ": "j",
+    "tɕ": "j",
+    "tɕʰ": "ch",
+    # Nasals
+    "m": "m",
+    "n": "n",
+    "ŋ": "ng",
+    "ɲ": "ñ",
+    "ɳ": "ṇ",
+    # Fricatives
+    "f": "f",
+    "v": "v",
+    "ɸ": "ph",
+    "β": "bh",
+    "θ": "th",
+    "ð": "dh",
+    "s": "s",
+    "z": "z",
+    "ʃ": "sh",
+    "ʒ": "zh",
+    "ʂ": "ṣ",
+    "ʐ": "ẓ",
+    "x": "kh",
+    "χ": "qh",
+    "ɣ": "gh",
+    "h": "h",
+    "ʁ": "ṛ",
+    # Rhotics / laterals / approximants
+    "r": "rr",
+    "ɾ": "r",
+    "ɽ": "ṛ",
+    "ɻ": "r",
+    "l": "l",
+    "ɭ": "ḷ",
+    "ʋ": "w",
+    "w": "w",
+    "j": "y",
+    # Other
+    "ʙ": "br",
 }
+
+IPA_TO_ROMAN_ASCII: Dict[str, str] = {
+    # Vowels
+    "a": "a",
+    "ɑ": "aa",
+    "ɐ": "a",
+    "æ": "ae",
+    "e": "e",
+    "eɪ": "ei",
+    "ɛ": "e",
+    "ə": "e",
+    "ɜ": "er",
+    "ɪ": "i",
+    "i": "i",
+    "o": "o",
+    "oʊ": "ou",
+    "ɔ": "o",
+    "ɒ": "o",
+    "ʊ": "u",
+    "u": "u",
+    "ʌ": "u",
+    "y": "u",
+    "ø": "oe",
+    "œ": "oe",
+    "ɨ": "y",
+    "ʉ": "u",
+    "ɯ": "eu",
+    # Stops / affricates
+    "p": "p",
+    "pʰ": "ph",
+    "b": "b",
+    "t": "t",
+    "tʰ": "th",
+    "d": "d",
+    "ʈ": "t",
+    "ɖ": "d",
+    "k": "k",
+    "kʰ": "kh",
+    "g": "g",
+    "q": "q",
+    "ɢ": "g",
+    "ʔ": "'",
+    "c": "ky",
+    "ɟ": "gy",
+    "tʃ": "ch",
+    "dʒ": "j",
+    "tɕ": "j",
+    "tɕʰ": "ch",
+    # Nasals
+    "m": "m",
+    "n": "n",
+    "ŋ": "ng",
+    "ɲ": "ny",
+    "ɳ": "n",
+    # Fricatives
+    "f": "f",
+    "v": "v",
+    "ɸ": "ph",
+    "β": "bh",
+    "θ": "th",
+    "ð": "dh",
+    "s": "s",
+    "z": "z",
+    "ʃ": "sh",
+    "ʒ": "zh",
+    "ʂ": "sh",
+    "ʐ": "zh",
+    "x": "kh",
+    "χ": "qh",
+    "ɣ": "gh",
+    "h": "h",
+    "ʁ": "r",
+    # Rhotics / laterals / approximants
+    "r": "rr",
+    "ɾ": "r",
+    "ɽ": "r",
+    "ɻ": "r",
+    "l": "l",
+    "ɭ": "l",
+    "ʋ": "w",
+    "w": "w",
+    "j": "y",
+    # Other
+    "ʙ": "br",
+}
+
+ROMANIZATION_PROFILES: Dict[str, Dict[str, str]] = {
+    "Diacritics (recommended)": IPA_TO_ROMAN_DIACRITICS,
+    "ASCII": IPA_TO_ROMAN_ASCII,
+}
+DEFAULT_ROMANIZATION_PROFILE = "Diacritics (recommended)"
 
 STYLE_PRESETS: Dict[str, Dict[str, object]] = {
     "Balanced": {
@@ -125,24 +222,32 @@ STYLE_PRESETS: Dict[str, Dict[str, object]] = {
     },
 }
 
-SEGMENT_KEYS = sorted(IPA_SOUND_ALIKES.keys(), key=len, reverse=True)
+def romanization_map(profile_name: str) -> Dict[str, str]:
+    """Return the chosen IPA->romanization map with safe fallback."""
+    return ROMANIZATION_PROFILES.get(profile_name, ROMANIZATION_PROFILES[DEFAULT_ROMANIZATION_PROFILE])
 
 
-def hint_for_segment(segment: str) -> Dict[str, str]:
-    """Return a user-friendly pronunciation hint for an IPA segment."""
-    hint = IPA_SOUND_ALIKES.get(segment)
-    if hint:
-        return hint
-    return {"sound_like": "(no hint yet)", "example": "keep IPA as source of truth"}
+def segment_keys(profile_name: str) -> List[str]:
+    """Return sorted IPA keys (longest first) for robust tokenization."""
+    return sorted(romanization_map(profile_name).keys(), key=len, reverse=True)
 
 
-def tokenize_ipa_text(text: str) -> List[Tuple[str, str]]:
+def hint_for_segment(segment: str, profile_name: str = DEFAULT_ROMANIZATION_PROFILE) -> Dict[str, str]:
+    """Return romanization metadata for an IPA segment."""
+    mapped = romanization_map(profile_name).get(segment)
+    if mapped:
+        return {"sound_like": mapped, "example": ""}
+    return {"sound_like": "(no romanization yet)", "example": ""}
+
+
+def tokenize_ipa_text(text: str, profile_name: str = DEFAULT_ROMANIZATION_PROFILE) -> List[Tuple[str, str]]:
     """Split a text into known IPA segments and literal characters."""
+    profile_segment_keys = segment_keys(profile_name)
     tokens: List[Tuple[str, str]] = []
     index = 0
     while index < len(text):
         match = None
-        for segment in SEGMENT_KEYS:
+        for segment in profile_segment_keys:
             if text.startswith(segment, index):
                 match = segment
                 break
@@ -155,14 +260,18 @@ def tokenize_ipa_text(text: str) -> List[Tuple[str, str]]:
     return tokens
 
 
-def ipa_text_to_sound_like(text: str, use_segment_separators: bool = False) -> str:
+def ipa_text_to_sound_like(
+    text: str,
+    use_segment_separators: bool = False,
+    profile_name: str = DEFAULT_ROMANIZATION_PROFILE,
+) -> str:
     """Render a rough sound-like guide from IPA text."""
     parts: List[str] = []
     previous_was_segment = False
 
-    for token_type, value in tokenize_ipa_text(text):
+    for token_type, value in tokenize_ipa_text(text, profile_name=profile_name):
         if token_type == "segment":
-            mapped = hint_for_segment(value)["sound_like"]
+            mapped = hint_for_segment(value, profile_name=profile_name)["sound_like"]
             if previous_was_segment and use_segment_separators:
                 parts.append("-")
             parts.append(mapped)
@@ -178,22 +287,29 @@ def ipa_text_to_sound_like(text: str, use_segment_separators: bool = False) -> s
     return "".join(parts)
 
 
-def build_segment_rows(segments: List[str]) -> List[Dict[str, str]]:
+def build_segment_rows(
+    segments: List[str],
+    profile_name: str = DEFAULT_ROMANIZATION_PROFILE,
+) -> List[Dict[str, str]]:
     """Build table rows with IPA plus sound-like references."""
     rows: List[Dict[str, str]] = []
     for segment in segments:
-        hint = hint_for_segment(segment)
+        hint = hint_for_segment(segment, profile_name=profile_name)
         rows.append({"IPA": segment, "Sound-like": hint["sound_like"], "Example": hint["example"]})
     return rows
 
 
-def build_pronunciation_csv(vowels: List[str], consonants: List[str]) -> str:
+def build_pronunciation_csv(
+    vowels: List[str],
+    consonants: List[str],
+    profile_name: str = DEFAULT_ROMANIZATION_PROFILE,
+) -> str:
     """Build a downloadable CSV pronunciation guide for the latest result."""
     output = io.StringIO()
     output.write("Type,IPA,Sound-alike,Example\n")
     for segment_type, segments in [("vowel", vowels), ("consonant", consonants)]:
         for segment in segments:
-            hint = hint_for_segment(segment)
+            hint = hint_for_segment(segment, profile_name=profile_name)
             output.write(f"{segment_type},{segment},{hint['sound_like']},{hint['example']}\n")
     return output.getvalue()
 
@@ -376,6 +492,7 @@ def render_mix_reference_panel(
     weights: List[float],
     random_weight: float,
     master_preset: str,
+    profile_name: str,
 ) -> None:
     """Render a dynamic guide to help users understand active mix sources."""
     st.caption("Weights are relative proportions: 0.2 + 0.4 behaves the same as 1 + 2.")
@@ -424,9 +541,9 @@ def render_mix_reference_panel(
             preset_data = loaded_presets[preset_name]
             col_left, col_right = st.columns(2)
             with col_left:
-                display_segment_table("Vowels", preset_data.get("vowels", []))
+                display_segment_table("Vowels", preset_data.get("vowels", []), profile_name=profile_name)
             with col_right:
-                display_segment_table("Consonants", preset_data.get("consonants", []))
+                display_segment_table("Consonants", preset_data.get("consonants", []), profile_name=profile_name)
 
     if random_weight > 0:
         random_key = f"random::{master_preset}"
@@ -435,9 +552,9 @@ def render_mix_reference_panel(
             master_data = loaded_presets[random_key]
             col_left, col_right = st.columns(2)
             with col_left:
-                display_segment_table("Vowels", master_data.get("vowels", []))
+                display_segment_table("Vowels", master_data.get("vowels", []), profile_name=profile_name)
             with col_right:
-                display_segment_table("Consonants", master_data.get("consonants", []))
+                display_segment_table("Consonants", master_data.get("consonants", []), profile_name=profile_name)
 
 
 def list_json_names(directory: str) -> List[str]:
@@ -480,10 +597,14 @@ def inventory_as_preset_payload(inventory: Dict[str, List[str]], language_name: 
     }
 
 
-def display_segment_table(title: str, segments: List[str]) -> None:
+def display_segment_table(
+    title: str,
+    segments: List[str],
+    profile_name: str = DEFAULT_ROMANIZATION_PROFILE,
+) -> None:
     """Render a segment list in a compact table."""
     st.markdown(f"**{title} ({len(segments)})**")
-    rows = build_segment_rows(segments)
+    rows = build_segment_rows(segments, profile_name=profile_name)
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
@@ -732,6 +853,12 @@ def main() -> None:
         st.markdown("**Output settings**")
         language_name = st.text_input("Generated language name", value="GeneratedLanguage")
         output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
+        romanization_profile = st.selectbox(
+            "Romanization profile",
+            options=list(ROMANIZATION_PROFILES.keys()),
+            index=0,
+            help="Affects Sound-like rendering in tables, samples, and pronunciation CSV.",
+        )
         use_seed = st.checkbox("Use fixed random seed", value=False)
         seed_value = st.number_input(
             "Seed value",
@@ -761,6 +888,7 @@ def main() -> None:
             weights=weights,
             random_weight=random_weight,
             master_preset=master_preset,
+            profile_name=romanization_profile,
         )
 
     if generate:
@@ -820,12 +948,24 @@ def main() -> None:
         )
 
         with result_tab_inventory:
-            st.caption("Sound-like notes are approximation helpers; IPA remains the canonical data.")
+            st.caption(
+                f"Sound-like notes are approximation helpers; IPA remains canonical. "
+                f"Profile: {romanization_profile}."
+            )
+            st.caption("Example column is intentionally blank for now (ready for your later notes).")
             col_a, col_b = st.columns(2)
             with col_a:
-                display_segment_table("Vowels", latest_inventory.get("vowels", []))
+                display_segment_table(
+                    "Vowels",
+                    latest_inventory.get("vowels", []),
+                    profile_name=romanization_profile,
+                )
             with col_b:
-                display_segment_table("Consonants", latest_inventory.get("consonants", []))
+                display_segment_table(
+                    "Consonants",
+                    latest_inventory.get("consonants", []),
+                    profile_name=romanization_profile,
+                )
 
         with result_tab_samples:
             st.caption("Generate placeholder words and sentences from this inventory. Not saved unless exported.")
@@ -928,7 +1068,9 @@ def main() -> None:
                         {
                             "IPA": word,
                             "Sound-like": ipa_text_to_sound_like(
-                                word, use_segment_separators=show_segment_separators
+                                word,
+                                use_segment_separators=show_segment_separators,
+                                profile_name=romanization_profile,
                             ),
                         }
                         for word in sample_words
@@ -946,7 +1088,9 @@ def main() -> None:
                         {
                             "IPA": sentence,
                             "Sound-like": ipa_text_to_sound_like(
-                                sentence, use_segment_separators=show_segment_separators
+                                sentence,
+                                use_segment_separators=show_segment_separators,
+                                profile_name=romanization_profile,
                             ),
                         }
                         for sentence in sample_sentences
@@ -972,6 +1116,7 @@ def main() -> None:
             guide_csv = build_pronunciation_csv(
                 latest_inventory.get("vowels", []),
                 latest_inventory.get("consonants", []),
+                profile_name=romanization_profile,
             )
             with download_col_2:
                 st.download_button(

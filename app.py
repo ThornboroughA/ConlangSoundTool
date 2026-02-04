@@ -7,6 +7,7 @@ import io
 import json
 import random
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -486,10 +487,191 @@ def display_segment_table(title: str, segments: List[str]) -> None:
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
+def inject_custom_css() -> None:
+    """Apply visual polish while keeping Streamlit-native layout behavior."""
+    st.markdown(
+        """
+        <style>
+        :root {
+            --bg-start: #f2f7f4;
+            --bg-end: #e6f0ea;
+            --panel: rgba(255, 255, 255, 0.84);
+            --ink-strong: #1a2b23;
+            --ink-muted: #4a6257;
+            --line: #d2e0d7;
+            --accent: #1f7a5a;
+            --accent-soft: #2f9f76;
+            --accent-warm: #a06c2f;
+        }
+
+        .stApp {
+            background:
+                radial-gradient(1200px 500px at 12% -18%, #dceadf 0%, transparent 60%),
+                radial-gradient(900px 400px at 110% 0%, #e6ece2 0%, transparent 65%),
+                linear-gradient(180deg, var(--bg-start), var(--bg-end));
+        }
+
+        .main .block-container {
+            max-width: 1160px;
+            padding-top: 1.1rem;
+            padding-bottom: 2rem;
+        }
+
+        html, body, [class*="st-"], [data-testid="stAppViewContainer"] {
+            color: var(--ink-strong);
+            font-family: "Segoe UI Variable", "Trebuchet MS", "Verdana", sans-serif;
+        }
+
+        h1, h2, h3, [data-testid="stMarkdownContainer"] h1,
+        [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3 {
+            font-family: "Palatino Linotype", "Book Antiqua", "Georgia", serif;
+            letter-spacing: 0.01em;
+        }
+
+        .hero-shell {
+            border: 1px solid var(--line);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(242, 249, 245, 0.86));
+            border-radius: 16px;
+            padding: 1.1rem 1.2rem 1.15rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 10px 24px rgba(40, 70, 55, 0.06);
+        }
+
+        .hero-eyebrow {
+            display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            font-size: 0.74rem;
+            color: var(--accent);
+            background: rgba(31, 122, 90, 0.12);
+            border: 1px solid rgba(31, 122, 90, 0.28);
+            border-radius: 999px;
+            padding: 0.2rem 0.55rem;
+            margin-bottom: 0.45rem;
+            font-weight: 600;
+        }
+
+        .hero-title {
+            font-size: clamp(1.55rem, 2.8vw, 2.15rem);
+            line-height: 1.15;
+            margin: 0;
+        }
+
+        .hero-copy {
+            margin: 0.45rem 0 0;
+            color: var(--ink-muted);
+            max-width: 70ch;
+            line-height: 1.45;
+        }
+
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, rgba(246, 251, 248, 0.98), rgba(236, 245, 239, 0.98));
+            border-right: 1px solid var(--line);
+        }
+
+        [data-testid="stMetric"] {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 0.55rem 0.7rem;
+        }
+
+        [data-testid="stExpander"] {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.75);
+        }
+
+        [data-testid="stDataFrame"] {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .stButton > button, .stDownloadButton > button {
+            border-radius: 10px;
+            border: 1px solid rgba(31, 122, 90, 0.45);
+            background: linear-gradient(180deg, #ffffff, #eef7f1);
+        }
+
+        .stButton > button[kind="primary"] {
+            border: none;
+            background: linear-gradient(145deg, var(--accent), var(--accent-soft));
+            color: white;
+            box-shadow: 0 8px 18px rgba(31, 122, 90, 0.24);
+        }
+
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.35rem;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 9px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.74);
+        }
+
+        .stTabs [aria-selected="true"] {
+            border-color: rgba(31, 122, 90, 0.42);
+            background: rgba(238, 248, 242, 0.96);
+        }
+
+        .section-kicker {
+            color: var(--accent-warm);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 0.73rem;
+            margin-bottom: 0.1rem;
+            font-weight: 600;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_hero() -> None:
+    """Render branded header copy."""
+    st.markdown(
+        """
+        <section class="hero-shell">
+            <div class="hero-eyebrow">Conlang Sound Toolkit</div>
+            <h1 class="hero-title">Build stable naming constraints without full conlang overhead.</h1>
+            <p class="hero-copy">
+                Blend real-language inventories, tune the flavor, and save reusable presets.
+                Keep your names coherent now, then evolve into deeper linguistics later.
+            </p>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_mix_metrics(selected_presets: List[str], selected_rules: List[str], random_weight: float, total_weight: float) -> None:
+    """Show at-a-glance settings metrics for current controls."""
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Sources", f"{len(selected_presets)}")
+    metric_cols[1].metric("Rules", f"{len(selected_rules)}")
+    metric_cols[2].metric("Random Share", f"{mix_share(random_weight, total_weight):.1f}%")
+    metric_cols[3].metric("Total Weight", f"{total_weight:.2f}")
+
+
+def render_inventory_metrics(inventory: Dict[str, List[str]], applied_rule_count: int) -> None:
+    """Show concise stats for the latest generated inventory."""
+    vowels_count = len(inventory.get("vowels", []))
+    consonants_count = len(inventory.get("consonants", []))
+    total_count = vowels_count + consonants_count
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Vowels", f"{vowels_count}")
+    metric_cols[1].metric("Consonants", f"{consonants_count}")
+    metric_cols[2].metric("Total Segments", f"{total_count}")
+    metric_cols[3].metric("Rules Applied", f"{applied_rule_count}")
+
+
 def main() -> None:
-    st.set_page_config(page_title="Sound Inventory Generator", layout="wide")
-    st.title("Sound Inventory Generator")
-    st.caption("Mix language presets, apply optional sound-change rules, and export reusable inventories.")
+    st.set_page_config(page_title="Sound Inventory Generator", page_icon="🔤", layout="wide")
+    inject_custom_css()
+    render_hero()
 
     preset_names = list_json_names(generator.PRESETS_DIR)
     rule_names = list_json_names(generator.RULES_DIR)
@@ -498,51 +680,82 @@ def main() -> None:
         st.error("No preset files found. Add JSON files to presets/ and reload.")
         st.stop()
 
-    st.subheader("Generator Controls")
-    selected_presets = st.multiselect(
-        "Presets to mix",
-        options=preset_names,
-        default=default_preset_selection(preset_names),
-        help="Pick one or more source inventories.",
-    )
+    st.markdown('<div class="section-kicker">Step 1</div>', unsafe_allow_html=True)
+    st.subheader("Configure and Generate")
 
+    controls_col, run_col = st.columns([1.8, 1.2], gap="large")
     weights: List[float] = []
-    if selected_presets:
-        st.markdown("**Preset weights**")
-        default_weight = round(1.0 / len(selected_presets), 2)
-        for preset_name in selected_presets:
-            weight = st.slider(
-                f"{preset_name} weight",
-                min_value=0.0,
-                max_value=1.0,
-                value=default_weight,
-                step=0.05,
-                key=f"weight_{preset_name}",
-            )
-            weights.append(weight)
+    with controls_col:
+        selected_presets = st.multiselect(
+            "Presets to mix",
+            options=preset_names,
+            default=default_preset_selection(preset_names),
+            help="Pick one or more source inventories.",
+        )
 
-    random_weight = st.slider(
-        "Random weight (master pool)",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.10,
-        step=0.05,
+        if selected_presets:
+            st.markdown("**Preset weights**")
+            default_weight = round(1.0 / len(selected_presets), 2)
+            for preset_name in selected_presets:
+                weight = st.slider(
+                    f"{preset_name} weight",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=default_weight,
+                    step=0.05,
+                    key=f"weight_{preset_name}",
+                )
+                weights.append(weight)
+
+        random_weight = st.slider(
+            "Random weight (master pool)",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.10,
+            step=0.05,
+        )
+
+        master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
+        master_preset = st.selectbox(
+            "Master preset for random picks",
+            options=preset_names,
+            index=master_default,
+        )
+
+        selected_rules = st.multiselect(
+            "Sound-change rules (optional)",
+            options=rule_names,
+            help="Rules are applied in order, from top to bottom.",
+        )
+
+    with run_col:
+        st.markdown("**Output settings**")
+        language_name = st.text_input("Generated language name", value="GeneratedLanguage")
+        output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
+        use_seed = st.checkbox("Use fixed random seed", value=False)
+        seed_value = st.number_input(
+            "Seed value",
+            min_value=0,
+            max_value=2_147_483_647,
+            value=42,
+            step=1,
+            disabled=not use_seed,
+        )
+        generate = st.button("Generate Inventory", type="primary", use_container_width=True)
+
+        st.caption(
+            "Tip: keep a fixed seed while exploring, then save successful inventories as presets."
+        )
+
+    total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
+    render_mix_metrics(
+        selected_presets=selected_presets,
+        selected_rules=selected_rules,
+        random_weight=random_weight,
+        total_weight=total_weight,
     )
 
-    master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
-    master_preset = st.selectbox(
-        "Master preset for random picks",
-        options=preset_names,
-        index=master_default,
-    )
-
-    selected_rules = st.multiselect(
-        "Sound-change rules (optional)",
-        options=rule_names,
-        help="Rules are applied in order, from top to bottom.",
-    )
-
-    with st.expander("Mixing guide: source sounds and weights", expanded=True):
+    with st.expander("Source inventory reference", expanded=False):
         render_mix_reference_panel(
             selected_presets=selected_presets,
             weights=weights,
@@ -550,25 +763,10 @@ def main() -> None:
             master_preset=master_preset,
         )
 
-    language_name = st.text_input("Generated language name", value="GeneratedLanguage")
-    output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
-
-    use_seed = st.checkbox("Use fixed random seed", value=False)
-    seed_value = st.number_input(
-        "Seed value",
-        min_value=0,
-        max_value=2_147_483_647,
-        value=42,
-        step=1,
-        disabled=not use_seed,
-    )
-
-    generate = st.button("Generate Inventory", type="primary")
-
     if generate:
         if not selected_presets:
             st.error("Pick at least one preset before generating.")
-        elif (sum(weights) + random_weight) <= 0:
+        elif total_weight <= 0:
             st.error("At least one preset/random weight must be greater than zero.")
         else:
             try:
@@ -592,6 +790,8 @@ def main() -> None:
                 st.session_state["last_inventory"] = mixed_inventory
                 st.session_state["last_language_name"] = language_name
                 st.session_state["last_output_dir"] = str(output_dir)
+                st.session_state["last_rule_sets"] = selected_rules[:]
+                st.session_state["last_generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.session_state.pop("sample_words", None)
                 st.session_state.pop("sample_sentences", None)
 
@@ -601,186 +801,206 @@ def main() -> None:
 
     latest_inventory = st.session_state.get("last_inventory")
     latest_language_name = st.session_state.get("last_language_name", "GeneratedLanguage")
+    latest_rule_sets = st.session_state.get("last_rule_sets", [])
+    latest_generated_at = st.session_state.get("last_generated_at")
 
     if latest_inventory:
-        st.subheader("Latest Result")
-        col_a, col_b = st.columns(2)
-        with col_a:
-            display_segment_table("Vowels", latest_inventory.get("vowels", []))
-        with col_b:
-            display_segment_table("Consonants", latest_inventory.get("consonants", []))
+        st.divider()
+        st.markdown('<div class="section-kicker">Step 2</div>', unsafe_allow_html=True)
+        st.subheader("Review Latest Result")
+        render_inventory_metrics(latest_inventory, applied_rule_count=len(latest_rule_sets))
 
         output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
-        st.caption(f"Latest files were written to: {output_dir_label}")
-        st.caption("Sound-likes are approximation helpers; IPA stays the canonical data.")
+        generated_time_label = f" at {latest_generated_at}" if latest_generated_at else ""
+        st.caption(f"Latest files were written to: {output_dir_label}{generated_time_label}")
 
         preset_payload = inventory_as_preset_payload(latest_inventory, latest_language_name)
-        st.download_button(
-            label="Download preset JSON",
-            data=json.dumps(preset_payload, ensure_ascii=False, indent=2),
-            file_name=f"{sanitize_name(latest_language_name)}.json",
-            mime="application/json",
-        )
-        guide_csv = build_pronunciation_csv(
-            latest_inventory.get("vowels", []),
-            latest_inventory.get("consonants", []),
-        )
-        st.download_button(
-            label="Download pronunciation guide CSV",
-            data=guide_csv,
-            file_name=f"{sanitize_name(latest_language_name)}_pronunciation_guide.csv",
-            mime="text/csv",
+        result_tab_inventory, result_tab_samples, result_tab_export = st.tabs(
+            ["Inventory", "Sample Text", "Export and Reuse"]
         )
 
-        st.subheader("Sample Text Playground (Not Saved)")
-        st.caption("Step 2: generate placeholder words and sentences from this inventory. Regenerate as much as you want.")
+        with result_tab_inventory:
+            st.caption("Sound-like notes are approximation helpers; IPA remains the canonical data.")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                display_segment_table("Vowels", latest_inventory.get("vowels", []))
+            with col_b:
+                display_segment_table("Consonants", latest_inventory.get("consonants", []))
 
-        style_names = list(STYLE_PRESETS.keys())
-        selected_style = st.selectbox(
-            "Sample style preset",
-            options=style_names,
-            index=0,
-            key="sample_style_preset",
-            help="Tweak the rhythm profile of generated placeholder words/sentences.",
-        )
-        st.caption(f"Style guide: {STYLE_PRESETS[selected_style]['description']}")
+        with result_tab_samples:
+            st.caption("Generate placeholder words and sentences from this inventory. Not saved unless exported.")
 
-        sample_controls_left, sample_controls_right = st.columns(2)
-        with sample_controls_left:
-            sample_word_count = st.number_input(
-                "Word samples per run",
-                min_value=1,
-                max_value=50,
-                value=15,
-                step=1,
-                key="sample_word_count",
+            style_names = list(STYLE_PRESETS.keys())
+            selected_style = st.selectbox(
+                "Sample style preset",
+                options=style_names,
+                index=0,
+                key="sample_style_preset",
+                help="Tweak the rhythm profile of generated placeholder words/sentences.",
             )
-            sample_syllable_range = st.slider(
-                "Syllables per generated word",
-                min_value=1,
-                max_value=5,
-                value=(1, 3),
-                key="sample_syllable_range",
+            st.caption(f"Style guide: {STYLE_PRESETS[selected_style]['description']}")
+
+            sample_controls_left, sample_controls_right = st.columns(2)
+            with sample_controls_left:
+                sample_word_count = st.number_input(
+                    "Word samples per run",
+                    min_value=1,
+                    max_value=50,
+                    value=15,
+                    step=1,
+                    key="sample_word_count",
+                )
+                sample_syllable_range = st.slider(
+                    "Syllables per generated word",
+                    min_value=1,
+                    max_value=5,
+                    value=(1, 3),
+                    key="sample_syllable_range",
+                )
+            with sample_controls_right:
+                sample_sentence_count = st.number_input(
+                    "Sentence samples per run",
+                    min_value=1,
+                    max_value=30,
+                    value=6,
+                    step=1,
+                    key="sample_sentence_count",
+                )
+                sample_words_range = st.slider(
+                    "Words per generated sentence",
+                    min_value=2,
+                    max_value=14,
+                    value=(4, 8),
+                    key="sample_sentence_words_range",
+                )
+
+            show_syllable_breaks = st.checkbox(
+                "Show syllable separators (.)",
+                value=False,
+                key="sample_show_syllable_breaks",
             )
-        with sample_controls_right:
-            sample_sentence_count = st.number_input(
-                "Sentence samples per run",
-                min_value=1,
-                max_value=30,
-                value=6,
-                step=1,
-                key="sample_sentence_count",
+            show_segment_separators = st.checkbox(
+                "Show segment separators (-) in sound-like text",
+                value=False,
+                key="sample_show_segment_separators",
             )
-            sample_words_range = st.slider(
-                "Words per generated sentence",
-                min_value=2,
-                max_value=14,
-                value=(4, 8),
-                key="sample_sentence_words_range",
-            )
+            syllable_separator = "." if show_syllable_breaks else ""
 
-        show_syllable_breaks = st.checkbox(
-            "Show syllable separators (.)",
-            value=False,
-            key="sample_show_syllable_breaks",
-        )
-        show_segment_separators = st.checkbox(
-            "Show segment separators (-) in sound-like text",
-            value=False,
-            key="sample_show_segment_separators",
-        )
-        syllable_separator = "." if show_syllable_breaks else ""
+            samples_button_col_1, samples_button_col_2, samples_button_col_3 = st.columns(3)
+            with samples_button_col_1:
+                generate_word_samples = st.button("Generate Word Samples", key="generate_word_samples")
+            with samples_button_col_2:
+                generate_sentence_samples = st.button("Generate Sentence Samples", key="generate_sentence_samples")
+            with samples_button_col_3:
+                generate_both_samples = st.button("Generate Both", key="generate_both_samples")
 
-        samples_button_col_1, samples_button_col_2, samples_button_col_3 = st.columns(3)
-        with samples_button_col_1:
-            generate_word_samples = st.button("Generate Word Samples", key="generate_word_samples")
-        with samples_button_col_2:
-            generate_sentence_samples = st.button("Generate Sentence Samples", key="generate_sentence_samples")
-        with samples_button_col_3:
-            generate_both_samples = st.button("Generate Both", key="generate_both_samples")
+            latest_vowels = latest_inventory.get("vowels", [])
+            latest_consonants = latest_inventory.get("consonants", [])
 
-        latest_vowels = latest_inventory.get("vowels", [])
-        latest_consonants = latest_inventory.get("consonants", [])
+            if generate_word_samples or generate_both_samples:
+                st.session_state["sample_words"] = build_sample_words(
+                    latest_vowels,
+                    latest_consonants,
+                    sample_count=int(sample_word_count),
+                    syllable_range=sample_syllable_range,
+                    syllable_separator=syllable_separator,
+                    style_name=selected_style,
+                )
 
-        if generate_word_samples or generate_both_samples:
-            st.session_state["sample_words"] = build_sample_words(
-                latest_vowels,
-                latest_consonants,
-                sample_count=int(sample_word_count),
-                syllable_range=sample_syllable_range,
-                syllable_separator=syllable_separator,
-                style_name=selected_style,
-            )
+            if generate_sentence_samples or generate_both_samples:
+                st.session_state["sample_sentences"] = build_sample_sentences(
+                    latest_vowels,
+                    latest_consonants,
+                    sample_count=int(sample_sentence_count),
+                    syllable_range=sample_syllable_range,
+                    words_range=sample_words_range,
+                    syllable_separator=syllable_separator,
+                    style_name=selected_style,
+                )
 
-        if generate_sentence_samples or generate_both_samples:
-            st.session_state["sample_sentences"] = build_sample_sentences(
-                latest_vowels,
-                latest_consonants,
-                sample_count=int(sample_sentence_count),
-                syllable_range=sample_syllable_range,
-                words_range=sample_words_range,
-                syllable_separator=syllable_separator,
-                style_name=selected_style,
-            )
+            sample_words = st.session_state.get("sample_words", [])
+            sample_sentences = st.session_state.get("sample_sentences", [])
 
-        sample_words = st.session_state.get("sample_words", [])
-        sample_sentences = st.session_state.get("sample_sentences", [])
-
-        if sample_words:
-            st.markdown("**Word samples**")
-            st.dataframe(
-                [
-                    {
-                        "IPA": word,
-                        "Sound-like": ipa_text_to_sound_like(
-                            word, use_segment_separators=show_segment_separators
-                        ),
-                    }
-                    for word in sample_words
-                ],
-                hide_index=True,
-                use_container_width=True,
-            )
-        else:
-            st.info("No word samples yet. Click 'Generate Word Samples' or 'Generate Both'.")
-
-        if sample_sentences:
-            st.markdown("**Sentence samples**")
-            st.dataframe(
-                [
-                    {
-                        "IPA": sentence,
-                        "Sound-like": ipa_text_to_sound_like(
-                            sentence, use_segment_separators=show_segment_separators
-                        ),
-                    }
-                    for sentence in sample_sentences
-                ],
-                hide_index=True,
-                use_container_width=True,
-            )
-        else:
-            st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
-
-        st.subheader("Save Latest Result as Preset")
-        preset_filename = st.text_input(
-            "Preset filename (without .json)",
-            value=sanitize_name(latest_language_name),
-            key="preset_filename",
-        )
-        overwrite_existing = st.checkbox("Overwrite existing preset file", value=False)
-        save_preset = st.button("Save to presets/")
-
-        if save_preset:
-            safe_name = sanitize_name(preset_filename)
-            preset_path = Path(generator.PRESETS_DIR) / f"{safe_name}.json"
-
-            if preset_path.exists() and not overwrite_existing:
-                st.error(f"`{preset_path.name}` already exists. Enable overwrite to replace it.")
+            if sample_words:
+                st.markdown("**Word samples**")
+                st.dataframe(
+                    [
+                        {
+                            "IPA": word,
+                            "Sound-like": ipa_text_to_sound_like(
+                                word, use_segment_separators=show_segment_separators
+                            ),
+                        }
+                        for word in sample_words
+                    ],
+                    hide_index=True,
+                    use_container_width=True,
+                )
             else:
-                with preset_path.open("w", encoding="utf-8") as file:
-                    json.dump(preset_payload, file, ensure_ascii=False, indent=2)
-                st.success(f"Saved preset: {preset_path}")
+                st.info("No word samples yet. Click 'Generate Word Samples' or 'Generate Both'.")
+
+            if sample_sentences:
+                st.markdown("**Sentence samples**")
+                st.dataframe(
+                    [
+                        {
+                            "IPA": sentence,
+                            "Sound-like": ipa_text_to_sound_like(
+                                sentence, use_segment_separators=show_segment_separators
+                            ),
+                        }
+                        for sentence in sample_sentences
+                    ],
+                    hide_index=True,
+                    use_container_width=True,
+                )
+            else:
+                st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
+
+        with result_tab_export:
+            st.caption("Download ready-to-reuse files or save this result as a preset for future sessions.")
+
+            download_col_1, download_col_2 = st.columns(2)
+            with download_col_1:
+                st.download_button(
+                    label="Download preset JSON",
+                    data=json.dumps(preset_payload, ensure_ascii=False, indent=2),
+                    file_name=f"{sanitize_name(latest_language_name)}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+            guide_csv = build_pronunciation_csv(
+                latest_inventory.get("vowels", []),
+                latest_inventory.get("consonants", []),
+            )
+            with download_col_2:
+                st.download_button(
+                    label="Download pronunciation guide CSV",
+                    data=guide_csv,
+                    file_name=f"{sanitize_name(latest_language_name)}_pronunciation_guide.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+
+            st.markdown("**Save latest result as preset**")
+            preset_filename = st.text_input(
+                "Preset filename (without .json)",
+                value=sanitize_name(latest_language_name),
+                key="preset_filename",
+            )
+            overwrite_existing = st.checkbox("Overwrite existing preset file", value=False)
+            save_preset = st.button("Save to presets/", use_container_width=True)
+
+            if save_preset:
+                safe_name = sanitize_name(preset_filename)
+                preset_path = Path(generator.PRESETS_DIR) / f"{safe_name}.json"
+
+                if preset_path.exists() and not overwrite_existing:
+                    st.error(f"`{preset_path.name}` already exists. Enable overwrite to replace it.")
+                else:
+                    with preset_path.open("w", encoding="utf-8") as file:
+                        json.dump(preset_payload, file, ensure_ascii=False, indent=2)
+                    st.success(f"Saved preset: {preset_path}")
 
 
 if __name__ == "__main__":

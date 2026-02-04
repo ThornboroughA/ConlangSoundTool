@@ -638,9 +638,13 @@ def inject_custom_css() -> None:
             padding-bottom: 2rem;
         }
 
-        html, body, [class*="st-"], [data-testid="stAppViewContainer"] {
+        html, body, .stApp, [data-testid="stAppViewContainer"] {
             color: var(--ink-strong);
             font-family: "Segoe UI Variable", "Trebuchet MS", "Verdana", sans-serif;
+        }
+
+        .material-symbols-rounded {
+            font-family: "Material Symbols Rounded" !important;
         }
 
         h1, h2, h3, [data-testid="stMarkdownContainer"] h1,
@@ -943,11 +947,15 @@ def main() -> None:
         st.caption(f"Latest files were written to: {output_dir_label}{generated_time_label}")
 
         preset_payload = inventory_as_preset_payload(latest_inventory, latest_language_name)
-        result_tab_inventory, result_tab_samples, result_tab_export = st.tabs(
-            ["Inventory", "Sample Text", "Export and Reuse"]
+        selected_result_view = st.radio(
+            "Result view",
+            options=["Inventory", "Sample Text", "Export and Reuse"],
+            horizontal=True,
+            key="result_view_selector",
+            label_visibility="collapsed",
         )
 
-        with result_tab_inventory:
+        if selected_result_view == "Inventory":
             st.caption(
                 f"Sound-like notes are approximation helpers; IPA remains canonical. "
                 f"Profile: {romanization_profile}."
@@ -967,7 +975,7 @@ def main() -> None:
                     profile_name=romanization_profile,
                 )
 
-        with result_tab_samples:
+        elif selected_result_view == "Sample Text":
             st.caption("Generate placeholder words and sentences from this inventory. Not saved unless exported.")
 
             style_names = list(STYLE_PRESETS.keys())
@@ -1101,7 +1109,7 @@ def main() -> None:
             else:
                 st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
 
-        with result_tab_export:
+        else:
             st.caption("Download ready-to-reuse files or save this result as a preset for future sessions.")
 
             download_col_1, download_col_2 = st.columns(2)

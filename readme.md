@@ -43,8 +43,8 @@ streamlit run app.py
 - choose presets and weights,
 - set random weight and master preset,
 - apply rule sets,
-- view source-sound mixing guides and IPA sound-alike hints,
+- view source-sound mixing guides and sound-like hints anywhere IPA is shown,
 - generate and preview vowels/consonants,
-- generate throwaway sample words/sentences from the latest inventory,
+- generate throwaway sample words/sentences from the latest inventory (with style presets),
 - save outputs to an output folder,
 - save the latest result as a reusable preset in `presets/`.

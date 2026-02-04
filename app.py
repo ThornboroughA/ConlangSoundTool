@@ -93,6 +93,39 @@ IPA_SOUND_ALIKES: Dict[str, Dict[str, str]] = {
     "ʙ": {"sound_like": "bilabial trill", "example": "trilled lips"},
 }
 
+STYLE_PRESETS: Dict[str, Dict[str, object]] = {
+    "Balanced": {
+        "description": "Neutral blend of short and medium words.",
+        "syllable_shapes": [("V", 0.10), ("CV", 0.40), ("VC", 0.12), ("CVC", 0.23), ("CVV", 0.08), ("VCV", 0.07)],
+        "punctuation": [(".", 0.75), ("?", 0.15), ("!", 0.10)],
+        "particle_rate": 0.08,
+        "particle_syllables": (1, 1),
+    },
+    "Clipped": {
+        "description": "Short, punchy cadence with tighter consonant-heavy chunks.",
+        "syllable_shapes": [("CV", 0.35), ("CVC", 0.38), ("VC", 0.15), ("V", 0.05), ("CVV", 0.04), ("VCV", 0.03)],
+        "punctuation": [(".", 0.70), ("!", 0.20), ("?", 0.10)],
+        "particle_rate": 0.03,
+        "particle_syllables": (1, 1),
+    },
+    "Flowing": {
+        "description": "Smoother rhythm with more open syllables and vowel sequences.",
+        "syllable_shapes": [("V", 0.16), ("CV", 0.44), ("VC", 0.06), ("CVC", 0.10), ("CVV", 0.16), ("VCV", 0.08)],
+        "punctuation": [(".", 0.80), ("?", 0.12), ("!", 0.08)],
+        "particle_rate": 0.06,
+        "particle_syllables": (1, 2),
+    },
+    "Particle-rich": {
+        "description": "Adds frequent short particles for a more grammaticalized surface feel.",
+        "syllable_shapes": [("V", 0.10), ("CV", 0.36), ("VC", 0.10), ("CVC", 0.20), ("CVV", 0.12), ("VCV", 0.12)],
+        "punctuation": [(".", 0.72), ("?", 0.18), ("!", 0.10)],
+        "particle_rate": 0.45,
+        "particle_syllables": (1, 1),
+    },
+}
+
+SEGMENT_KEYS = sorted(IPA_SOUND_ALIKES.keys(), key=len, reverse=True)
+
 
 def hint_for_segment(segment: str) -> Dict[str, str]:
     """Return a user-friendly pronunciation hint for an IPA segment."""
@@ -102,21 +135,54 @@ def hint_for_segment(segment: str) -> Dict[str, str]:
     return {"sound_like": "(no hint yet)", "example": "keep IPA as source of truth"}
 
 
-def build_segment_rows(segments: List[str], include_hints: bool) -> List[Dict[str, str]]:
-    """Build table rows for segment display."""
+def tokenize_ipa_text(text: str) -> List[Tuple[str, str]]:
+    """Split a text into known IPA segments and literal characters."""
+    tokens: List[Tuple[str, str]] = []
+    index = 0
+    while index < len(text):
+        match = None
+        for segment in SEGMENT_KEYS:
+            if text.startswith(segment, index):
+                match = segment
+                break
+        if match:
+            tokens.append(("segment", match))
+            index += len(match)
+        else:
+            tokens.append(("literal", text[index]))
+            index += 1
+    return tokens
+
+
+def ipa_text_to_sound_like(text: str) -> str:
+    """Render a rough sound-like guide from IPA text."""
+    parts: List[str] = []
+    previous_was_segment = False
+
+    for token_type, value in tokenize_ipa_text(text):
+        if token_type == "segment":
+            mapped = hint_for_segment(value)["sound_like"]
+            if previous_was_segment:
+                parts.append("-")
+            parts.append(mapped)
+            previous_was_segment = True
+            continue
+
+        parts.append(value)
+        if value in {" ", "\t", "\n", ".", ",", ";", ":", "?", "!", "-", "(" , ")"}:
+            previous_was_segment = False
+        else:
+            previous_was_segment = False
+
+    return "".join(parts)
+
+
+def build_segment_rows(segments: List[str]) -> List[Dict[str, str]]:
+    """Build table rows with IPA plus sound-like references."""
     rows: List[Dict[str, str]] = []
     for segment in segments:
-        if include_hints:
-            hint = hint_for_segment(segment)
-            rows.append(
-                {
-                    "IPA": segment,
-                    "Sound-alike": hint["sound_like"],
-                    "Example": hint["example"],
-                }
-            )
-        else:
-            rows.append({"IPA": segment})
+        hint = hint_for_segment(segment)
+        rows.append({"IPA": segment, "Sound-like": hint["sound_like"], "Example": hint["example"]})
     return rows
 
 
@@ -131,6 +197,21 @@ def build_pronunciation_csv(vowels: List[str], consonants: List[str]) -> str:
     return output.getvalue()
 
 
+def weighted_choice(weighted_items: List[Tuple[str, float]], fallback: str) -> str:
+    """Choose one label from weighted items, with fallback if invalid."""
+    valid = [(label, weight) for label, weight in weighted_items if weight > 0]
+    if not valid:
+        return fallback
+    labels = [label for label, _ in valid]
+    weights = [weight for _, weight in valid]
+    return random.choices(labels, weights=weights, k=1)[0]
+
+
+def style_profile(style_name: str) -> Dict[str, object]:
+    """Return style config with balanced fallback."""
+    return STYLE_PRESETS.get(style_name, STYLE_PRESETS["Balanced"])
+
+
 def choose_segment(segments: List[str]) -> str:
     """Return a random segment, or empty string if unavailable."""
     if not segments:
@@ -138,21 +219,21 @@ def choose_segment(segments: List[str]) -> str:
     return random.choice(segments)
 
 
-def generate_syllable(vowels: List[str], consonants: List[str]) -> str:
+def generate_syllable(vowels: List[str], consonants: List[str], style_name: str) -> str:
     """Generate a syllable-like chunk from the current inventory."""
     if not vowels and not consonants:
         return ""
 
     if not consonants:
-        shape = random.choices(["V", "VV"], weights=[0.75, 0.25], k=1)[0]
+        shape_weights = [("V", 0.75), ("VV", 0.25)]
+        shape = weighted_choice(shape_weights, fallback="V")
     elif not vowels:
-        shape = random.choices(["C", "CC"], weights=[0.85, 0.15], k=1)[0]
+        shape_weights = [("C", 0.85), ("CC", 0.15)]
+        shape = weighted_choice(shape_weights, fallback="C")
     else:
-        shape = random.choices(
-            ["V", "CV", "VC", "CVC", "CVV", "VCV"],
-            weights=[0.10, 0.40, 0.12, 0.23, 0.08, 0.07],
-            k=1,
-        )[0]
+        profile = style_profile(style_name)
+        shape_weights = profile.get("syllable_shapes", STYLE_PRESETS["Balanced"]["syllable_shapes"])
+        shape = weighted_choice(shape_weights, fallback="CV")
 
     parts: List[str] = []
     for slot in shape:
@@ -167,6 +248,7 @@ def generate_word(
     consonants: List[str],
     syllable_range: Tuple[int, int],
     syllable_separator: str,
+    style_name: str,
 ) -> str:
     """Generate a placeholder word made from inventory segments."""
     min_syllables, max_syllables = syllable_range
@@ -174,7 +256,7 @@ def generate_word(
     max_syllables = max(min_syllables, int(max_syllables))
 
     syllable_count = random.randint(min_syllables, max_syllables)
-    syllables = [generate_syllable(vowels, consonants) for _ in range(syllable_count)]
+    syllables = [generate_syllable(vowels, consonants, style_name=style_name) for _ in range(syllable_count)]
     syllables = [syllable for syllable in syllables if syllable]
 
     if not syllables:
@@ -188,6 +270,7 @@ def generate_sentence(
     syllable_range: Tuple[int, int],
     words_range: Tuple[int, int],
     syllable_separator: str,
+    style_name: str,
 ) -> str:
     """Generate a placeholder sentence from inventory-derived words."""
     min_words, max_words = words_range
@@ -196,10 +279,32 @@ def generate_sentence(
 
     word_count = random.randint(min_words, max_words)
     words = [
-        generate_word(vowels, consonants, syllable_range, syllable_separator)
+        generate_word(
+            vowels,
+            consonants,
+            syllable_range=syllable_range,
+            syllable_separator=syllable_separator,
+            style_name=style_name,
+        )
         for _ in range(word_count)
     ]
-    punctuation = random.choices([".", "?", "!"], weights=[0.75, 0.15, 0.10], k=1)[0]
+
+    profile = style_profile(style_name)
+    particle_rate = float(profile.get("particle_rate", 0.0))
+    particle_syllables = profile.get("particle_syllables", (1, 1))
+    if random.random() < particle_rate:
+        words.append(
+            generate_word(
+                vowels,
+                consonants,
+                syllable_range=particle_syllables,
+                syllable_separator=syllable_separator,
+                style_name=style_name,
+            )
+        )
+
+    punctuation_weights = profile.get("punctuation", STYLE_PRESETS["Balanced"]["punctuation"])
+    punctuation = weighted_choice(punctuation_weights, fallback=".")
     return f"{' '.join(words)}{punctuation}"
 
 
@@ -209,11 +314,18 @@ def build_sample_words(
     sample_count: int,
     syllable_range: Tuple[int, int],
     syllable_separator: str,
+    style_name: str,
 ) -> List[str]:
     """Return a list of generated placeholder words."""
     count = max(1, int(sample_count))
     return [
-        generate_word(vowels, consonants, syllable_range, syllable_separator)
+        generate_word(
+            vowels,
+            consonants,
+            syllable_range=syllable_range,
+            syllable_separator=syllable_separator,
+            style_name=style_name,
+        )
         for _ in range(count)
     ]
 
@@ -225,6 +337,7 @@ def build_sample_sentences(
     syllable_range: Tuple[int, int],
     words_range: Tuple[int, int],
     syllable_separator: str,
+    style_name: str,
 ) -> List[str]:
     """Return a list of generated placeholder sentences."""
     count = max(1, int(sample_count))
@@ -235,6 +348,7 @@ def build_sample_sentences(
             syllable_range=syllable_range,
             words_range=words_range,
             syllable_separator=syllable_separator,
+            style_name=style_name,
         )
         for _ in range(count)
     ]
@@ -261,7 +375,6 @@ def render_mix_reference_panel(
     weights: List[float],
     random_weight: float,
     master_preset: str,
-    include_hints: bool,
 ) -> None:
     """Render a dynamic guide to help users understand active mix sources."""
     st.caption("Weights are relative proportions: 0.2 + 0.4 behaves the same as 1 + 2.")
@@ -310,9 +423,9 @@ def render_mix_reference_panel(
             preset_data = loaded_presets[preset_name]
             col_left, col_right = st.columns(2)
             with col_left:
-                display_segment_table("Vowels", preset_data.get("vowels", []), include_hints=include_hints)
+                display_segment_table("Vowels", preset_data.get("vowels", []))
             with col_right:
-                display_segment_table("Consonants", preset_data.get("consonants", []), include_hints=include_hints)
+                display_segment_table("Consonants", preset_data.get("consonants", []))
 
     if random_weight > 0:
         random_key = f"random::{master_preset}"
@@ -321,9 +434,9 @@ def render_mix_reference_panel(
             master_data = loaded_presets[random_key]
             col_left, col_right = st.columns(2)
             with col_left:
-                display_segment_table("Vowels", master_data.get("vowels", []), include_hints=include_hints)
+                display_segment_table("Vowels", master_data.get("vowels", []))
             with col_right:
-                display_segment_table("Consonants", master_data.get("consonants", []), include_hints=include_hints)
+                display_segment_table("Consonants", master_data.get("consonants", []))
 
 
 def list_json_names(directory: str) -> List[str]:
@@ -366,10 +479,10 @@ def inventory_as_preset_payload(inventory: Dict[str, List[str]], language_name: 
     }
 
 
-def display_segment_table(title: str, segments: List[str], include_hints: bool) -> None:
+def display_segment_table(title: str, segments: List[str]) -> None:
     """Render a segment list in a compact table."""
     st.markdown(f"**{title} ({len(segments)})**")
-    rows = build_segment_rows(segments, include_hints=include_hints)
+    rows = build_segment_rows(segments)
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
@@ -428,11 +541,6 @@ def main() -> None:
         options=rule_names,
         help="Rules are applied in order, from top to bottom.",
     )
-    show_sound_alikes = st.checkbox(
-        "Show sound-alike hints",
-        value=True,
-        help="Keeps IPA exact, but adds rough English-leaning pronunciation hints in result tables.",
-    )
 
     with st.expander("Mixing guide: source sounds and weights", expanded=True):
         render_mix_reference_panel(
@@ -440,7 +548,6 @@ def main() -> None:
             weights=weights,
             random_weight=random_weight,
             master_preset=master_preset,
-            include_hints=show_sound_alikes,
         )
 
     language_name = st.text_input("Generated language name", value="GeneratedLanguage")
@@ -499,17 +606,13 @@ def main() -> None:
         st.subheader("Latest Result")
         col_a, col_b = st.columns(2)
         with col_a:
-            display_segment_table("Vowels", latest_inventory.get("vowels", []), include_hints=show_sound_alikes)
+            display_segment_table("Vowels", latest_inventory.get("vowels", []))
         with col_b:
-            display_segment_table(
-                "Consonants",
-                latest_inventory.get("consonants", []),
-                include_hints=show_sound_alikes,
-            )
+            display_segment_table("Consonants", latest_inventory.get("consonants", []))
 
         output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
         st.caption(f"Latest files were written to: {output_dir_label}")
-        st.caption("Sound-alikes are approximation helpers; IPA stays the canonical data.")
+        st.caption("Sound-likes are approximation helpers; IPA stays the canonical data.")
 
         preset_payload = inventory_as_preset_payload(latest_inventory, latest_language_name)
         st.download_button(
@@ -530,9 +633,17 @@ def main() -> None:
         )
 
         st.subheader("Sample Text Playground (Not Saved)")
-        st.caption(
-            "Step 2: generate placeholder words and sentences from this inventory. Regenerate as much as you want."
+        st.caption("Step 2: generate placeholder words and sentences from this inventory. Regenerate as much as you want.")
+
+        style_names = list(STYLE_PRESETS.keys())
+        selected_style = st.selectbox(
+            "Sample style preset",
+            options=style_names,
+            index=0,
+            key="sample_style_preset",
+            help="Tweak the rhythm profile of generated placeholder words/sentences.",
         )
+        st.caption(f"Style guide: {STYLE_PRESETS[selected_style]['description']}")
 
         sample_controls_left, sample_controls_right = st.columns(2)
         with sample_controls_left:
@@ -579,10 +690,7 @@ def main() -> None:
         with samples_button_col_1:
             generate_word_samples = st.button("Generate Word Samples", key="generate_word_samples")
         with samples_button_col_2:
-            generate_sentence_samples = st.button(
-                "Generate Sentence Samples",
-                key="generate_sentence_samples",
-            )
+            generate_sentence_samples = st.button("Generate Sentence Samples", key="generate_sentence_samples")
         with samples_button_col_3:
             generate_both_samples = st.button("Generate Both", key="generate_both_samples")
 
@@ -596,6 +704,7 @@ def main() -> None:
                 sample_count=int(sample_word_count),
                 syllable_range=sample_syllable_range,
                 syllable_separator=syllable_separator,
+                style_name=selected_style,
             )
 
         if generate_sentence_samples or generate_both_samples:
@@ -606,6 +715,7 @@ def main() -> None:
                 syllable_range=sample_syllable_range,
                 words_range=sample_words_range,
                 syllable_separator=syllable_separator,
+                style_name=selected_style,
             )
 
         sample_words = st.session_state.get("sample_words", [])
@@ -614,7 +724,10 @@ def main() -> None:
         if sample_words:
             st.markdown("**Word samples**")
             st.dataframe(
-                [{"Word": word} for word in sample_words],
+                [
+                    {"IPA": word, "Sound-like": ipa_text_to_sound_like(word)}
+                    for word in sample_words
+                ],
                 hide_index=True,
                 use_container_width=True,
             )
@@ -623,8 +736,14 @@ def main() -> None:
 
         if sample_sentences:
             st.markdown("**Sentence samples**")
-            for sentence in sample_sentences:
-                st.write(f"- {sentence}")
+            st.dataframe(
+                [
+                    {"IPA": sentence, "Sound-like": ipa_text_to_sound_like(sentence)}
+                    for sentence in sample_sentences
+                ],
+                hide_index=True,
+                use_container_width=True,
+            )
         else:
             st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
 

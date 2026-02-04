@@ -8,7 +8,7 @@ import json
 import random
 import re
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import streamlit as st
 
@@ -131,6 +131,201 @@ def build_pronunciation_csv(vowels: List[str], consonants: List[str]) -> str:
     return output.getvalue()
 
 
+def choose_segment(segments: List[str]) -> str:
+    """Return a random segment, or empty string if unavailable."""
+    if not segments:
+        return ""
+    return random.choice(segments)
+
+
+def generate_syllable(vowels: List[str], consonants: List[str]) -> str:
+    """Generate a syllable-like chunk from the current inventory."""
+    if not vowels and not consonants:
+        return ""
+
+    if not consonants:
+        shape = random.choices(["V", "VV"], weights=[0.75, 0.25], k=1)[0]
+    elif not vowels:
+        shape = random.choices(["C", "CC"], weights=[0.85, 0.15], k=1)[0]
+    else:
+        shape = random.choices(
+            ["V", "CV", "VC", "CVC", "CVV", "VCV"],
+            weights=[0.10, 0.40, 0.12, 0.23, 0.08, 0.07],
+            k=1,
+        )[0]
+
+    parts: List[str] = []
+    for slot in shape:
+        segment = choose_segment(consonants) if slot == "C" else choose_segment(vowels)
+        if segment:
+            parts.append(segment)
+    return "".join(parts)
+
+
+def generate_word(
+    vowels: List[str],
+    consonants: List[str],
+    syllable_range: Tuple[int, int],
+    syllable_separator: str,
+) -> str:
+    """Generate a placeholder word made from inventory segments."""
+    min_syllables, max_syllables = syllable_range
+    min_syllables = max(1, int(min_syllables))
+    max_syllables = max(min_syllables, int(max_syllables))
+
+    syllable_count = random.randint(min_syllables, max_syllables)
+    syllables = [generate_syllable(vowels, consonants) for _ in range(syllable_count)]
+    syllables = [syllable for syllable in syllables if syllable]
+
+    if not syllables:
+        return choose_segment(vowels) or choose_segment(consonants) or "a"
+    return syllable_separator.join(syllables)
+
+
+def generate_sentence(
+    vowels: List[str],
+    consonants: List[str],
+    syllable_range: Tuple[int, int],
+    words_range: Tuple[int, int],
+    syllable_separator: str,
+) -> str:
+    """Generate a placeholder sentence from inventory-derived words."""
+    min_words, max_words = words_range
+    min_words = max(1, int(min_words))
+    max_words = max(min_words, int(max_words))
+
+    word_count = random.randint(min_words, max_words)
+    words = [
+        generate_word(vowels, consonants, syllable_range, syllable_separator)
+        for _ in range(word_count)
+    ]
+    punctuation = random.choices([".", "?", "!"], weights=[0.75, 0.15, 0.10], k=1)[0]
+    return f"{' '.join(words)}{punctuation}"
+
+
+def build_sample_words(
+    vowels: List[str],
+    consonants: List[str],
+    sample_count: int,
+    syllable_range: Tuple[int, int],
+    syllable_separator: str,
+) -> List[str]:
+    """Return a list of generated placeholder words."""
+    count = max(1, int(sample_count))
+    return [
+        generate_word(vowels, consonants, syllable_range, syllable_separator)
+        for _ in range(count)
+    ]
+
+
+def build_sample_sentences(
+    vowels: List[str],
+    consonants: List[str],
+    sample_count: int,
+    syllable_range: Tuple[int, int],
+    words_range: Tuple[int, int],
+    syllable_separator: str,
+) -> List[str]:
+    """Return a list of generated placeholder sentences."""
+    count = max(1, int(sample_count))
+    return [
+        generate_sentence(
+            vowels,
+            consonants,
+            syllable_range=syllable_range,
+            words_range=words_range,
+            syllable_separator=syllable_separator,
+        )
+        for _ in range(count)
+    ]
+
+
+def mix_share(weight: float, total_weight: float) -> float:
+    """Return a safe percentage share for a source weight."""
+    if total_weight <= 0:
+        return 0.0
+    return (weight / total_weight) * 100.0
+
+
+def load_preset_safe(name: str) -> Dict[str, List[str]]:
+    """Load preset data, returning empty lists on load issues."""
+    try:
+        return generator.load_preset(name)
+    except Exception as exc:  # pragma: no cover - UI safety net
+        st.warning(f"Could not load preset '{name}': {exc}")
+        return {"vowels": [], "consonants": []}
+
+
+def render_mix_reference_panel(
+    selected_presets: List[str],
+    weights: List[float],
+    random_weight: float,
+    master_preset: str,
+    include_hints: bool,
+) -> None:
+    """Render a dynamic guide to help users understand active mix sources."""
+    st.caption("Weights are relative proportions: 0.2 + 0.4 behaves the same as 1 + 2.")
+
+    if not selected_presets:
+        st.info("Select presets to preview their sounds and contribution to the mix.")
+        return
+
+    total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
+    summary_rows: List[Dict[str, str]] = []
+    loaded_presets: Dict[str, Dict[str, List[str]]] = {}
+
+    for preset_name, weight in zip(selected_presets, weights):
+        preset_data = load_preset_safe(preset_name)
+        loaded_presets[preset_name] = preset_data
+        summary_rows.append(
+            {
+                "Source": preset_name,
+                "Weight": f"{weight:.2f}",
+                "Mix share": f"{mix_share(weight, total_weight):.1f}%",
+                "Vowels": str(len(preset_data.get("vowels", []))),
+                "Consonants": str(len(preset_data.get("consonants", []))),
+            }
+        )
+
+    if random_weight > 0:
+        master_data = load_preset_safe(master_preset)
+        loaded_presets[f"random::{master_preset}"] = master_data
+        summary_rows.append(
+            {
+                "Source": f"random ({master_preset})",
+                "Weight": f"{random_weight:.2f}",
+                "Mix share": f"{mix_share(random_weight, total_weight):.1f}%",
+                "Vowels": str(len(master_data.get("vowels", []))),
+                "Consonants": str(len(master_data.get("consonants", []))),
+            }
+        )
+
+    st.markdown("**Current weight breakdown**")
+    st.dataframe(summary_rows, hide_index=True, use_container_width=True)
+
+    st.markdown("**Source sound inventories**")
+    for preset_name, weight in zip(selected_presets, weights):
+        share_label = mix_share(weight, total_weight)
+        with st.expander(f"{preset_name} - {share_label:.1f}% of current mix"):
+            preset_data = loaded_presets[preset_name]
+            col_left, col_right = st.columns(2)
+            with col_left:
+                display_segment_table("Vowels", preset_data.get("vowels", []), include_hints=include_hints)
+            with col_right:
+                display_segment_table("Consonants", preset_data.get("consonants", []), include_hints=include_hints)
+
+    if random_weight > 0:
+        random_key = f"random::{master_preset}"
+        share_label = mix_share(random_weight, total_weight)
+        with st.expander(f"random pool ({master_preset}) - {share_label:.1f}% of current mix"):
+            master_data = loaded_presets[random_key]
+            col_left, col_right = st.columns(2)
+            with col_left:
+                display_segment_table("Vowels", master_data.get("vowels", []), include_hints=include_hints)
+            with col_right:
+                display_segment_table("Consonants", master_data.get("consonants", []), include_hints=include_hints)
+
+
 def list_json_names(directory: str) -> List[str]:
     """Return sorted JSON basenames in a directory."""
     path = Path(directory)
@@ -239,6 +434,15 @@ def main() -> None:
         help="Keeps IPA exact, but adds rough English-leaning pronunciation hints in result tables.",
     )
 
+    with st.expander("Mixing guide: source sounds and weights", expanded=True):
+        render_mix_reference_panel(
+            selected_presets=selected_presets,
+            weights=weights,
+            random_weight=random_weight,
+            master_preset=master_preset,
+            include_hints=show_sound_alikes,
+        )
+
     language_name = st.text_input("Generated language name", value="GeneratedLanguage")
     output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
 
@@ -281,6 +485,8 @@ def main() -> None:
                 st.session_state["last_inventory"] = mixed_inventory
                 st.session_state["last_language_name"] = language_name
                 st.session_state["last_output_dir"] = str(output_dir)
+                st.session_state.pop("sample_words", None)
+                st.session_state.pop("sample_sentences", None)
 
                 st.success(f"Generated '{language_name}' and saved files to {output_dir}")
             except Exception as exc:  # pragma: no cover - UI safety net
@@ -322,6 +528,105 @@ def main() -> None:
             file_name=f"{sanitize_name(latest_language_name)}_pronunciation_guide.csv",
             mime="text/csv",
         )
+
+        st.subheader("Sample Text Playground (Not Saved)")
+        st.caption(
+            "Step 2: generate placeholder words and sentences from this inventory. Regenerate as much as you want."
+        )
+
+        sample_controls_left, sample_controls_right = st.columns(2)
+        with sample_controls_left:
+            sample_word_count = st.number_input(
+                "Word samples per run",
+                min_value=1,
+                max_value=50,
+                value=15,
+                step=1,
+                key="sample_word_count",
+            )
+            sample_syllable_range = st.slider(
+                "Syllables per generated word",
+                min_value=1,
+                max_value=5,
+                value=(1, 3),
+                key="sample_syllable_range",
+            )
+        with sample_controls_right:
+            sample_sentence_count = st.number_input(
+                "Sentence samples per run",
+                min_value=1,
+                max_value=30,
+                value=6,
+                step=1,
+                key="sample_sentence_count",
+            )
+            sample_words_range = st.slider(
+                "Words per generated sentence",
+                min_value=2,
+                max_value=14,
+                value=(4, 8),
+                key="sample_sentence_words_range",
+            )
+
+        show_syllable_breaks = st.checkbox(
+            "Show syllable separators (.)",
+            value=False,
+            key="sample_show_syllable_breaks",
+        )
+        syllable_separator = "." if show_syllable_breaks else ""
+
+        samples_button_col_1, samples_button_col_2, samples_button_col_3 = st.columns(3)
+        with samples_button_col_1:
+            generate_word_samples = st.button("Generate Word Samples", key="generate_word_samples")
+        with samples_button_col_2:
+            generate_sentence_samples = st.button(
+                "Generate Sentence Samples",
+                key="generate_sentence_samples",
+            )
+        with samples_button_col_3:
+            generate_both_samples = st.button("Generate Both", key="generate_both_samples")
+
+        latest_vowels = latest_inventory.get("vowels", [])
+        latest_consonants = latest_inventory.get("consonants", [])
+
+        if generate_word_samples or generate_both_samples:
+            st.session_state["sample_words"] = build_sample_words(
+                latest_vowels,
+                latest_consonants,
+                sample_count=int(sample_word_count),
+                syllable_range=sample_syllable_range,
+                syllable_separator=syllable_separator,
+            )
+
+        if generate_sentence_samples or generate_both_samples:
+            st.session_state["sample_sentences"] = build_sample_sentences(
+                latest_vowels,
+                latest_consonants,
+                sample_count=int(sample_sentence_count),
+                syllable_range=sample_syllable_range,
+                words_range=sample_words_range,
+                syllable_separator=syllable_separator,
+            )
+
+        sample_words = st.session_state.get("sample_words", [])
+        sample_sentences = st.session_state.get("sample_sentences", [])
+
+        if sample_words:
+            st.markdown("**Word samples**")
+            st.dataframe(
+                [{"Word": word} for word in sample_words],
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            st.info("No word samples yet. Click 'Generate Word Samples' or 'Generate Both'.")
+
+        if sample_sentences:
+            st.markdown("**Sentence samples**")
+            for sentence in sample_sentences:
+                st.write(f"- {sentence}")
+        else:
+            st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
 
         st.subheader("Save Latest Result as Preset")
         preset_filename = st.text_input(

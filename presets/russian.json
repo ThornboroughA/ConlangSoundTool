@@ -1,5 +1,33 @@
 {
   "name": "Russian",
-  "vowels": ["a", "e", "i", "o", "u", "ɨ", "ʉ"],
-  "consonants": ["p", "b", "t", "d", "k", "g", "m", "n", "f", "v", "s", "z", "ʂ", "ʐ", "x", "h", "r", "l", "j"]
+  "vowels": [
+    {"segment": "a", "representation": 1.0},
+    {"segment": "e", "representation": 1.0},
+    {"segment": "i", "representation": 1.0},
+    {"segment": "o", "representation": 1.0},
+    {"segment": "u", "representation": 1.0},
+    {"segment": "ɨ", "representation": 1.0},
+    {"segment": "ʉ", "representation": 1.0}
+  ],
+  "consonants": [
+    {"segment": "p", "representation": 1.0},
+    {"segment": "b", "representation": 1.0},
+    {"segment": "t", "representation": 1.0},
+    {"segment": "d", "representation": 1.0},
+    {"segment": "k", "representation": 1.0},
+    {"segment": "g", "representation": 1.0},
+    {"segment": "m", "representation": 1.0},
+    {"segment": "n", "representation": 1.0},
+    {"segment": "f", "representation": 1.0},
+    {"segment": "v", "representation": 1.0},
+    {"segment": "s", "representation": 1.0},
+    {"segment": "z", "representation": 1.0},
+    {"segment": "ʂ", "representation": 1.0},
+    {"segment": "ʐ", "representation": 1.0},
+    {"segment": "x", "representation": 1.0},
+    {"segment": "h", "representation": 1.0},
+    {"segment": "r", "representation": 1.0},
+    {"segment": "l", "representation": 1.0},
+    {"segment": "j", "representation": 1.0}
+  ]
 }

@@ -9,7 +9,7 @@ import random
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import streamlit as st
 
@@ -290,12 +290,23 @@ def ipa_text_to_sound_like(
 def build_segment_rows(
     segments: List[str],
     profile_name: str = DEFAULT_ROMANIZATION_PROFILE,
+    representation_lookup: Optional[Dict[str, float]] = None,
 ) -> List[Dict[str, str]]:
     """Build table rows with IPA plus sound-like references."""
     rows: List[Dict[str, str]] = []
     for segment in segments:
         hint = hint_for_segment(segment, profile_name=profile_name)
-        rows.append({"IPA": segment, "Sound-like": hint["sound_like"], "Example": hint["example"]})
+        representation_text = ""
+        if representation_lookup and segment in representation_lookup:
+            representation_text = f"{representation_lookup[segment]:.3f}"
+        rows.append(
+            {
+                "IPA": segment,
+                "Representation": representation_text,
+                "Sound-like": hint["sound_like"],
+                "Example": hint["example"],
+            }
+        )
     return rows
 
 
@@ -478,13 +489,28 @@ def mix_share(weight: float, total_weight: float) -> float:
     return (weight / total_weight) * 100.0
 
 
-def load_preset_safe(name: str) -> Dict[str, List[str]]:
+def load_preset_safe(name: str) -> Dict[str, Any]:
     """Load preset data, returning empty lists on load issues."""
     try:
         return generator.load_preset(name)
     except Exception as exc:  # pragma: no cover - UI safety net
         st.warning(f"Could not load preset '{name}': {exc}")
-        return {"vowels": [], "consonants": []}
+        return {"vowels": [], "consonants": [], "vowels_entries": [], "consonants_entries": []}
+
+
+def representation_lookup(entries: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Build a map of segment -> representation for table display."""
+    lookup: Dict[str, float] = {}
+    for entry in entries:
+        segment = str(entry.get("segment", "")).strip()
+        if not segment:
+            continue
+        raw_value = entry.get("representation", 1.0)
+        try:
+            lookup[segment] = float(raw_value)
+        except (TypeError, ValueError):
+            lookup[segment] = 1.0
+    return lookup
 
 
 def render_mix_reference_panel(
@@ -503,7 +529,7 @@ def render_mix_reference_panel(
 
     total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
     summary_rows: List[Dict[str, str]] = []
-    loaded_presets: Dict[str, Dict[str, List[str]]] = {}
+    loaded_presets: Dict[str, Dict[str, Any]] = {}
 
     for preset_name, weight in zip(selected_presets, weights):
         preset_data = load_preset_safe(preset_name)
@@ -541,9 +567,19 @@ def render_mix_reference_panel(
             preset_data = loaded_presets[preset_name]
             col_left, col_right = st.columns(2)
             with col_left:
-                display_segment_table("Vowels", preset_data.get("vowels", []), profile_name=profile_name)
+                display_segment_table(
+                    "Vowels",
+                    preset_data.get("vowels", []),
+                    profile_name=profile_name,
+                    representation_values=representation_lookup(preset_data.get("vowels_entries", [])),
+                )
             with col_right:
-                display_segment_table("Consonants", preset_data.get("consonants", []), profile_name=profile_name)
+                display_segment_table(
+                    "Consonants",
+                    preset_data.get("consonants", []),
+                    profile_name=profile_name,
+                    representation_values=representation_lookup(preset_data.get("consonants_entries", [])),
+                )
 
     if random_weight > 0:
         random_key = f"random::{master_preset}"
@@ -552,9 +588,19 @@ def render_mix_reference_panel(
             master_data = loaded_presets[random_key]
             col_left, col_right = st.columns(2)
             with col_left:
-                display_segment_table("Vowels", master_data.get("vowels", []), profile_name=profile_name)
+                display_segment_table(
+                    "Vowels",
+                    master_data.get("vowels", []),
+                    profile_name=profile_name,
+                    representation_values=representation_lookup(master_data.get("vowels_entries", [])),
+                )
             with col_right:
-                display_segment_table("Consonants", master_data.get("consonants", []), profile_name=profile_name)
+                display_segment_table(
+                    "Consonants",
+                    master_data.get("consonants", []),
+                    profile_name=profile_name,
+                    representation_values=representation_lookup(master_data.get("consonants_entries", [])),
+                )
 
 
 def list_json_names(directory: str) -> List[str]:
@@ -588,12 +634,20 @@ def resolve_output_dir(raw_value: str) -> Path:
     return Path(generator.SCRIPT_DIR) / path
 
 
-def inventory_as_preset_payload(inventory: Dict[str, List[str]], language_name: str) -> Dict[str, List[str]]:
+def inventory_as_preset_payload(inventory: Dict[str, Any], language_name: str) -> Dict[str, Any]:
     """Return generated inventory in preset-compatible JSON format."""
+    vowels_representation = inventory.get("vowels_representation", {})
+    consonants_representation = inventory.get("consonants_representation", {})
     return {
         "name": language_name,
-        "vowels": inventory.get("vowels", []),
-        "consonants": inventory.get("consonants", []),
+        "vowels": [
+            {"segment": segment, "representation": float(vowels_representation.get(segment, 1.0))}
+            for segment in inventory.get("vowels", [])
+        ],
+        "consonants": [
+            {"segment": segment, "representation": float(consonants_representation.get(segment, 1.0))}
+            for segment in inventory.get("consonants", [])
+        ],
     }
 
 
@@ -601,10 +655,15 @@ def display_segment_table(
     title: str,
     segments: List[str],
     profile_name: str = DEFAULT_ROMANIZATION_PROFILE,
+    representation_values: Optional[Dict[str, float]] = None,
 ) -> None:
     """Render a segment list in a compact table."""
     st.markdown(f"**{title} ({len(segments)})**")
-    rows = build_segment_rows(segments, profile_name=profile_name)
+    rows = build_segment_rows(
+        segments,
+        profile_name=profile_name,
+        representation_lookup=representation_values,
+    )
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
@@ -967,12 +1026,20 @@ def main() -> None:
                     "Vowels",
                     latest_inventory.get("vowels", []),
                     profile_name=romanization_profile,
+                    representation_values={
+                        segment: float(value)
+                        for segment, value in latest_inventory.get("vowels_representation", {}).items()
+                    },
                 )
             with col_b:
                 display_segment_table(
                     "Consonants",
                     latest_inventory.get("consonants", []),
                     profile_name=romanization_profile,
+                    representation_values={
+                        segment: float(value)
+                        for segment, value in latest_inventory.get("consonants_representation", {}).items()
+                    },
                 )
 
         elif selected_result_view == "Sample Text":

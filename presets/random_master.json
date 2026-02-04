@@ -1,5 +1,38 @@
 {
   "name": "MasterRandom",
-  "vowels": ["ɐ", "ɔ", "ɛ", "ɒ", "œ", "ø", "y"],
-  "consonants": ["q", "ɢ", "ʔ", "χ", "ʁ", "θ", "ð", "ʃ", "ʒ", "ʈ", "ɖ", "c", "ɟ", "ɲ", "ɳ", "ɽ", "ɭ", "β", "ɸ", "ʙ", "ʋ", "ð", "ɻ", "ɾ", "ɣ"]
+  "vowels": [
+    {"segment": "ɐ", "representation": 1.0},
+    {"segment": "ɔ", "representation": 1.0},
+    {"segment": "ɛ", "representation": 1.0},
+    {"segment": "ɒ", "representation": 1.0},
+    {"segment": "œ", "representation": 1.0},
+    {"segment": "ø", "representation": 1.0},
+    {"segment": "y", "representation": 1.0}
+  ],
+  "consonants": [
+    {"segment": "q", "representation": 1.0},
+    {"segment": "ɢ", "representation": 1.0},
+    {"segment": "ʔ", "representation": 1.0},
+    {"segment": "χ", "representation": 1.0},
+    {"segment": "ʁ", "representation": 1.0},
+    {"segment": "θ", "representation": 1.0},
+    {"segment": "ð", "representation": 1.0},
+    {"segment": "ʃ", "representation": 1.0},
+    {"segment": "ʒ", "representation": 1.0},
+    {"segment": "ʈ", "representation": 1.0},
+    {"segment": "ɖ", "representation": 1.0},
+    {"segment": "c", "representation": 1.0},
+    {"segment": "ɟ", "representation": 1.0},
+    {"segment": "ɲ", "representation": 1.0},
+    {"segment": "ɳ", "representation": 1.0},
+    {"segment": "ɽ", "representation": 1.0},
+    {"segment": "ɭ", "representation": 1.0},
+    {"segment": "β", "representation": 1.0},
+    {"segment": "ɸ", "representation": 1.0},
+    {"segment": "ʙ", "representation": 1.0},
+    {"segment": "ʋ", "representation": 1.0},
+    {"segment": "ɻ", "representation": 1.0},
+    {"segment": "ɾ", "representation": 1.0},
+    {"segment": "ɣ", "representation": 1.0}
+  ]
 }

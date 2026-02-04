@@ -1,0 +1,87 @@
+{
+  "name": "Early Middle Japanese",
+  "vowels": [
+    {
+      "segment": "a",
+      "representation": 0.25
+    },
+    {
+      "segment": "i",
+      "representation": 0.2
+    },
+    {
+      "segment": "u",
+      "representation": 0.2
+    },
+    {
+      "segment": "e",
+      "representation": 0.17
+    },
+    {
+      "segment": "o",
+      "representation": 0.18
+    }
+  ],
+  "consonants": [
+    {
+      "segment": "m",
+      "representation": 0.067308
+    },
+    {
+      "segment": "n",
+      "representation": 0.173077
+    },
+    {
+      "segment": "p",
+      "representation": 0.009615
+    },
+    {
+      "segment": "b",
+      "representation": 0.038462
+    },
+    {
+      "segment": "t",
+      "representation": 0.096154
+    },
+    {
+      "segment": "d",
+      "representation": 0.038462
+    },
+    {
+      "segment": "k",
+      "representation": 0.115385
+    },
+    {
+      "segment": "ɡ",
+      "representation": 0.038462
+    },
+    {
+      "segment": "ɸ",
+      "representation": 0.067308
+    },
+    {
+      "segment": "s",
+      "representation": 0.096154
+    },
+    {
+      "segment": "z",
+      "representation": 0.028846
+    },
+    {
+      "segment": "r",
+      "representation": 0.105769
+    },
+    {
+      "segment": "j",
+      "representation": 0.057692
+    },
+    {
+      "segment": "w",
+      "representation": 0.057692
+    },
+    {
+      "segment": "ɴ",
+      "representation": 0.009615
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "name": "Middle Korean",
+  "vowels": [
+    {
+      "segment": "i",
+      "representation": 0.15
+    },
+    {
+      "segment": "ɨ",
+      "representation": 0.12
+    },
+    {
+      "segment": "u",
+      "representation": 0.12
+    },
+    {
+      "segment": "ə",
+      "representation": 0.18
+    },
+    {
+      "segment": "o",
+      "representation": 0.1
+    },
+    {
+      "segment": "a",
+      "representation": 0.24
+    },
+    {
+      "segment": "ʌ",
+      "representation": 0.09
+    }
+  ],
+  "consonants": [
+    {
+      "segment": "p",
+      "representation": 0.075799
+    },
+    {
+      "segment": "pʰ",
+      "representation": 0.032485
+    },
+    {
+      "segment": "p͈",
+      "representation": 0.010828
+    },
+    {
+      "segment": "t",
+      "representation": 0.086627
+    },
+    {
+      "segment": "tʰ",
+      "representation": 0.037899
+    },
+    {
+      "segment": "t͈",
+      "representation": 0.012994
+    },
+    {
+      "segment": "k",
+      "representation": 0.097455
+    },
+    {
+      "segment": "kʰ",
+      "representation": 0.043313
+    },
+    {
+      "segment": "k͈",
+      "representation": 0.016243
+    },
+    {
+      "segment": "c",
+      "representation": 0.043313
+    },
+    {
+      "segment": "ch",
+      "representation": 0.021657
+    },
+    {
+      "segment": "cc",
+      "representation": 0.008663
+    },
+    {
+      "segment": "s",
+      "representation": 0.06497
+    },
+    {
+      "segment": "s͈",
+      "representation": 0.032485
+    },
+    {
+      "segment": "h",
+      "representation": 0.054142
+    },
+    {
+      "segment": "h͈",
+      "representation": 0.000541
+    },
+    {
+      "segment": "β",
+      "representation": 0.010828
+    },
+    {
+      "segment": "z",
+      "representation": 0.008663
+    },
+    {
+      "segment": "ɣ",
+      "representation": 0.016243
+    },
+    {
+      "segment": "ʔ",
+      "representation": 0.021657
+    },
+    {
+      "segment": "m",
+      "representation": 0.06497
+    },
+    {
+      "segment": "n",
+      "representation": 0.119112
+    },
+    {
+      "segment": "ŋ",
+      "representation": 0.054142
+    },
+    {
+      "segment": "l",
+      "representation": 0.06497
+    }
+  ]
+}

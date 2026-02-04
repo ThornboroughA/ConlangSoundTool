@@ -1,5 +1,29 @@
 {
   "name": "Korean",
-  "vowels": ["a", "e", "i", "o", "u", "ʌ", "ɯ"],
-  "consonants": ["p", "pʰ", "t", "tʰ", "k", "kʰ", "m", "n", "ŋ", "s", "h", "tɕ", "tɕʰ", "l", "j"]
+  "vowels": [
+    {"segment": "a", "representation": 1.0},
+    {"segment": "e", "representation": 1.0},
+    {"segment": "i", "representation": 1.0},
+    {"segment": "o", "representation": 1.0},
+    {"segment": "u", "representation": 1.0},
+    {"segment": "ʌ", "representation": 1.0},
+    {"segment": "ɯ", "representation": 1.0}
+  ],
+  "consonants": [
+    {"segment": "p", "representation": 1.0},
+    {"segment": "pʰ", "representation": 1.0},
+    {"segment": "t", "representation": 1.0},
+    {"segment": "tʰ", "representation": 1.0},
+    {"segment": "k", "representation": 1.0},
+    {"segment": "kʰ", "representation": 1.0},
+    {"segment": "m", "representation": 1.0},
+    {"segment": "n", "representation": 1.0},
+    {"segment": "ŋ", "representation": 1.0},
+    {"segment": "s", "representation": 1.0},
+    {"segment": "h", "representation": 1.0},
+    {"segment": "tɕ", "representation": 1.0},
+    {"segment": "tɕʰ", "representation": 1.0},
+    {"segment": "l", "representation": 1.0},
+    {"segment": "j", "representation": 1.0}
+  ]
 }

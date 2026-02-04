@@ -1,0 +1,11 @@
+{
+  "name": "demo_shift",
+  "description": "Example simple sound change rules for demonstration",
+  "rules": [
+    {"from": "p", "to": "b"},
+    {"from": "t", "to": "d"},
+    {"from": "k", "to": "g"},
+    {"from": "s", "to": "z"},
+    {"from": "h", "to": ""}
+  ]
+}

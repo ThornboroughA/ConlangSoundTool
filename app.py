@@ -9,13 +9,14 @@ import random
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import streamlit as st
 
 import sound_inventory_generator as generator
 from sample_text_generator import (
     CONCEPT_LIST_PRESETS,
+    DEFAULT_PHONOTACTIC_PROFILE,
     GRAMMAR_PROFILES,
     STYLE_PRESETS,
     build_language_model,
@@ -23,6 +24,7 @@ from sample_text_generator import (
     build_sample_words,
     language_model_summary,
     model_matches,
+    reroll_lexicon_entry,
     validate_generation_config,
 )
 
@@ -447,6 +449,38 @@ def sanitize_name(value: str) -> str:
     """Convert free text to a safe lowercase filename."""
     cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", value.strip()).strip("_").lower()
     return cleaned or "generated_preset"
+
+
+def nested_value(mapping: Dict[str, Any], path: Sequence[str], fallback: Any) -> Any:
+    current: Any = mapping
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            return fallback
+        current = current[key]
+    return current
+
+
+def deep_merge_dict(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+    merged = dict(base)
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge_dict(dict(merged.get(key, {})), value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def parse_override_json(raw_text: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    cleaned = raw_text.strip()
+    if not cleaned:
+        return {}, None
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        return {}, f"Invalid override JSON: {exc}"
+    if not isinstance(parsed, dict):
+        return {}, "Override JSON must be an object at the top level."
+    return parsed, None
 
 
 def resolve_output_dir(raw_value: str) -> Path:
@@ -905,7 +939,7 @@ def main() -> None:
             st.caption(f"Style guide: {STYLE_PRESETS[selected_style]['description']}")
             st.caption(f"Concept list: {CONCEPT_LIST_PRESETS[selected_concept_list]['description']}")
             st.caption(f"Grammar profile: {GRAMMAR_PROFILES[selected_grammar_profile]['description']}")
-            st.caption("Word rows include meaning tags + part-of-speech labels from the shared lexicon.")
+            st.caption("Word rows include every concept-list root with meaning tags + part-of-speech labels.")
             concept_entries_raw = CONCEPT_LIST_PRESETS[selected_concept_list].get("entries", [])
             concept_entry_count = len(concept_entries_raw) if isinstance(concept_entries_raw, (list, tuple)) else 0
             grammar_particles_raw = GRAMMAR_PROFILES[selected_grammar_profile].get("particle_inventory", [])
@@ -917,10 +951,150 @@ def main() -> None:
                 f"{grammar_particle_count} particle slots."
             )
 
+            with st.expander("Phonotactics tuning (global profile + optional overrides)", expanded=False):
+                default_initial_ng_penalty = float(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["soft_constraints", "initial_velar_nasal_penalty"], 4.0)
+                )
+                default_candidate_count = int(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["candidate_selection", "candidates_per_word"], 7)
+                )
+                default_temperature = float(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["candidate_selection", "temperature"], 0.82)
+                )
+                default_harmony_penalty = float(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["co_occurrence", "harmony_penalty"], 0.32)
+                )
+                default_morph_enabled = bool(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["morphology", "enabled"], True)
+                )
+                default_noun_suffix_rate = float(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["morphology", "suffix_rate_by_pos", "N"], 0.28)
+                )
+                default_verb_suffix_rate = float(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["morphology", "suffix_rate_by_pos", "V"], 0.38)
+                )
+                default_prefix_rate = float(
+                    nested_value(DEFAULT_PHONOTACTIC_PROFILE, ["morphology", "prefix_rate_by_pos", "default"], 0.06)
+                )
+
+                tuning_col_1, tuning_col_2 = st.columns(2)
+                with tuning_col_1:
+                    ui_initial_ng_penalty = st.slider(
+                        "Initial velar nasal penalty",
+                        min_value=0.0,
+                        max_value=8.0,
+                        value=default_initial_ng_penalty,
+                        step=0.1,
+                        key="phon_ui_initial_ng_penalty",
+                        help="Higher values make word-initial ŋ rarer.",
+                    )
+                    ui_candidate_count = st.slider(
+                        "Candidates per word",
+                        min_value=1,
+                        max_value=24,
+                        value=default_candidate_count,
+                        step=1,
+                        key="phon_ui_candidates_per_word",
+                        help="More candidates increases naturalness and generation cost.",
+                    )
+                    ui_temperature = st.slider(
+                        "Candidate selection temperature",
+                        min_value=0.1,
+                        max_value=2.5,
+                        value=default_temperature,
+                        step=0.01,
+                        key="phon_ui_temperature",
+                        help="Lower values pick stricter high-scoring forms.",
+                    )
+                    ui_harmony_penalty = st.slider(
+                        "Vowel disharmony penalty",
+                        min_value=0.0,
+                        max_value=2.0,
+                        value=default_harmony_penalty,
+                        step=0.05,
+                        key="phon_ui_harmony_penalty",
+                        help="Encourages front/back vowel cohesion across words.",
+                    )
+                with tuning_col_2:
+                    ui_morph_enabled = st.checkbox(
+                        "Enable morphology-lite affixes",
+                        value=default_morph_enabled,
+                        key="phon_ui_morph_enabled",
+                    )
+                    ui_prefix_rate = st.slider(
+                        "General prefix rate",
+                        min_value=0.0,
+                        max_value=0.8,
+                        value=default_prefix_rate,
+                        step=0.01,
+                        key="phon_ui_prefix_rate",
+                    )
+                    ui_noun_suffix_rate = st.slider(
+                        "Noun suffix rate",
+                        min_value=0.0,
+                        max_value=0.95,
+                        value=default_noun_suffix_rate,
+                        step=0.01,
+                        key="phon_ui_noun_suffix_rate",
+                    )
+                    ui_verb_suffix_rate = st.slider(
+                        "Verb suffix rate",
+                        min_value=0.0,
+                        max_value=0.95,
+                        value=default_verb_suffix_rate,
+                        step=0.01,
+                        key="phon_ui_verb_suffix_rate",
+                    )
+
+                advanced_override_text = st.text_area(
+                    "Advanced override JSON (optional)",
+                    value=st.session_state.get("phon_ui_advanced_override_json", ""),
+                    key="phon_ui_advanced_override_json",
+                    height=140,
+                    help="Merged on top of the slider values.",
+                )
+                st.caption(
+                    "Use advanced JSON for fine-grained controls (templates, slot weights, cluster tuning, etc.)."
+                )
+
+            phonotactic_overrides: Dict[str, Any] = {
+                "candidate_selection": {
+                    "candidates_per_word": int(ui_candidate_count),
+                    "temperature": float(ui_temperature),
+                },
+                "soft_constraints": {
+                    "initial_velar_nasal_penalty": float(ui_initial_ng_penalty),
+                },
+                "co_occurrence": {
+                    "enabled": True,
+                    "harmony_penalty": float(ui_harmony_penalty),
+                },
+                "morphology": {
+                    "enabled": bool(ui_morph_enabled),
+                    "prefix_rate_by_pos": {
+                        "N": float(ui_prefix_rate),
+                        "V": float(ui_prefix_rate),
+                        "ADJ": float(ui_prefix_rate),
+                        "default": float(ui_prefix_rate),
+                    },
+                    "suffix_rate_by_pos": {
+                        "N": float(ui_noun_suffix_rate),
+                        "V": float(ui_verb_suffix_rate),
+                        "ADJ": float((ui_noun_suffix_rate + ui_verb_suffix_rate) / 2.0),
+                        "default": float((ui_noun_suffix_rate + ui_verb_suffix_rate) / 2.0),
+                    },
+                },
+            }
+            advanced_override_dict, advanced_override_error = parse_override_json(advanced_override_text)
+            if advanced_override_error:
+                st.error(advanced_override_error)
+            else:
+                phonotactic_overrides = deep_merge_dict(phonotactic_overrides, advanced_override_dict)
+
             validation_report = validate_generation_config()
             validation_errors = validation_report.get("errors", [])
             validation_warnings = validation_report.get("warnings", [])
-            sample_generation_disabled = bool(validation_errors)
+            sample_generation_disabled = bool(validation_errors or advanced_override_error)
             if validation_errors:
                 st.error(
                     "Sample generation configuration has validation errors. "
@@ -936,14 +1110,6 @@ def main() -> None:
 
             sample_controls_left, sample_controls_right = st.columns(2)
             with sample_controls_left:
-                sample_word_count = st.number_input(
-                    "Word samples per run",
-                    min_value=1,
-                    max_value=50,
-                    value=15,
-                    step=1,
-                    key="sample_word_count",
-                )
                 sample_syllable_range = st.slider(
                     "Syllables per generated word",
                     min_value=1,
@@ -951,6 +1117,7 @@ def main() -> None:
                     value=(1, 3),
                     key="sample_syllable_range",
                 )
+                st.caption(f"Generate Word Samples now returns all {concept_entry_count} concept entries.")
             with sample_controls_right:
                 sample_sentence_count = st.number_input(
                     "Sentence samples per run",
@@ -1012,6 +1179,7 @@ def main() -> None:
                 style_name=selected_style,
                 concept_list_name=selected_concept_list,
                 grammar_profile_name=selected_grammar_profile,
+                phonotactic_profile_overrides=phonotactic_overrides,
             )
 
             if model_is_current:
@@ -1038,6 +1206,7 @@ def main() -> None:
                         style_name=selected_style,
                         concept_list_name=selected_concept_list,
                         grammar_profile_name=selected_grammar_profile,
+                        phonotactic_profile_overrides=phonotactic_overrides,
                     )
                     st.session_state["sample_language_model"] = cached_model
 
@@ -1045,13 +1214,14 @@ def main() -> None:
                 st.session_state["sample_words"] = build_sample_words(
                     latest_vowels,
                     latest_consonants,
-                    sample_count=int(sample_word_count),
+                    sample_count=max(1, int(concept_entry_count)),
                     syllable_range=sample_syllable_range,
                     syllable_separator=syllable_separator,
                     style_name=selected_style,
                     concept_list_name=selected_concept_list,
                     grammar_profile_name=selected_grammar_profile,
                     language_model=st.session_state.get("sample_language_model"),
+                    phonotactic_profile_overrides=phonotactic_overrides,
                 )
 
             if (generate_sentence_samples or generate_both_samples) and not sample_generation_disabled:
@@ -1066,6 +1236,7 @@ def main() -> None:
                     concept_list_name=selected_concept_list,
                     grammar_profile_name=selected_grammar_profile,
                     language_model=st.session_state.get("sample_language_model"),
+                    phonotactic_profile_overrides=phonotactic_overrides,
                 )
 
             sample_words = st.session_state.get("sample_words", [])
@@ -1073,25 +1244,80 @@ def main() -> None:
 
             if sample_words:
                 st.markdown("**Word samples**")
-                st.dataframe(
-                    [
-                        {
-                            "IPA": str(word.get("ipa", "")) if isinstance(word, dict) else str(word),
-                            "Part of speech": str(word.get("part_of_speech", "")) if isinstance(word, dict) else "",
-                            "Meaning tag": str(word.get("meaning", "")) if isinstance(word, dict) else "",
-                            "Gloss": str(word.get("gloss", "")) if isinstance(word, dict) else "",
-                            "Source": str(word.get("source", "")) if isinstance(word, dict) else "",
-                            "Sound-like": ipa_text_to_sound_like(
-                                str(word.get("ipa", "")) if isinstance(word, dict) else str(word),
+                word_rows = [
+                    {
+                        "Entry": str(word.get("id", "")) if isinstance(word, dict) else "",
+                        "IPA": str(word.get("ipa", "")) if isinstance(word, dict) else str(word),
+                        "Part of speech": str(word.get("part_of_speech", "")) if isinstance(word, dict) else "",
+                        "Meaning tag": str(word.get("meaning", "")) if isinstance(word, dict) else "",
+                        "Gloss": str(word.get("gloss", "")) if isinstance(word, dict) else "",
+                        "Source": str(word.get("source", "")) if isinstance(word, dict) else "",
+                        "Sound-like": ipa_text_to_sound_like(
+                            str(word.get("ipa", "")) if isinstance(word, dict) else str(word),
+                            use_segment_separators=show_segment_separators,
+                            profile_name=romanization_profile,
+                        ),
+                    }
+                    for word in sample_words
+                ]
+                st.dataframe(word_rows, hide_index=True, use_container_width=True)
+
+                with st.expander("Curate words (reroll one word at a time)", expanded=False):
+                    for word in sample_words:
+                        if not isinstance(word, dict):
+                            continue
+                        word_id = str(word.get("id", "")).strip()
+                        if not word_id:
+                            continue
+
+                        reroll_col_1, reroll_col_2, reroll_col_3, reroll_col_4 = st.columns([2.8, 1.5, 1.8, 1.0])
+                        reroll_col_1.write(
+                            f"{str(word.get('meaning', ''))} ({str(word.get('part_of_speech', ''))})"
+                        )
+                        reroll_col_2.code(str(word.get("ipa", "")))
+                        reroll_col_3.write(
+                            ipa_text_to_sound_like(
+                                str(word.get("ipa", "")),
                                 use_segment_separators=show_segment_separators,
                                 profile_name=romanization_profile,
-                            ),
-                        }
-                        for word in sample_words
-                    ],
-                    hide_index=True,
-                    use_container_width=True,
-                )
+                            )
+                        )
+                        reroll_clicked = reroll_col_4.button(
+                            "Re-roll",
+                            key=f"reroll_word_{word_id}",
+                            disabled=sample_generation_disabled,
+                        )
+                        if reroll_clicked:
+                            model = st.session_state.get("sample_language_model")
+                            if not isinstance(model, dict):
+                                st.error("No active lexicon model found. Generate samples first.")
+                                continue
+
+                            updated_entry = reroll_lexicon_entry(
+                                model,
+                                entry_id=word_id,
+                                phonotactic_profile_overrides=phonotactic_overrides,
+                            )
+                            if not updated_entry:
+                                st.error(f"Could not reroll entry '{word_id}'.")
+                                continue
+
+                            st.session_state["sample_language_model"] = model
+                            st.session_state["sample_words"] = build_sample_words(
+                                latest_vowels,
+                                latest_consonants,
+                                sample_count=max(1, int(concept_entry_count)),
+                                syllable_range=sample_syllable_range,
+                                syllable_separator=syllable_separator,
+                                style_name=selected_style,
+                                concept_list_name=selected_concept_list,
+                                grammar_profile_name=selected_grammar_profile,
+                                language_model=model,
+                                phonotactic_profile_overrides=phonotactic_overrides,
+                            )
+                            st.session_state.pop("sample_sentences", None)
+                            st.success(f"Rerolled {word_id}: {updated_entry.get('ipa', '')}")
+                            st.rerun()
             else:
                 st.info("No word samples yet. Click 'Generate Word Samples' or 'Generate Both'.")
 

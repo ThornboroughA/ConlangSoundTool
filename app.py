@@ -21,7 +21,9 @@ from sample_text_generator import (
     build_language_model,
     build_sample_sentences,
     build_sample_words,
+    language_model_summary,
     model_matches,
+    validate_generation_config,
 )
 
 IPA_TO_ROMAN_DIACRITICS: Dict[str, str] = {
@@ -904,6 +906,33 @@ def main() -> None:
             st.caption(f"Concept list: {CONCEPT_LIST_PRESETS[selected_concept_list]['description']}")
             st.caption(f"Grammar profile: {GRAMMAR_PROFILES[selected_grammar_profile]['description']}")
             st.caption("Word rows include meaning tags + part-of-speech labels from the shared lexicon.")
+            concept_entries_raw = CONCEPT_LIST_PRESETS[selected_concept_list].get("entries", [])
+            concept_entry_count = len(concept_entries_raw) if isinstance(concept_entries_raw, (list, tuple)) else 0
+            grammar_particles_raw = GRAMMAR_PROFILES[selected_grammar_profile].get("particle_inventory", [])
+            grammar_particle_count = (
+                len(grammar_particles_raw) if isinstance(grammar_particles_raw, (list, tuple)) else 0
+            )
+            st.caption(
+                f"Current setup: {concept_entry_count} concept entries, "
+                f"{grammar_particle_count} particle slots."
+            )
+
+            validation_report = validate_generation_config()
+            validation_errors = validation_report.get("errors", [])
+            validation_warnings = validation_report.get("warnings", [])
+            sample_generation_disabled = bool(validation_errors)
+            if validation_errors:
+                st.error(
+                    "Sample generation configuration has validation errors. "
+                    "Fix profile definitions before generating."
+                )
+                with st.expander("Show generation-config errors", expanded=False):
+                    for issue in validation_errors:
+                        st.write(f"- {issue}")
+            elif validation_warnings:
+                with st.expander("Generation-config warnings", expanded=False):
+                    for issue in validation_warnings:
+                        st.write(f"- {issue}")
 
             sample_controls_left, sample_controls_right = st.columns(2)
             with sample_controls_left:
@@ -953,28 +982,54 @@ def main() -> None:
 
             samples_button_col_1, samples_button_col_2, samples_button_col_3 = st.columns(3)
             with samples_button_col_1:
-                generate_word_samples = st.button("Generate Word Samples", key="generate_word_samples")
+                generate_word_samples = st.button(
+                    "Generate Word Samples",
+                    key="generate_word_samples",
+                    disabled=sample_generation_disabled,
+                )
             with samples_button_col_2:
-                generate_sentence_samples = st.button("Generate Sentence Samples", key="generate_sentence_samples")
+                generate_sentence_samples = st.button(
+                    "Generate Sentence Samples",
+                    key="generate_sentence_samples",
+                    disabled=sample_generation_disabled,
+                )
             with samples_button_col_3:
-                generate_both_samples = st.button("Generate Both", key="generate_both_samples")
+                generate_both_samples = st.button(
+                    "Generate Both",
+                    key="generate_both_samples",
+                    disabled=sample_generation_disabled,
+                )
 
             latest_vowels = latest_inventory.get("vowels", [])
             latest_consonants = latest_inventory.get("consonants", [])
+            cached_model = st.session_state.get("sample_language_model")
+            model_is_current = model_matches(
+                cached_model,
+                vowels=latest_vowels,
+                consonants=latest_consonants,
+                syllable_range=sample_syllable_range,
+                syllable_separator=syllable_separator,
+                style_name=selected_style,
+                concept_list_name=selected_concept_list,
+                grammar_profile_name=selected_grammar_profile,
+            )
+
+            if model_is_current:
+                model_stats = language_model_summary(cached_model)
+                st.caption(
+                    f"Current lexicon model: {model_stats['root_entries']} roots + "
+                    f"{model_stats['particle_entries']} particles "
+                    f"({model_stats['total_entries']} total entries)."
+                )
+            elif cached_model:
+                st.info(
+                    "Sample settings changed since the last generation. "
+                    "Generate again to rebuild the shared lexicon model."
+                )
 
             generate_any_samples = generate_word_samples or generate_sentence_samples or generate_both_samples
-            if generate_any_samples:
-                cached_model = st.session_state.get("sample_language_model")
-                if not model_matches(
-                    cached_model,
-                    vowels=latest_vowels,
-                    consonants=latest_consonants,
-                    syllable_range=sample_syllable_range,
-                    syllable_separator=syllable_separator,
-                    style_name=selected_style,
-                    concept_list_name=selected_concept_list,
-                    grammar_profile_name=selected_grammar_profile,
-                ):
+            if generate_any_samples and not sample_generation_disabled:
+                if not model_is_current:
                     cached_model = build_language_model(
                         vowels=latest_vowels,
                         consonants=latest_consonants,
@@ -986,7 +1041,7 @@ def main() -> None:
                     )
                     st.session_state["sample_language_model"] = cached_model
 
-            if generate_word_samples or generate_both_samples:
+            if (generate_word_samples or generate_both_samples) and not sample_generation_disabled:
                 st.session_state["sample_words"] = build_sample_words(
                     latest_vowels,
                     latest_consonants,
@@ -999,7 +1054,7 @@ def main() -> None:
                     language_model=st.session_state.get("sample_language_model"),
                 )
 
-            if generate_sentence_samples or generate_both_samples:
+            if (generate_sentence_samples or generate_both_samples) and not sample_generation_disabled:
                 st.session_state["sample_sentences"] = build_sample_sentences(
                     latest_vowels,
                     latest_consonants,
@@ -1025,6 +1080,7 @@ def main() -> None:
                             "Part of speech": str(word.get("part_of_speech", "")) if isinstance(word, dict) else "",
                             "Meaning tag": str(word.get("meaning", "")) if isinstance(word, dict) else "",
                             "Gloss": str(word.get("gloss", "")) if isinstance(word, dict) else "",
+                            "Source": str(word.get("source", "")) if isinstance(word, dict) else "",
                             "Sound-like": ipa_text_to_sound_like(
                                 str(word.get("ipa", "")) if isinstance(word, dict) else str(word),
                                 use_segment_separators=show_segment_separators,

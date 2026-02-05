@@ -342,6 +342,283 @@ def grammar_profile(grammar_profile_name: str) -> Dict[str, object]:
     return GRAMMAR_PROFILES.get(grammar_profile_name, GRAMMAR_PROFILES[DEFAULT_GRAMMAR_PROFILE])
 
 
+def _as_float(value: object) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _validate_weighted_pairs(
+    report: Dict[str, List[str]],
+    owner: str,
+    field_name: str,
+    value: object,
+    allowed_labels: Optional[Set[str]] = None,
+    label_pattern: Optional[str] = None,
+) -> None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        report["errors"].append(f"{owner}.{field_name} must be a weighted list of (label, weight) pairs.")
+        return
+
+    positive_weights = 0
+    for index, item in enumerate(value):
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            report["errors"].append(f"{owner}.{field_name}[{index}] must be a (label, weight) pair.")
+            continue
+
+        raw_label, raw_weight = item
+        label = str(raw_label)
+        weight = _as_float(raw_weight)
+        if weight is None:
+            report["errors"].append(f"{owner}.{field_name}[{index}] has a non-numeric weight.")
+        elif weight < 0:
+            report["errors"].append(f"{owner}.{field_name}[{index}] has a negative weight.")
+        elif weight > 0:
+            positive_weights += 1
+
+        if allowed_labels is not None and label not in allowed_labels:
+            report["errors"].append(
+                f"{owner}.{field_name}[{index}] references unknown label '{label}'."
+            )
+
+        if label_pattern is not None and not re.fullmatch(label_pattern, label):
+            report["errors"].append(
+                f"{owner}.{field_name}[{index}] label '{label}' does not match expected pattern."
+            )
+
+    if positive_weights == 0:
+        report["errors"].append(f"{owner}.{field_name} must include at least one positive weight.")
+
+
+def _validate_probability_field(
+    report: Dict[str, List[str]],
+    owner: str,
+    field_name: str,
+    value: object,
+) -> None:
+    number = _as_float(value)
+    if number is None:
+        report["errors"].append(f"{owner}.{field_name} must be numeric.")
+        return
+    if number < 0 or number > 1:
+        report["errors"].append(f"{owner}.{field_name} must be between 0 and 1.")
+
+
+def _validate_range_field(
+    report: Dict[str, List[str]],
+    owner: str,
+    field_name: str,
+    value: object,
+) -> None:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        report["errors"].append(f"{owner}.{field_name} must be a (min, max) pair.")
+        return
+    low = _as_float(value[0])
+    high = _as_float(value[1])
+    if low is None or high is None:
+        report["errors"].append(f"{owner}.{field_name} must contain numeric values.")
+        return
+    if low < 1 or high < 1:
+        report["errors"].append(f"{owner}.{field_name} must be >= 1.")
+        return
+    if int(high) < int(low):
+        report["errors"].append(f"{owner}.{field_name} max must be >= min.")
+
+
+def validate_generation_config() -> Dict[str, List[str]]:
+    """Validate configurable concept/style/grammar presets used by sample generation."""
+    report: Dict[str, List[str]] = {"errors": [], "warnings": []}
+
+    if DEFAULT_STYLE_PRESET not in STYLE_PRESETS:
+        report["errors"].append(f"DEFAULT_STYLE_PRESET '{DEFAULT_STYLE_PRESET}' is missing.")
+    if DEFAULT_CONCEPT_LIST not in CONCEPT_LIST_PRESETS:
+        report["errors"].append(f"DEFAULT_CONCEPT_LIST '{DEFAULT_CONCEPT_LIST}' is missing.")
+    if DEFAULT_GRAMMAR_PROFILE not in GRAMMAR_PROFILES:
+        report["errors"].append(f"DEFAULT_GRAMMAR_PROFILE '{DEFAULT_GRAMMAR_PROFILE}' is missing.")
+
+    if not STYLE_PRESETS:
+        report["errors"].append("STYLE_PRESETS is empty.")
+    for name, profile in STYLE_PRESETS.items():
+        owner = f"STYLE_PRESETS[{name}]"
+        if not isinstance(profile.get("description"), str) or not str(profile.get("description", "")).strip():
+            report["errors"].append(f"{owner}.description must be a non-empty string.")
+        _validate_weighted_pairs(
+            report,
+            owner=owner,
+            field_name="syllable_shapes",
+            value=profile.get("syllable_shapes"),
+            label_pattern=r"[CV]+",
+        )
+
+    if not CONCEPT_LIST_PRESETS:
+        report["errors"].append("CONCEPT_LIST_PRESETS is empty.")
+    for name, profile in CONCEPT_LIST_PRESETS.items():
+        owner = f"CONCEPT_LIST_PRESETS[{name}]"
+        if not isinstance(profile.get("description"), str) or not str(profile.get("description", "")).strip():
+            report["errors"].append(f"{owner}.description must be a non-empty string.")
+
+        entries = profile.get("entries")
+        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
+            report["errors"].append(f"{owner}.entries must be a sequence.")
+            continue
+        if len(entries) == 0:
+            report["errors"].append(f"{owner}.entries must not be empty.")
+            continue
+
+        seen_meanings: Set[str] = set()
+        duplicate_meanings: Set[str] = set()
+        for idx, entry in enumerate(entries):
+            if isinstance(entry, str):
+                meaning = _normalize_meaning(entry)
+                if not meaning:
+                    report["errors"].append(f"{owner}.entries[{idx}] is blank.")
+                    continue
+                normalized_meaning = meaning.lower()
+                if normalized_meaning in seen_meanings:
+                    duplicate_meanings.add(meaning)
+                seen_meanings.add(normalized_meaning)
+                continue
+
+            if not isinstance(entry, dict):
+                report["errors"].append(
+                    f"{owner}.entries[{idx}] must be either a string meaning or a dict definition."
+                )
+                continue
+
+            meaning = _normalize_meaning(str(entry.get("meaning", "")))
+            if not meaning:
+                report["errors"].append(f"{owner}.entries[{idx}].meaning is required.")
+                continue
+
+            pos = _normalize_meaning(str(entry.get("pos", "")).upper())
+            if pos and pos not in POS_LABELS:
+                report["errors"].append(
+                    f"{owner}.entries[{idx}].pos '{pos}' is not in POS_LABELS."
+                )
+
+            normalized_meaning = meaning.lower()
+            if normalized_meaning in seen_meanings:
+                duplicate_meanings.add(meaning)
+            seen_meanings.add(normalized_meaning)
+
+        if duplicate_meanings and name != "Leipzig-Jakarta 100":
+            duplicate_preview = ", ".join(sorted(duplicate_meanings)[:5])
+            report["warnings"].append(
+                f"{owner}.entries contains duplicate meanings (showing up to 5): {duplicate_preview}"
+            )
+
+    lj_profile = CONCEPT_LIST_PRESETS.get("Leipzig-Jakarta 100", {})
+    lj_entries = lj_profile.get("entries", ())
+    if isinstance(lj_entries, Sequence) and not isinstance(lj_entries, (str, bytes)):
+        if len(lj_entries) != 100:
+            report["warnings"].append(
+                "CONCEPT_LIST_PRESETS['Leipzig-Jakarta 100'] does not currently contain exactly 100 entries."
+            )
+
+    if not GRAMMAR_PROFILES:
+        report["errors"].append("GRAMMAR_PROFILES is empty.")
+    for name, profile in GRAMMAR_PROFILES.items():
+        owner = f"GRAMMAR_PROFILES[{name}]"
+        if not isinstance(profile.get("description"), str) or not str(profile.get("description", "")).strip():
+            report["errors"].append(f"{owner}.description must be a non-empty string.")
+
+        _validate_weighted_pairs(
+            report,
+            owner=owner,
+            field_name="clause_templates",
+            value=profile.get("clause_templates"),
+            allowed_labels=set(CLAUSE_SLOTS.keys()),
+        )
+        _validate_weighted_pairs(
+            report,
+            owner=owner,
+            field_name="sample_word_pos",
+            value=profile.get("sample_word_pos"),
+            allowed_labels=set(POS_LABELS.keys()),
+        )
+        _validate_weighted_pairs(
+            report,
+            owner=owner,
+            field_name="filler_pos",
+            value=profile.get("filler_pos"),
+            allowed_labels=set(POS_LABELS.keys()),
+        )
+        _validate_weighted_pairs(
+            report,
+            owner=owner,
+            field_name="modifier_positions",
+            value=profile.get("modifier_positions"),
+            allowed_labels={"pre", "post"},
+        )
+        _validate_weighted_pairs(
+            report,
+            owner=owner,
+            field_name="punctuation",
+            value=profile.get("punctuation"),
+        )
+
+        for rate_key in (
+            "subject_pronoun_rate",
+            "object_pronoun_rate",
+            "subject_particle_rate",
+            "object_particle_rate",
+            "tam_particle_rate",
+            "adjunct_rate",
+            "modifier_rate",
+        ):
+            _validate_probability_field(
+                report,
+                owner=owner,
+                field_name=rate_key,
+                value=profile.get(rate_key),
+            )
+
+        _validate_range_field(
+            report,
+            owner=owner,
+            field_name="particle_syllables",
+            value=profile.get("particle_syllables"),
+        )
+
+        particle_inventory = profile.get("particle_inventory")
+        if not isinstance(particle_inventory, Sequence) or isinstance(particle_inventory, (str, bytes)):
+            report["errors"].append(f"{owner}.particle_inventory must be a sequence.")
+        else:
+            for idx, particle in enumerate(particle_inventory):
+                particle_name = str(particle).upper()
+                if particle_name not in PARTICLE_DEFINITIONS:
+                    report["errors"].append(
+                        f"{owner}.particle_inventory[{idx}] references unknown particle '{particle_name}'."
+                    )
+
+    return report
+
+
+def language_model_summary(language_model: Optional[Dict[str, Any]]) -> Dict[str, int]:
+    """Return compact counts used for UI status display."""
+    if not isinstance(language_model, dict):
+        return {"total_entries": 0, "root_entries": 0, "particle_entries": 0}
+
+    lexicon = language_model.get("lexicon", [])
+    if not isinstance(lexicon, list):
+        lexicon = []
+    particles = language_model.get("particles", {})
+    if not isinstance(particles, dict):
+        particles = {}
+
+    root_entries = 0
+    for entry in lexicon:
+        if isinstance(entry, dict) and str(entry.get("source", "")).startswith("concept-list:"):
+            root_entries += 1
+
+    return {
+        "total_entries": len(lexicon),
+        "root_entries": root_entries,
+        "particle_entries": len(particles),
+    }
+
+
 def normalize_range(values: Tuple[int, int], minimum: int = 1) -> Tuple[int, int]:
     min_value, max_value = values
     min_value = max(minimum, int(min_value))

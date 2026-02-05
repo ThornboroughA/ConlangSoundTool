@@ -68,6 +68,6 @@ streamlit run app.py
 - apply rule sets,
 - view source-sound mixing guides and sound-like hints anywhere IPA is shown,
 - generate and preview vowels/consonants,
-- generate throwaway sample words/sentences from the latest inventory (with style presets),
+- generate lexicon-backed sample words/sentences from the latest inventory (with phonotactic styles, concept lists, grammar profiles, POS tags, and gloss hints),
 - save outputs to an output folder,
 - save the latest result as a reusable preset in `presets/`.

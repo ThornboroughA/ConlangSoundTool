@@ -14,7 +14,15 @@ from typing import Any, Dict, List, Optional, Tuple
 import streamlit as st
 
 import sound_inventory_generator as generator
-from sample_text_generator import STYLE_PRESETS, build_sample_sentences, build_sample_words
+from sample_text_generator import (
+    CONCEPT_LIST_PRESETS,
+    GRAMMAR_PROFILES,
+    STYLE_PRESETS,
+    build_language_model,
+    build_sample_sentences,
+    build_sample_words,
+    model_matches,
+)
 
 IPA_TO_ROMAN_DIACRITICS: Dict[str, str] = {
     # Vowels
@@ -798,6 +806,7 @@ def main() -> None:
                 st.session_state["last_generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.session_state.pop("sample_words", None)
                 st.session_state.pop("sample_sentences", None)
+                st.session_state.pop("sample_language_model", None)
 
                 st.success(f"Generated '{language_name}' and saved files to {output_dir}")
             except Exception as exc:  # pragma: no cover - UI safety net
@@ -856,17 +865,45 @@ def main() -> None:
                 )
 
         elif selected_result_view == "Sample Text":
-            st.caption("Generate placeholder words and sentences from this inventory. Not saved unless exported.")
+            st.caption(
+                "Generate lexicon-backed word and sentence samples from this inventory. "
+                "The same generated lexicon powers both views."
+            )
 
             style_names = list(STYLE_PRESETS.keys())
-            selected_style = st.selectbox(
-                "Sample style preset",
-                options=style_names,
-                index=0,
-                key="sample_style_preset",
-                help="Tweak the rhythm profile of generated placeholder words/sentences.",
-            )
+            concept_list_names = list(CONCEPT_LIST_PRESETS.keys())
+            grammar_profile_names = list(GRAMMAR_PROFILES.keys())
+
+            profile_col_1, profile_col_2, profile_col_3 = st.columns(3)
+            with profile_col_1:
+                selected_style = st.selectbox(
+                    "Phonotactic style",
+                    options=style_names,
+                    index=0,
+                    key="sample_style_preset",
+                    help="Controls syllable-shape tendencies for generated forms.",
+                )
+            with profile_col_2:
+                selected_concept_list = st.selectbox(
+                    "Concept list",
+                    options=concept_list_names,
+                    index=0,
+                    key="sample_concept_list",
+                    help="Controls which core meanings receive generated roots.",
+                )
+            with profile_col_3:
+                selected_grammar_profile = st.selectbox(
+                    "Grammar profile",
+                    options=grammar_profile_names,
+                    index=0,
+                    key="sample_grammar_profile",
+                    help="Controls clause order and particle behavior in sentences.",
+                )
+
             st.caption(f"Style guide: {STYLE_PRESETS[selected_style]['description']}")
+            st.caption(f"Concept list: {CONCEPT_LIST_PRESETS[selected_concept_list]['description']}")
+            st.caption(f"Grammar profile: {GRAMMAR_PROFILES[selected_grammar_profile]['description']}")
+            st.caption("Word rows include meaning tags + part-of-speech labels from the shared lexicon.")
 
             sample_controls_left, sample_controls_right = st.columns(2)
             with sample_controls_left:
@@ -925,6 +962,30 @@ def main() -> None:
             latest_vowels = latest_inventory.get("vowels", [])
             latest_consonants = latest_inventory.get("consonants", [])
 
+            generate_any_samples = generate_word_samples or generate_sentence_samples or generate_both_samples
+            if generate_any_samples:
+                cached_model = st.session_state.get("sample_language_model")
+                if not model_matches(
+                    cached_model,
+                    vowels=latest_vowels,
+                    consonants=latest_consonants,
+                    syllable_range=sample_syllable_range,
+                    syllable_separator=syllable_separator,
+                    style_name=selected_style,
+                    concept_list_name=selected_concept_list,
+                    grammar_profile_name=selected_grammar_profile,
+                ):
+                    cached_model = build_language_model(
+                        vowels=latest_vowels,
+                        consonants=latest_consonants,
+                        syllable_range=sample_syllable_range,
+                        syllable_separator=syllable_separator,
+                        style_name=selected_style,
+                        concept_list_name=selected_concept_list,
+                        grammar_profile_name=selected_grammar_profile,
+                    )
+                    st.session_state["sample_language_model"] = cached_model
+
             if generate_word_samples or generate_both_samples:
                 st.session_state["sample_words"] = build_sample_words(
                     latest_vowels,
@@ -933,6 +994,9 @@ def main() -> None:
                     syllable_range=sample_syllable_range,
                     syllable_separator=syllable_separator,
                     style_name=selected_style,
+                    concept_list_name=selected_concept_list,
+                    grammar_profile_name=selected_grammar_profile,
+                    language_model=st.session_state.get("sample_language_model"),
                 )
 
             if generate_sentence_samples or generate_both_samples:
@@ -944,6 +1008,9 @@ def main() -> None:
                     words_range=sample_words_range,
                     syllable_separator=syllable_separator,
                     style_name=selected_style,
+                    concept_list_name=selected_concept_list,
+                    grammar_profile_name=selected_grammar_profile,
+                    language_model=st.session_state.get("sample_language_model"),
                 )
 
             sample_words = st.session_state.get("sample_words", [])
@@ -954,9 +1021,12 @@ def main() -> None:
                 st.dataframe(
                     [
                         {
-                            "IPA": word,
+                            "IPA": str(word.get("ipa", "")) if isinstance(word, dict) else str(word),
+                            "Part of speech": str(word.get("part_of_speech", "")) if isinstance(word, dict) else "",
+                            "Meaning tag": str(word.get("meaning", "")) if isinstance(word, dict) else "",
+                            "Gloss": str(word.get("gloss", "")) if isinstance(word, dict) else "",
                             "Sound-like": ipa_text_to_sound_like(
-                                word,
+                                str(word.get("ipa", "")) if isinstance(word, dict) else str(word),
                                 use_segment_separators=show_segment_separators,
                                 profile_name=romanization_profile,
                             ),
@@ -974,9 +1044,11 @@ def main() -> None:
                 st.dataframe(
                     [
                         {
-                            "IPA": sentence,
+                            "IPA": str(sentence.get("ipa", "")) if isinstance(sentence, dict) else str(sentence),
+                            "Gloss": str(sentence.get("gloss", "")) if isinstance(sentence, dict) else "",
+                            "Template": str(sentence.get("template", "")) if isinstance(sentence, dict) else "",
                             "Sound-like": ipa_text_to_sound_like(
-                                sentence,
+                                str(sentence.get("ipa", "")) if isinstance(sentence, dict) else str(sentence),
                                 use_segment_separators=show_segment_separators,
                                 profile_name=romanization_profile,
                             ),

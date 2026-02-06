@@ -2395,3 +2395,29 @@ def build_sample_sentences(
         )
         for _ in range(count)
     ]
+
+
+def rebuild_indices(language_model: Dict[str, Any]) -> Dict[str, Any]:
+    """Rebuild lightweight lookup tables for a persisted language model snapshot."""
+    model = dict(language_model)
+    lexicon = model.get("lexicon", [])
+    if not isinstance(lexicon, list):
+        lexicon = []
+    model["lexicon"] = lexicon
+
+    by_pos: Dict[str, List[Dict[str, str]]] = {}
+    particles: Dict[str, Dict[str, str]] = {}
+    for entry in lexicon:
+        if not isinstance(entry, dict):
+            continue
+        pos = str(entry.get("pos", "")).strip()
+        if pos:
+            by_pos.setdefault(pos, []).append(entry)
+        entry_id = str(entry.get("id", ""))
+        if entry_id.startswith("PART:") or pos == "PART":
+            gloss = str(entry.get("gloss", "") or entry_id.replace("PART:", "")).upper()
+            particles[gloss] = entry
+
+    model["by_pos"] = by_pos
+    model["particles"] = particles
+    return model

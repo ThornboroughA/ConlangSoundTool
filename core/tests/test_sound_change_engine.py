@@ -1,6 +1,6 @@
 import unittest
 
-import sound_change_engine as sce
+from core.engine import sound_change as sce
 
 
 class TestSoundChangeEngine(unittest.TestCase):

@@ -1,7 +1,7 @@
 import random
 import unittest
 
-from family_generator import assign_years, build_random_binary_topology
+from core.engine.family_generator import assign_years, build_random_binary_topology
 
 
 def _collect_nodes(node):

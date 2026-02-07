@@ -11,3 +11,15 @@ __pycache__/
 # Generated outputs: keep folder, ignore contents
 outputs/*
 !outputs/.gitkeep
+
+# Desktop app artifacts
+apps/desktop/node_modules/
+apps/desktop/dist/
+apps/desktop/.vite/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# Sidecar build artifacts
+dist/
+build/
+*.spec

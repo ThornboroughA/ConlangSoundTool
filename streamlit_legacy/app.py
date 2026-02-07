@@ -13,12 +13,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import streamlit as st
 
-import family_generator
-import language_diff
-import project_io
-import sound_inventory_generator as generator
-import sound_change_engine
-from sample_text_generator import (
+from core.engine import family_generator
+from core.engine import language_diff
+from core.engine import project_io
+from core.engine import sound_inventory as generator
+from core.engine import sound_change as sound_change_engine
+from core.engine.sample_text import (
     CONCEPT_LIST_PRESETS,
     DEFAULT_PHONOTACTIC_PROFILE,
     DEFAULT_CONCEPT_LIST,

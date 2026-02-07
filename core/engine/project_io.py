@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from sample_text_generator import (
+from .sample_text import (
     DEFAULT_CONCEPT_LIST,
     DEFAULT_GRAMMAR_PROFILE,
     DEFAULT_STYLE_PRESET,
@@ -178,3 +178,23 @@ def hydrate_language_model(language: Dict[str, Any]) -> Dict[str, Any]:
     model.setdefault("phonotactic_profile_overrides", {})
 
     return rebuild_indices(model)
+
+
+def load_project_languages(project_dir: Path, project: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    languages: Dict[str, Dict[str, Any]] = {}
+    language_index = project.get("language_index", [])
+    if not isinstance(language_index, list):
+        return languages
+    languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+    for entry in language_index:
+        if not isinstance(entry, dict):
+            continue
+        language_id = entry.get("language_id")
+        filename = entry.get("filename")
+        if not language_id or not filename:
+            continue
+        path = languages_dir / filename
+        if not path.exists():
+            continue
+        languages[str(language_id)] = load_language(path)
+    return languages

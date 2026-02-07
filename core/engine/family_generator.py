@@ -7,8 +7,8 @@ import random
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
-import project_io
-import sound_change_engine
+from . import project_io
+from . import sound_change as sound_change_engine
 
 
 @dataclass

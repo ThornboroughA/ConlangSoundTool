@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-import sound_change_engine
+from . import sound_change as sound_change_engine
 
 
 def summarize_rule_effects(parent_inventory: Dict[str, Any], changeset: Dict[str, Any]) -> Dict[str, Any]:

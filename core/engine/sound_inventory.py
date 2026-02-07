@@ -9,8 +9,8 @@ inventory both as a JSON file and in a minimal CLDF/PHOIBLE style CSV format so 
 it can be re‑loaded or used in external tools.
 
 Usage:
-  python sound_inventory_generator.py --presets english korean --weights 0.5 0.5 \
-      --random-weight 0.1 --rules demo_shift --output my_lang
+  python core/engine/sound_inventory.py --presets english korean --weights 0.5 0.5 \
+      --random-weight 0.1 --rules demo_shift --output outputs/mylang
 
 Run with --help for full options.
 """
@@ -24,8 +24,9 @@ from typing import Dict, List, Any, Tuple
 
 # Directory constants (relative to script location)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PRESETS_DIR = os.path.join(SCRIPT_DIR, 'presets')
-RULES_DIR = os.path.join(SCRIPT_DIR, 'rules')
+ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir, os.pardir))
+PRESETS_DIR = os.path.join(ROOT_DIR, 'presets')
+RULES_DIR = os.path.join(ROOT_DIR, 'rules')
 
 
 def _normalize_segment_entries(raw_items: Any) -> List[Dict[str, Any]]:

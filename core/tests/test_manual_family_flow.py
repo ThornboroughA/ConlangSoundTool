@@ -2,11 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import family_generator
-import language_diff
-import project_io
-import sound_change_engine
-from sample_text_generator import DEFAULT_CONCEPT_LIST, DEFAULT_GRAMMAR_PROFILE, DEFAULT_STYLE_PRESET
+from core.engine import family_generator
+from core.engine import language_diff
+from core.engine import project_io
+from core.engine import sound_change as sound_change_engine
+from core.engine.sample_text import DEFAULT_CONCEPT_LIST, DEFAULT_GRAMMAR_PROFILE, DEFAULT_STYLE_PRESET
 
 
 def _write_proto(project_dir: Path) -> None:

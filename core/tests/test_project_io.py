@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import project_io
+from core.engine import project_io
 
 
 class TestProjectIO(unittest.TestCase):

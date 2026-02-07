@@ -624,34 +624,37 @@ def inject_custom_css() -> None:
     st.markdown(
         """
         <style>
+        @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap");
+
         :root {
-            --bg-start: #f2f7f4;
-            --bg-end: #e6f0ea;
-            --panel: rgba(255, 255, 255, 0.84);
-            --ink-strong: #1a2b23;
-            --ink-muted: #4a6257;
-            --line: #d2e0d7;
-            --accent: #1f7a5a;
-            --accent-soft: #2f9f76;
-            --accent-warm: #a06c2f;
+            --bg-start: #f7f1e8;
+            --bg-end: #e9f1ed;
+            --panel: rgba(255, 255, 255, 0.9);
+            --ink-strong: #1e2a2b;
+            --ink-muted: #4f6460;
+            --line: #d7e2da;
+            --accent: #1a6b62;
+            --accent-soft: #2f8f82;
+            --accent-warm: #c07d36;
+            --accent-cool: #3b6b92;
         }
 
         .stApp {
             background:
-                radial-gradient(1200px 500px at 12% -18%, #dceadf 0%, transparent 60%),
-                radial-gradient(900px 400px at 110% 0%, #e6ece2 0%, transparent 65%),
+                radial-gradient(1100px 520px at 8% -20%, #f1dfc6 0%, transparent 60%),
+                radial-gradient(900px 520px at 100% 0%, #d9ece4 0%, transparent 65%),
                 linear-gradient(180deg, var(--bg-start), var(--bg-end));
         }
 
         .main .block-container {
-            max-width: 1160px;
+            max-width: 1180px;
             padding-top: 1.1rem;
-            padding-bottom: 2rem;
+            padding-bottom: 2.2rem;
         }
 
         html, body, .stApp, [data-testid="stAppViewContainer"] {
             color: var(--ink-strong);
-            font-family: "Segoe UI Variable", "Trebuchet MS", "Verdana", sans-serif;
+            font-family: "IBM Plex Sans", "Segoe UI", "Trebuchet MS", sans-serif;
         }
 
         .material-symbols-rounded {
@@ -660,17 +663,23 @@ def inject_custom_css() -> None:
 
         h1, h2, h3, [data-testid="stMarkdownContainer"] h1,
         [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3 {
-            font-family: "Palatino Linotype", "Book Antiqua", "Georgia", serif;
+            font-family: "Fraunces", "Palatino Linotype", "Book Antiqua", serif;
             letter-spacing: 0.01em;
+        }
+
+        @keyframes riseIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .hero-shell {
             border: 1px solid var(--line);
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(242, 249, 245, 0.86));
-            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(246, 248, 244, 0.86));
+            border-radius: 18px;
             padding: 1.1rem 1.2rem 1.15rem;
             margin-bottom: 1rem;
-            box-shadow: 0 10px 24px rgba(40, 70, 55, 0.06);
+            box-shadow: 0 14px 30px rgba(30, 45, 40, 0.08);
+            animation: riseIn 0.6s ease-out;
         }
 
         .hero-eyebrow {
@@ -679,8 +688,8 @@ def inject_custom_css() -> None:
             letter-spacing: 0.09em;
             font-size: 0.74rem;
             color: var(--accent);
-            background: rgba(31, 122, 90, 0.12);
-            border: 1px solid rgba(31, 122, 90, 0.28);
+            background: rgba(26, 107, 98, 0.12);
+            border: 1px solid rgba(26, 107, 98, 0.3);
             border-radius: 999px;
             padding: 0.2rem 0.55rem;
             margin-bottom: 0.45rem;
@@ -715,7 +724,7 @@ def inject_custom_css() -> None:
         [data-testid="stExpander"] {
             border: 1px solid var(--line);
             border-radius: 12px;
-            background: rgba(255, 255, 255, 0.75);
+            background: rgba(255, 255, 255, 0.78);
         }
 
         [data-testid="stDataFrame"] {
@@ -726,15 +735,15 @@ def inject_custom_css() -> None:
 
         .stButton > button, .stDownloadButton > button {
             border-radius: 10px;
-            border: 1px solid rgba(31, 122, 90, 0.45);
-            background: linear-gradient(180deg, #ffffff, #eef7f1);
+            border: 1px solid rgba(26, 107, 98, 0.4);
+            background: linear-gradient(180deg, #ffffff, #eef6f2);
         }
 
         .stButton > button[kind="primary"] {
             border: none;
             background: linear-gradient(145deg, var(--accent), var(--accent-soft));
             color: white;
-            box-shadow: 0 8px 18px rgba(31, 122, 90, 0.24);
+            box-shadow: 0 10px 20px rgba(26, 107, 98, 0.24);
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -744,12 +753,12 @@ def inject_custom_css() -> None:
         .stTabs [data-baseweb="tab"] {
             border-radius: 9px;
             border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.74);
+            background: rgba(255, 255, 255, 0.78);
         }
 
         .stTabs [aria-selected="true"] {
-            border-color: rgba(31, 122, 90, 0.42);
-            background: rgba(238, 248, 242, 0.96);
+            border-color: rgba(26, 107, 98, 0.42);
+            background: rgba(236, 246, 242, 0.96);
         }
 
         .section-kicker {
@@ -759,6 +768,7 @@ def inject_custom_css() -> None:
             font-size: 0.73rem;
             margin-bottom: 0.1rem;
             font-weight: 600;
+            animation: riseIn 0.5s ease-out;
         }
         </style>
         """,
@@ -816,159 +826,181 @@ def render_single_language_ui() -> None:
         st.error("No preset files found. Add JSON files to presets/ and reload.")
         st.stop()
 
-    st.markdown('<div class="section-kicker">Step 1</div>', unsafe_allow_html=True)
-    st.subheader("Configure and Generate")
+    latest_inventory = st.session_state.get("last_inventory")
+    latest_language_name = st.session_state.get("last_language_name", "GeneratedLanguage")
+    latest_rule_sets = st.session_state.get("last_rule_sets", [])
+    latest_generated_at = st.session_state.get("last_generated_at")
+    output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
+    generated_time_label = f" at {latest_generated_at}" if latest_generated_at else ""
 
-    controls_col, run_col = st.columns([1.8, 1.2], gap="large")
-    weights: List[float] = []
-    with controls_col:
-        selected_presets = st.multiselect(
-            "Presets to mix",
-            options=preset_names,
-            default=default_preset_selection(preset_names),
-            help="Pick one or more source inventories.",
+    status_col, display_col = st.columns([2.2, 1.0], gap="large")
+    with status_col:
+        st.markdown("### Session Status")
+        if latest_inventory:
+            vowels = latest_inventory.get("vowels", []) if isinstance(latest_inventory, dict) else []
+            consonants = latest_inventory.get("consonants", []) if isinstance(latest_inventory, dict) else []
+            st.caption(f"Active language: {latest_language_name}")
+            st.caption(
+                f"{len(vowels)} vowels, {len(consonants)} consonants, "
+                f"{len(latest_rule_sets)} rule set(s) applied."
+            )
+            st.caption(f"Latest files written to: {output_dir_label}{generated_time_label}")
+        else:
+            st.info("No language generated yet. Use the Build tab to start.")
+
+    with display_col:
+        st.markdown("### Display")
+        romanization_profile = st.selectbox(
+            "Romanization profile",
+            options=list(ROMANIZATION_PROFILES.keys()),
+            index=list(ROMANIZATION_PROFILES.keys()).index(romanization_profile)
+            if romanization_profile in ROMANIZATION_PROFILES
+            else 0,
+            key="romanization_profile",
+            help="Display-only: how IPA renders to sound-like text.",
         )
 
-        if selected_presets:
-            st.markdown("**Preset weights**")
-            default_weight = round(1.0 / len(selected_presets), 2)
-            for preset_name in selected_presets:
-                weight = st.slider(
-                    f"{preset_name} weight",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=default_weight,
-                    step=0.05,
-                    key=f"weight_{preset_name}",
-                )
-                weights.append(weight)
-
-        random_weight = st.slider(
-            "Random weight (master pool)",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.10,
-            step=0.05,
-        )
-
-        master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
-        master_preset = st.selectbox(
-            "Master preset for random picks",
-            options=preset_names,
-            index=master_default,
-        )
-
-        selected_rules = st.multiselect(
-            "Sound-change rules (optional)",
-            options=rule_names,
-            help="Rules are applied in order, from top to bottom.",
-        )
-
-    with run_col:
-        st.markdown("**Output settings**")
-        language_name = st.text_input("Generated language name", value="GeneratedLanguage")
-        output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
-        use_seed = st.checkbox("Use fixed random seed", value=False)
-        seed_value = st.number_input(
-            "Seed value",
-            min_value=0,
-            max_value=2_147_483_647,
-            value=42,
-            step=1,
-            disabled=not use_seed,
-        )
-        generate = st.button("Generate Inventory", type="primary", use_container_width=True)
-
-        st.caption(
-            "Tip: keep a fixed seed while exploring, then save successful inventories as presets."
-        )
-
-    total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
-    render_mix_metrics(
-        selected_presets=selected_presets,
-        selected_rules=selected_rules,
-        random_weight=random_weight,
-        total_weight=total_weight,
+    tab_build, tab_review, tab_samples, tab_export = st.tabs(
+        ["1. Build", "2. Review", "3. Samples", "4. Export"]
     )
 
-    with st.expander("Source inventory reference", expanded=False):
-        render_mix_reference_panel(
+    with tab_build:
+        st.markdown('<div class="section-kicker">Step 1</div>', unsafe_allow_html=True)
+        st.subheader("Configure and Generate")
+
+        controls_col, run_col = st.columns([1.8, 1.2], gap="large")
+        weights: List[float] = []
+        with controls_col:
+            selected_presets = st.multiselect(
+                "Presets to mix",
+                options=preset_names,
+                default=default_preset_selection(preset_names),
+                help="Pick one or more source inventories.",
+            )
+
+            if selected_presets:
+                st.markdown("**Preset weights**")
+                default_weight = round(1.0 / len(selected_presets), 2)
+                for preset_name in selected_presets:
+                    weight = st.slider(
+                        f"{preset_name} weight",
+                        min_value=0.0,
+                        max_value=1.0,
+                        value=default_weight,
+                        step=0.05,
+                        key=f"weight_{preset_name}",
+                    )
+                    weights.append(weight)
+
+            random_weight = st.slider(
+                "Random weight (master pool)",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.10,
+                step=0.05,
+            )
+
+            master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
+            master_preset = st.selectbox(
+                "Master preset for random picks",
+                options=preset_names,
+                index=master_default,
+            )
+
+            selected_rules = st.multiselect(
+                "Sound-change rules (optional)",
+                options=rule_names,
+                help="Rules are applied in order, from top to bottom.",
+            )
+
+        with run_col:
+            st.markdown("**Output settings**")
+            language_name = st.text_input("Generated language name", value="GeneratedLanguage")
+            output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
+            use_seed = st.checkbox("Use fixed random seed", value=False)
+            seed_value = st.number_input(
+                "Seed value",
+                min_value=0,
+                max_value=2_147_483_647,
+                value=42,
+                step=1,
+                disabled=not use_seed,
+            )
+            generate = st.button("Generate Inventory", type="primary", use_container_width=True)
+
+            st.caption(
+                "Tip: keep a fixed seed while exploring, then save successful inventories as presets."
+            )
+
+        total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
+        render_mix_metrics(
             selected_presets=selected_presets,
-            weights=weights,
+            selected_rules=selected_rules,
             random_weight=random_weight,
-            master_preset=master_preset,
-            profile_name=romanization_profile,
+            total_weight=total_weight,
         )
 
-    if generate:
-        if not selected_presets:
-            st.error("Pick at least one preset before generating.")
-        elif total_weight <= 0:
-            st.error("At least one preset/random weight must be greater than zero.")
-        else:
-            try:
-                if use_seed:
-                    random.seed(int(seed_value))
+        with st.expander("Source inventory reference", expanded=False):
+            render_mix_reference_panel(
+                selected_presets=selected_presets,
+                weights=weights,
+                random_weight=random_weight,
+                master_preset=master_preset,
+                profile_name=romanization_profile,
+            )
 
-                mixed_inventory = generator.mix_inventories(
-                    preset_names=selected_presets,
-                    weights=weights,
-                    random_weight=random_weight,
-                    master_preset_name=master_preset,
-                )
+        if generate:
+            if not selected_presets:
+                st.error("Pick at least one preset before generating.")
+            elif total_weight <= 0:
+                st.error("At least one preset/random weight must be greater than zero.")
+            else:
+                try:
+                    if use_seed:
+                        random.seed(int(seed_value))
 
-                if selected_rules:
-                    mixed_inventory = generator.apply_rules(mixed_inventory, selected_rules)
+                    mixed_inventory = generator.mix_inventories(
+                        preset_names=selected_presets,
+                        weights=weights,
+                        random_weight=random_weight,
+                        master_preset_name=master_preset,
+                    )
 
-                output_dir = resolve_output_dir(output_dir_value)
-                generator.save_inventory_as_json(mixed_inventory, str(output_dir), language_name)
-                generator.save_inventory_as_cldf(mixed_inventory, str(output_dir), language_name)
+                    if selected_rules:
+                        mixed_inventory = generator.apply_rules(mixed_inventory, selected_rules)
 
-                st.session_state["last_inventory"] = mixed_inventory
-                st.session_state["last_language_name"] = language_name
-                st.session_state["last_output_dir"] = str(output_dir)
-                st.session_state["last_rule_sets"] = selected_rules[:]
-                st.session_state["last_generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.session_state.pop("sample_words", None)
-                st.session_state.pop("sample_sentences", None)
-                st.session_state.pop("sample_language_model", None)
+                    output_dir = resolve_output_dir(output_dir_value)
+                    generator.save_inventory_as_json(mixed_inventory, str(output_dir), language_name)
+                    generator.save_inventory_as_cldf(mixed_inventory, str(output_dir), language_name)
 
-                st.success(f"Generated '{language_name}' and saved files to {output_dir}")
-            except Exception as exc:  # pragma: no cover - UI safety net
-                st.exception(exc)
+                    st.session_state["last_inventory"] = mixed_inventory
+                    st.session_state["last_language_name"] = language_name
+                    st.session_state["last_output_dir"] = str(output_dir)
+                    st.session_state["last_rule_sets"] = selected_rules[:]
+                    st.session_state["last_generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    st.session_state.pop("sample_words", None)
+                    st.session_state.pop("sample_sentences", None)
+                    st.session_state.pop("sample_language_model", None)
+
+                    st.success(f"Generated '{language_name}' and saved files to {output_dir}")
+                except Exception as exc:  # pragma: no cover - UI safety net
+                    st.exception(exc)
 
     latest_inventory = st.session_state.get("last_inventory")
     latest_language_name = st.session_state.get("last_language_name", "GeneratedLanguage")
     latest_rule_sets = st.session_state.get("last_rule_sets", [])
     latest_generated_at = st.session_state.get("last_generated_at")
 
-    if latest_inventory:
-        st.divider()
+    with tab_review:
         st.markdown('<div class="section-kicker">Step 2</div>', unsafe_allow_html=True)
         st.subheader("Review Latest Result")
-        romanization_profile = st.selectbox(
-            "Romanization profile (display only)",
-            options=list(ROMANIZATION_PROFILES.keys()),
-            index=0,
-            key="romanization_profile",
-            help="Toggle how IPA is rendered to sound-like text. This does not regenerate the language.",
-        )
-        render_inventory_metrics(latest_inventory, applied_rule_count=len(latest_rule_sets))
-
-        output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
-        generated_time_label = f" at {latest_generated_at}" if latest_generated_at else ""
-        st.caption(f"Latest files were written to: {output_dir_label}{generated_time_label}")
-
-        preset_payload = inventory_as_preset_payload(latest_inventory, latest_language_name)
-        selected_result_view = st.radio(
-            "Result view",
-            options=["Inventory", "Sample Text", "Export and Reuse"],
-            horizontal=True,
-            key="result_view_selector",
-            label_visibility="collapsed",
-        )
-
-        if selected_result_view == "Inventory":
+        if not latest_inventory:
+            st.info("Generate a language first to review its inventory.")
+        else:
+            render_inventory_metrics(latest_inventory, applied_rule_count=len(latest_rule_sets))
+            output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
+            generated_time_label = f" at {latest_generated_at}" if latest_generated_at else ""
+            st.caption(f"Latest files were written to: {output_dir_label}{generated_time_label}")
             st.caption(
                 f"Sound-like notes are approximation helpers; IPA remains canonical. "
                 f"Profile: {romanization_profile}."
@@ -996,7 +1028,12 @@ def render_single_language_ui() -> None:
                     },
                 )
 
-        elif selected_result_view == "Sample Text":
+    with tab_samples:
+        st.markdown('<div class="section-kicker">Step 3</div>', unsafe_allow_html=True)
+        st.subheader("Generate Samples and Curate")
+        if not latest_inventory:
+            st.info("Generate a language first to build lexicon samples.")
+        else:
             st.caption(
                 "Generate lexicon-backed word and sentence samples from this inventory. "
                 "The same generated lexicon powers both views."
@@ -1450,8 +1487,14 @@ def render_single_language_ui() -> None:
             else:
                 st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
 
+    with tab_export:
+        st.markdown('<div class="section-kicker">Step 4</div>', unsafe_allow_html=True)
+        st.subheader("Export and Reuse")
+        if not latest_inventory:
+            st.info("Generate a language first to export snapshots and presets.")
         else:
             st.caption("Download ready-to-reuse files or save this result as a preset for future sessions.")
+            preset_payload = inventory_as_preset_payload(latest_inventory, latest_language_name)
 
             download_col_1, download_col_2 = st.columns(2)
             with download_col_1:
@@ -1549,6 +1592,11 @@ def render_single_language_ui() -> None:
                         json.dump(preset_payload, file, ensure_ascii=False, indent=2)
                     st.success(f"Saved preset: {preset_path}")
 
+            st.markdown("**Next step**")
+            if st.button("Open Language Family Builder", use_container_width=True):
+                st.session_state["app_mode"] = "Language Family"
+                st.rerun()
+
 
 def render_language_family_ui() -> None:
     st.subheader("Language Family Generator")
@@ -1556,10 +1604,14 @@ def render_language_family_ui() -> None:
     if romanization_profile not in ROMANIZATION_PROFILES:
         romanization_profile = DEFAULT_ROMANIZATION_PROFILE
 
+    notice = st.session_state.pop("family_notice", None)
+    if notice:
+        st.success(notice)
+
     def _set_project_state(project: Dict[str, Any], project_dir: Path) -> None:
         st.session_state["family_project"] = project
         st.session_state["family_project_dir"] = str(project_dir)
-        st.session_state["family_languages_cache"] = {}
+        st.session_state["family_languages_cache"] = None
 
     help_topics = {
         "project_root": {
@@ -1605,7 +1657,9 @@ def render_language_family_ui() -> None:
         if st.button("?", key=key):
             st.session_state["help_topic"] = topic_key
 
-    with st.sidebar:
+    setup_col_1, setup_col_2 = st.columns([1.4, 1.0], gap="large")
+
+    with setup_col_1:
         st.markdown("### Project")
         project_root = st.text_input(
             "Project root folder",
@@ -1677,7 +1731,11 @@ def render_language_family_ui() -> None:
                 except Exception as exc:  # pragma: no cover - UI safety net
                     st.error(f"Could not save project: {exc}")
 
-        st.markdown("---")
+    project = st.session_state.get("family_project")
+    project_dir_value = st.session_state.get("family_project_dir")
+    project_dir = Path(project_dir_value) if project_dir_value else None
+
+    with setup_col_2:
         st.markdown("### Proto")
         proto_source = st.radio(
             "Proto source",
@@ -1758,12 +1816,16 @@ def render_language_family_ui() -> None:
                     project["language_index"] = language_index
                     project_io.save_project(project)
                     _set_project_state(project, project_dir)
-                    st.success(f"Saved proto language: {language_id}")
+                    st.session_state["family_notice"] = f"Saved proto language: {language_id}"
+                    st.rerun()
+
+    st.divider()
 
     def _load_languages(force: bool = False) -> Dict[str, Dict[str, Any]]:
         if not isinstance(project, dict) or not project_dir:
             return {}
-        if force or not isinstance(st.session_state.get("family_languages_cache"), dict):
+        cache = st.session_state.get("family_languages_cache")
+        if force or not isinstance(cache, dict) or not cache:
             st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
         return st.session_state.get("family_languages_cache", {})
 
@@ -1885,11 +1947,17 @@ def render_language_family_ui() -> None:
         else:
             languages = _load_languages()
             if not languages:
-                st.info("Save a proto language first in the sidebar.")
+                st.info("Save a proto language first in the setup panel above.")
             else:
                 selected_id = st.session_state.get("family_selected_id") or project.get("root_language_id")
                 if selected_id not in languages:
                     selected_id = list(languages.keys())[0]
+                selected_meta = languages.get(selected_id, {}).get("meta", {})
+                selected_label = f"{selected_meta.get('name', selected_id)} ({selected_id})"
+                summary_cols = st.columns(3)
+                summary_cols[0].metric("Languages", str(len(languages)))
+                summary_cols[1].metric("Selected", selected_label)
+                summary_cols[2].metric("Root", str(project.get("root_language_id") or "—"))
                 view = st.radio(
                     "Workspace",
                     options=["Create Daughter", "Compare", "Language Details"],
@@ -1898,227 +1966,264 @@ def render_language_family_ui() -> None:
 
                 if view == "Create Daughter":
                     existing_ids = sorted(list(languages.keys()))
-                    parent_col, parent_help_col = st.columns([4, 1])
-                    with parent_col:
-                        selected_parent = st.selectbox(
-                            "Step 1: Select parent",
-                            options=existing_ids,
-                            index=existing_ids.index(selected_id) if selected_id in existing_ids else 0,
+                    selected_parent_default = st.session_state.get("family_selected_id") or project.get("root_language_id")
+                    if selected_parent_default not in existing_ids:
+                        selected_parent_default = existing_ids[0]
+
+                    selected_parent = selected_parent_default
+                    child_name = f"{selected_parent}_child"
+                    child_id_input = ""
+                    override_settings: Dict[str, Any] = {}
+                    cleaned_rules: List[Dict[str, Any]] = []
+
+                    step_parent, step_identity, step_changes, step_preview = st.tabs(
+                        ["1. Parent", "2. Identity", "3. Changes", "4. Preview"]
+                    )
+
+                    with step_parent:
+                        parent_col, parent_help_col = st.columns([4, 1])
+                        with parent_col:
+                            selected_parent = st.selectbox(
+                                "Select parent language",
+                                options=existing_ids,
+                                index=existing_ids.index(selected_parent_default)
+                                if selected_parent_default in existing_ids
+                                else 0,
+                            )
+                        with parent_help_col:
+                            help_button("parent_select")
+                        parent_language = languages[selected_parent]
+                        parent_meta = parent_language.get("meta", {})
+                        st.caption(
+                            f"Parent: {parent_meta.get('name', selected_parent)} "
+                            f"({selected_parent}, year {parent_meta.get('year', '?')})"
                         )
-                    with parent_help_col:
-                        help_button("parent_select")
-                    parent_language = languages[selected_parent]
 
-                    st.markdown("**Step 2: Name + ID**")
-                    child_name = st.text_input("Child language name", value=f"{selected_parent}_child")
-                    suggested_id = _suggest_unique_id(child_name, existing_ids)
-                    child_id_input = st.text_input("Child language ID", value=suggested_id)
-                    help_button("child_id")
-                    if child_id_input in existing_ids:
-                        st.error("This ID is already used. Choose a different one.")
-                    year_default = int(parent_language.get("meta", {}).get("year", 0)) + 100
-                    child_year = st.number_input("Year (relative to proto timeline)", value=year_default, step=10)
-                    notes = st.text_area("Notes (optional)", value="")
+                    with step_identity:
+                        parent_language = languages[selected_parent]
+                        st.markdown("**Name + ID**")
+                        child_name = st.text_input("Child language name", value=f"{selected_parent}_child")
+                        suggested_id = _suggest_unique_id(child_name, existing_ids)
+                        child_id_input = st.text_input("Child language ID", value=suggested_id)
+                        help_button("child_id")
+                        if child_id_input in existing_ids:
+                            st.error("This ID is already used. Choose a different one.")
+                        year_default = int(parent_language.get("meta", {}).get("year", 0)) + 100
+                        child_year = st.number_input("Year (relative to proto timeline)", value=year_default, step=10)
+                        notes = st.text_area("Notes (optional)", value="")
 
-                    override_settings: Dict[str, Any] = {"year": int(child_year), "notes": notes}
-                    with st.expander("Override inherited settings", expanded=False):
-                        help_button("override_settings")
-                        parent_style = str(parent_language.get("style_name", DEFAULT_STYLE_PRESET))
-                        parent_concept = str(parent_language.get("concept_list_name", DEFAULT_CONCEPT_LIST))
-                        parent_grammar = str(parent_language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE))
-                        parent_syllable_range = parent_language.get("syllable_range", [1, 1])
-                        if not isinstance(parent_syllable_range, (list, tuple)) or len(parent_syllable_range) != 2:
-                            parent_syllable_range = [1, 1]
-                        parent_separator = str(parent_language.get("syllable_separator", ""))
+                        override_settings = {"year": int(child_year), "notes": notes}
+                        with st.expander("Override inherited settings", expanded=False):
+                            help_button("override_settings")
+                            parent_style = str(parent_language.get("style_name", DEFAULT_STYLE_PRESET))
+                            parent_concept = str(parent_language.get("concept_list_name", DEFAULT_CONCEPT_LIST))
+                            parent_grammar = str(parent_language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE))
+                            parent_syllable_range = parent_language.get("syllable_range", [1, 1])
+                            if not isinstance(parent_syllable_range, (list, tuple)) or len(parent_syllable_range) != 2:
+                                parent_syllable_range = [1, 1]
+                            parent_separator = str(parent_language.get("syllable_separator", ""))
 
-                        if st.checkbox("Override style preset", value=False, key="family_override_style"):
-                            override_settings["style_name"] = st.selectbox(
-                                "Style preset",
-                                options=list(STYLE_PRESETS.keys()),
-                                index=list(STYLE_PRESETS.keys()).index(parent_style)
-                                if parent_style in STYLE_PRESETS
-                                else 0,
-                            )
-
-                        if st.checkbox("Override concept list", value=False, key="family_override_concept"):
-                            override_settings["concept_list_name"] = st.selectbox(
-                                "Concept list",
-                                options=list(CONCEPT_LIST_PRESETS.keys()),
-                                index=list(CONCEPT_LIST_PRESETS.keys()).index(parent_concept)
-                                if parent_concept in CONCEPT_LIST_PRESETS
-                                else 0,
-                            )
-
-                        if st.checkbox("Override grammar profile", value=False, key="family_override_grammar"):
-                            override_settings["grammar_profile_name"] = st.selectbox(
-                                "Grammar profile",
-                                options=list(GRAMMAR_PROFILES.keys()),
-                                index=list(GRAMMAR_PROFILES.keys()).index(parent_grammar)
-                                if parent_grammar in GRAMMAR_PROFILES
-                                else 0,
-                            )
-
-                        if st.checkbox("Override syllable range", value=False, key="family_override_syllables"):
-                            override_settings["syllable_range"] = list(
-                                st.slider(
-                                    "Syllables per word",
-                                    min_value=1,
-                                    max_value=5,
-                                    value=(int(parent_syllable_range[0]), int(parent_syllable_range[1])),
+                            if st.checkbox("Override style preset", value=False, key="family_override_style"):
+                                override_settings["style_name"] = st.selectbox(
+                                    "Style preset",
+                                    options=list(STYLE_PRESETS.keys()),
+                                    index=list(STYLE_PRESETS.keys()).index(parent_style)
+                                    if parent_style in STYLE_PRESETS
+                                    else 0,
                                 )
-                            )
 
-                        if st.checkbox("Override syllable separator", value=False, key="family_override_sep"):
-                            override_settings["syllable_separator"] = st.selectbox(
-                                "Separator",
-                                options=["", "."],
-                                index=0 if parent_separator == "" else 1,
-                            )
+                            if st.checkbox("Override concept list", value=False, key="family_override_concept"):
+                                override_settings["concept_list_name"] = st.selectbox(
+                                    "Concept list",
+                                    options=list(CONCEPT_LIST_PRESETS.keys()),
+                                    index=list(CONCEPT_LIST_PRESETS.keys()).index(parent_concept)
+                                    if parent_concept in CONCEPT_LIST_PRESETS
+                                    else 0,
+                                )
 
-                        if st.checkbox("Override phonotactic profile (JSON)", value=False, key="family_override_phonotactics"):
-                            raw_override = st.text_area("Phonotactic overrides JSON", value="{}", height=120)
-                            override_dict, override_error = parse_override_json(raw_override)
-                            if override_error:
-                                st.error(override_error)
-                            else:
-                                override_settings["phonotactic_profile_overrides"] = override_dict
+                            if st.checkbox("Override grammar profile", value=False, key="family_override_grammar"):
+                                override_settings["grammar_profile_name"] = st.selectbox(
+                                    "Grammar profile",
+                                    options=list(GRAMMAR_PROFILES.keys()),
+                                    index=list(GRAMMAR_PROFILES.keys()).index(parent_grammar)
+                                    if parent_grammar in GRAMMAR_PROFILES
+                                    else 0,
+                                )
 
-                    st.markdown("**Step 3: Sound changes**")
-                    help_button("sound_changes")
-                    template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
-                    selected_templates = st.multiselect("Templates", options=template_options, default=[])
-                    parent_inventory = parent_language.get("inventory", {})
-                    rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
+                            if st.checkbox("Override syllable range", value=False, key="family_override_syllables"):
+                                override_settings["syllable_range"] = list(
+                                    st.slider(
+                                        "Syllables per word",
+                                        min_value=1,
+                                        max_value=5,
+                                        value=(int(parent_syllable_range[0]), int(parent_syllable_range[1])),
+                                    )
+                                )
 
-                    if rule_editor_key not in st.session_state:
-                        st.session_state[rule_editor_key] = []
+                            if st.checkbox("Override syllable separator", value=False, key="family_override_sep"):
+                                override_settings["syllable_separator"] = st.selectbox(
+                                    "Separator",
+                                    options=["", "."],
+                                    index=0 if parent_separator == "" else 1,
+                                )
 
-                    if st.button("Generate rules from templates"):
-                        if selected_templates:
-                            seed_base = int(project.get("seed", 0))
-                            seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}")) % (2**32)
-                            rng = random.Random(seed_value)
-                            changeset_preview = family_generator.generate_changeset(
-                                parent_inventory=parent_inventory,
-                                enabled_templates=selected_templates,
-                                event_count=max(1, len(selected_templates)),
-                                rng=rng,
-                                changeset_id=f"chg_{selected_parent}_{child_id_input}",
-                                name=f"{selected_parent}→{child_id_input}",
-                            )
-                            st.session_state[rule_editor_key] = [
-                                {
-                                    "from": rule.get("from", ""),
-                                    "to": rule.get("to", ""),
-                                    "enabled": rule.get("enabled", True),
-                                    "notes": rule.get("notes", ""),
-                                }
-                                for rule in changeset_preview.get("rules", [])
-                                if isinstance(rule, dict)
-                            ]
-                        else:
+                            if st.checkbox(
+                                "Override phonotactic profile (JSON)", value=False, key="family_override_phonotactics"
+                            ):
+                                raw_override = st.text_area("Phonotactic overrides JSON", value="{}", height=120)
+                                override_dict, override_error = parse_override_json(raw_override)
+                                if override_error:
+                                    st.error(override_error)
+                                else:
+                                    override_settings["phonotactic_profile_overrides"] = override_dict
+
+                    with step_changes:
+                        parent_language = languages[selected_parent]
+                        parent_inventory = parent_language.get("inventory", {})
+                        st.markdown("**Sound changes**")
+                        help_button("sound_changes")
+                        template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
+                        selected_templates = st.multiselect("Templates", options=template_options, default=[])
+                        rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
+
+                        if rule_editor_key not in st.session_state:
                             st.session_state[rule_editor_key] = []
 
-                    edited_rules = st.data_editor(
-                        st.session_state[rule_editor_key],
-                        hide_index=True,
-                        use_container_width=True,
-                        num_rows="dynamic",
-                        key=f"{rule_editor_key}_editor",
-                    )
-                    if hasattr(edited_rules, "to_dict"):
-                        edited_rules = edited_rules.to_dict(orient="records")
+                        if st.button("Generate rules from templates"):
+                            if selected_templates:
+                                seed_base = int(project.get("seed", 0))
+                                seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}")) % (2**32)
+                                rng = random.Random(seed_value)
+                                changeset_preview = family_generator.generate_changeset(
+                                    parent_inventory=parent_inventory,
+                                    enabled_templates=selected_templates,
+                                    event_count=max(1, len(selected_templates)),
+                                    rng=rng,
+                                    changeset_id=f"chg_{selected_parent}_{child_id_input}",
+                                    name=f"{selected_parent}→{child_id_input}",
+                                )
+                                st.session_state[rule_editor_key] = [
+                                    {
+                                        "from": rule.get("from", ""),
+                                        "to": rule.get("to", ""),
+                                        "enabled": rule.get("enabled", True),
+                                        "notes": rule.get("notes", ""),
+                                    }
+                                    for rule in changeset_preview.get("rules", [])
+                                    if isinstance(rule, dict)
+                                ]
+                            else:
+                                st.session_state[rule_editor_key] = []
 
-                    cleaned_rules: List[Dict[str, Any]] = []
-                    seen_from: set[str] = set()
-                    invalid_rules: List[str] = []
-                    for rule in edited_rules:
-                        if not isinstance(rule, dict):
-                            continue
-                        frm = str(rule.get("from", "")).strip()
-                        to = str(rule.get("to", "")).strip()
-                        enabled = bool(rule.get("enabled", True))
-                        if not frm:
-                            invalid_rules.append("Missing 'from' value.")
-                            continue
-                        if frm in seen_from:
-                            invalid_rules.append(f"Duplicate rule for '{frm}'.")
-                            continue
-                        seen_from.add(frm)
-                        cleaned_rules.append(
-                            {
-                                "from": frm,
-                                "to": to,
-                                "enabled": enabled,
-                                "notes": str(rule.get("notes", "")),
-                            }
-                        )
-                    if invalid_rules:
-                        st.warning("Rule validation warnings: " + "; ".join(sorted(set(invalid_rules))))
-                    if not cleaned_rules:
-                        st.info("No valid rules yet; you can still create a daughter with an empty changeset.")
-
-                    st.markdown("**Step 4: Preview**")
-                    changeset = {
-                        "schema_version": 1,
-                        "changeset_id": f"chg_{selected_parent}_{child_id_input}",
-                        "name": f"{selected_parent}→{child_id_input}",
-                        "description": f"{len(cleaned_rules)} sound-change rule(s)",
-                        "rules": cleaned_rules,
-                    }
-                    preview_language = family_generator.preview_child_language(
-                        project_dir=project_dir,
-                        parent_language_id=selected_parent,
-                        child_name=child_name,
-                        child_id=child_id_input,
-                        changeset=changeset,
-                        override_settings=override_settings,
-                    )
-                    diff = sound_change_engine.diff_inventory(parent_inventory, preview_language.get("inventory", {}))
-                    help_button("inventory_diff", "create")
-                    diff_cols = st.columns(2)
-                    with diff_cols[0]:
-                        st.metric("Added vowels", str(len(diff["added_vowels"])))
-                        st.metric("Removed vowels", str(len(diff["removed_vowels"])))
-                    with diff_cols[1]:
-                        st.metric("Added consonants", str(len(diff["added_consonants"])))
-                        st.metric("Removed consonants", str(len(diff["removed_consonants"])))
-
-                    if diff["added_vowels"] or diff["removed_vowels"] or diff["added_consonants"] or diff["removed_consonants"]:
-                        st.dataframe(
-                            [
-                                {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
-                                {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
-                                {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
-                                {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
-                            ],
+                        edited_rules = st.data_editor(
+                            st.session_state[rule_editor_key],
                             hide_index=True,
                             use_container_width=True,
+                            num_rows="dynamic",
+                            key=f"{rule_editor_key}_editor",
                         )
-                    summary = language_diff.summarize_rule_effects(parent_inventory, changeset)
-                    st.caption(f"Rules enabled: {summary['rule_count']}")
+                        if hasattr(edited_rules, "to_dict"):
+                            edited_rules = edited_rules.to_dict(orient="records")
 
-                    lexicon_preview = language_diff.sample_lexicon_diff(parent_language, preview_language, n=12)
-                    if lexicon_preview:
-                        help_button("lexicon_diff", "create")
-                        st.dataframe(lexicon_preview, hide_index=True, use_container_width=True)
-
-                    if st.button("Create Daughter", type="primary", use_container_width=True):
-                        if child_id_input in existing_ids:
-                            st.error("Please pick a unique child ID.")
-                        else:
-                            created = family_generator.create_child_language(
-                                project_dir=project_dir,
-                                parent_language_id=selected_parent,
-                                child_name=child_name,
-                                child_id=child_id_input,
-                                changeset=changeset,
-                                override_settings=override_settings,
+                        cleaned_rules = []
+                        seen_from: set[str] = set()
+                        invalid_rules: List[str] = []
+                        for rule in edited_rules:
+                            if not isinstance(rule, dict):
+                                continue
+                            frm = str(rule.get("from", "")).strip()
+                            to = str(rule.get("to", "")).strip()
+                            enabled = bool(rule.get("enabled", True))
+                            if not frm:
+                                invalid_rules.append("Missing 'from' value.")
+                                continue
+                            if frm in seen_from:
+                                invalid_rules.append(f"Duplicate rule for '{frm}'.")
+                                continue
+                            seen_from.add(frm)
+                            cleaned_rules.append(
+                                {
+                                    "from": frm,
+                                    "to": to,
+                                    "enabled": enabled,
+                                    "notes": str(rule.get("notes", "")),
+                                }
                             )
-                            st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-                            st.session_state["family_selected_id"] = created.get("meta", {}).get("language_id")
-                            st.success(f"Created daughter language: {created.get('meta', {}).get('name')}")
-                            st.rerun()
+                        if invalid_rules:
+                            st.warning("Rule validation warnings: " + "; ".join(sorted(set(invalid_rules))))
+                        if not cleaned_rules:
+                            st.info("No valid rules yet; you can still create a daughter with an empty changeset.")
+
+                    with step_preview:
+                        parent_language = languages[selected_parent]
+                        parent_inventory = parent_language.get("inventory", {})
+                        st.markdown("**Preview**")
+                        st.caption(f"Parent {selected_parent} → Child {child_id_input or '(auto)'}")
+
+                        changeset = {
+                            "schema_version": 1,
+                            "changeset_id": f"chg_{selected_parent}_{child_id_input}",
+                            "name": f"{selected_parent}→{child_id_input}",
+                            "description": f"{len(cleaned_rules)} sound-change rule(s)",
+                            "rules": cleaned_rules,
+                        }
+                        preview_language = family_generator.preview_child_language(
+                            project_dir=project_dir,
+                            parent_language_id=selected_parent,
+                            child_name=child_name,
+                            child_id=child_id_input,
+                            changeset=changeset,
+                            override_settings=override_settings,
+                        )
+                        diff = sound_change_engine.diff_inventory(parent_inventory, preview_language.get("inventory", {}))
+                        help_button("inventory_diff", "create")
+                        diff_cols = st.columns(2)
+                        with diff_cols[0]:
+                            st.metric("Added vowels", str(len(diff["added_vowels"])))
+                            st.metric("Removed vowels", str(len(diff["removed_vowels"])))
+                        with diff_cols[1]:
+                            st.metric("Added consonants", str(len(diff["added_consonants"])))
+                            st.metric("Removed consonants", str(len(diff["removed_consonants"])))
+
+                        if diff["added_vowels"] or diff["removed_vowels"] or diff["added_consonants"] or diff["removed_consonants"]:
+                            st.dataframe(
+                                [
+                                    {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
+                                    {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
+                                    {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
+                                    {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
+                                ],
+                                hide_index=True,
+                                use_container_width=True,
+                            )
+                        summary = language_diff.summarize_rule_effects(parent_inventory, changeset)
+                        st.caption(f"Rules enabled: {summary['rule_count']}")
+
+                        lexicon_preview = language_diff.sample_lexicon_diff(parent_language, preview_language, n=12)
+                        if lexicon_preview:
+                            help_button("lexicon_diff", "create")
+                            st.dataframe(lexicon_preview, hide_index=True, use_container_width=True)
+
+                        if st.button("Create Daughter", type="primary", use_container_width=True):
+                            if child_id_input in existing_ids:
+                                st.error("Please pick a unique child ID.")
+                            else:
+                                created = family_generator.create_child_language(
+                                    project_dir=project_dir,
+                                    parent_language_id=selected_parent,
+                                    child_name=child_name,
+                                    child_id=child_id_input,
+                                    changeset=changeset,
+                                    override_settings=override_settings,
+                                )
+                                project = project_io.load_project(project_dir)
+                                st.session_state["family_project"] = project
+                                st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                                st.session_state["family_selected_id"] = created.get("meta", {}).get("language_id")
+                                st.session_state["family_notice"] = (
+                                    f"Created daughter language: {created.get('meta', {}).get('name')}"
+                                )
+                                st.rerun()
 
                 elif view == "Compare":
                     ids = sorted(list(languages.keys()))
@@ -2322,6 +2427,7 @@ def main() -> None:
         "Mode",
         options=["Single Language", "Language Family"],
         index=0,
+        key="app_mode",
     )
     if mode == "Language Family":
         render_language_family_ui()

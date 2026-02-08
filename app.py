@@ -3446,138 +3446,542 @@ def render_language_family_ui() -> None:
                     meta_cols[2].metric("Changeset", str(meta.get("changeset_id", "—")))
                     meta_cols[3].metric("Lexicon", str(len(selected_language.get("lexicon", []))))
 
-                    inventory = selected_language.get("inventory", {})
-                    display_col_1, display_col_2 = st.columns(2)
-                    with display_col_1:
-                        display_segment_table(
-                            "Vowels",
-                            inventory.get("vowels", []) if isinstance(inventory, dict) else [],
-                            profile_name=romanization_profile,
-                        )
-                    with display_col_2:
-                        display_segment_table(
-                            "Consonants",
-                            inventory.get("consonants", []) if isinstance(inventory, dict) else [],
-                            profile_name=romanization_profile,
-                        )
-
-                    st.markdown("**Sample sentences**")
                     model = project_io.hydrate_language_model(selected_language)
-                    sample_sentence_count = st.number_input(
-                        "Sentence samples",
-                        min_value=1,
-                        max_value=20,
-                        value=5,
-                        step=1,
-                        key=f"family_sentence_count_{selected_id}",
-                    )
-                    words_range = st.slider(
-                        "Words per sentence",
-                        min_value=2,
-                        max_value=12,
-                        value=(4, 8),
-                        key=f"family_words_range_{selected_id}",
-                    )
-                    if st.button("Generate sentences", key=f"family_generate_sentences_{selected_id}"):
-                        sentences = build_sample_sentences(
-                            vowels=model.get("inventory", {}).get("vowels", []),
-                            consonants=model.get("inventory", {}).get("consonants", []),
-                            sample_count=int(sample_sentence_count),
-                            syllable_range=tuple(model.get("syllable_range", [1, 2])),
-                            words_range=tuple(words_range),
-                            syllable_separator=str(model.get("syllable_separator", "")),
-                            style_name=str(model.get("style_name", DEFAULT_STYLE_PRESET)),
-                            concept_list_name=str(model.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
-                            grammar_profile_name=str(model.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
-                            language_model=model,
-                            phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
-                        )
-                        st.session_state[f"family_sentences_{selected_id}"] = sentences
-                    sentences = st.session_state.get(f"family_sentences_{selected_id}", [])
-                    if sentences:
-                        st.dataframe(
-                            [
-                                {
-                                    "IPA": s.get("ipa", ""),
-                                    "Gloss": s.get("gloss", ""),
-                                    "Template": s.get("template", ""),
-                                }
-                                for s in sentences
-                            ],
-                            hide_index=True,
-                            use_container_width=True,
-                        )
-                    else:
-                        st.info("No sentences generated yet.")
+                    detail_tabs = st.tabs(["Overview", "Lexicon", "Samples"])
 
-                    st.markdown("**Lexicon curation**")
-                    lexicon = model.get("lexicon", [])
-                    word_rows = [
-                        {
-                            "Entry": str(entry.get("id", "")),
-                            "IPA": str(entry.get("ipa", "")),
-                            "Sound-like": ipa_text_to_sound_like(
-                                str(entry.get("ipa", "")),
-                                use_segment_separators=False,
-                                profile_name=romanization_profile,
-                            ),
-                            "Gloss": str(entry.get("gloss", "")),
-                            "Meaning tag": str(entry.get("meaning", "")),
-                            "Part of speech": str(entry.get("pos", "")),
-                            "Source": str(entry.get("source", "")),
-                            "Re-roll": False,
-                        }
-                        for entry in lexicon
-                        if isinstance(entry, dict)
-                    ]
-                    edited_rows = st.data_editor(
-                        word_rows,
-                        hide_index=True,
-                        use_container_width=True,
-                        key=f"family_lexicon_{selected_id}",
-                        column_config={
-                            "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
-                            "Entry": st.column_config.TextColumn("Entry", disabled=True),
-                            "IPA": st.column_config.TextColumn("IPA", disabled=True),
-                            "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
-                            "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
-                            "Meaning tag": st.column_config.TextColumn("Meaning tag", disabled=True),
-                            "Part of speech": st.column_config.TextColumn("Part of speech", disabled=True),
-                            "Source": st.column_config.TextColumn("Source", disabled=True),
-                        },
-                    )
-                    if hasattr(edited_rows, "to_dict"):
-                        edited_rows = edited_rows.to_dict(orient="records")
-                    selected_rerolls = [
-                        str(row.get("Entry", "")).strip()
-                        for row in edited_rows
-                        if isinstance(row, dict) and row.get("Re-roll") is True
-                    ]
-                    if st.button(
-                        f"Re-roll {len(selected_rerolls)} selected",
-                        key=f"family_reroll_{selected_id}",
-                        disabled=not selected_rerolls,
-                    ):
-                        overrides = meta.get("lexicon_overrides", {})
-                        if not isinstance(overrides, dict):
-                            overrides = {}
-                        for entry_id in selected_rerolls:
-                            reroll_lexicon_entry(
-                                model,
-                                entry_id=entry_id,
-                                phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
-                            )
-                            overrides[entry_id] = find_entry_ipa(model, entry_id)
-                        meta["lexicon_overrides"] = overrides
-                        selected_language["meta"] = meta
-                        selected_language["lexicon"] = model.get("lexicon", [])
-                        normalized = project_io.normalize_language_snapshot(selected_language)
-                        normalized["meta"] = meta
+                    pos_order = ["N", "V", "ADJ", "ADV", "PRON", "NUM", "DEM", "ADP", "NEG", "CONJ", "INT", "PART"]
+                    pos_options = [pos for pos in pos_order if pos in POS_LABELS]
+                    pos_options.extend([pos for pos in POS_LABELS.keys() if pos not in pos_options])
+
+                    def format_pos_label(value: str) -> str:
+                        label = POS_LABELS.get(value, value)
+                        return f"{label} ({value})" if value and label != value else label
+
+                    def save_family_language(updated_language: Dict[str, Any], updated_meta: Dict[str, Any]) -> None:
+                        updated_language["meta"] = updated_meta
+                        normalized = project_io.normalize_language_snapshot(updated_language)
+                        normalized["meta"] = updated_meta
                         languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
                         project_io.save_language(normalized, languages_dir / f"{selected_id}.json")
                         st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-                        st.success("Re-rolled entries saved.")
-                        st.rerun()
+
+                    with detail_tabs[0]:
+                        inventory = selected_language.get("inventory", {})
+                        display_col_1, display_col_2 = st.columns(2)
+                        with display_col_1:
+                            display_segment_table(
+                                "Vowels",
+                                inventory.get("vowels", []) if isinstance(inventory, dict) else [],
+                                profile_name=romanization_profile,
+                            )
+                        with display_col_2:
+                            display_segment_table(
+                                "Consonants",
+                                inventory.get("consonants", []) if isinstance(inventory, dict) else [],
+                                profile_name=romanization_profile,
+                            )
+                        st.markdown("**Language notes**")
+                        notes_key = f"family_notes_{selected_id}"
+                        notes_value = st.text_area(
+                            "Description / reminders",
+                            value=str(meta.get("notes", "")),
+                            key=notes_key,
+                            height=140,
+                            placeholder="Add notes about this language.",
+                        )
+                        if st.button("Save notes", key=f"family_notes_save_{selected_id}"):
+                            meta["notes"] = notes_value
+                            save_family_language(selected_language, meta)
+                            st.success("Notes saved.")
+                            st.rerun()
+
+                    with detail_tabs[1]:
+                        st.markdown("**Custom word builder**")
+                        lexicon_model = model
+                        root_ids: List[str] = []
+                        root_label_map: Dict[str, str] = {}
+                        builder_col_1, builder_col_2 = st.columns(2)
+                        with builder_col_1:
+                            meaning_tag = st.text_input(
+                                "Meaning tag",
+                                key=f"family_custom_word_meaning_{selected_id}",
+                            )
+                            selected_pos = st.selectbox(
+                                "Part of speech",
+                                options=pos_options,
+                                format_func=format_pos_label,
+                                key=f"family_custom_word_pos_{selected_id}",
+                            )
+                            auto_gloss = st.checkbox(
+                                "Auto gloss",
+                                value=True,
+                                key=f"family_custom_word_auto_gloss_{selected_id}",
+                            )
+                            gloss_input = st.text_input(
+                                "Gloss",
+                                key=f"family_custom_word_gloss_{selected_id}",
+                                disabled=auto_gloss,
+                            )
+                            gloss_value = ""
+                            if auto_gloss and meaning_tag.strip():
+                                gloss_value = concept_gloss(meaning_tag.strip(), selected_pos)
+                                st.caption(f"Gloss: {gloss_value}")
+                            elif gloss_input.strip():
+                                gloss_value = gloss_input.strip()
+
+                        with builder_col_2:
+                            mode_label = st.radio(
+                                "Build mode",
+                                options=["Random", "Use existing root"],
+                                horizontal=True,
+                                key=f"family_custom_word_mode_{selected_id}",
+                            )
+                            custom_meta: Dict[str, Any] = {}
+                            if mode_label == "Random":
+                                custom_range = st.slider(
+                                    "Syllables per word",
+                                    min_value=1,
+                                    max_value=5,
+                                    value=tuple(model.get("syllable_range", [1, 2])),
+                                    key=f"family_custom_word_random_range_{selected_id}",
+                                )
+                                custom_meta = {
+                                    "mode": "random",
+                                    "syllable_range": [int(custom_range[0]), int(custom_range[1])],
+                                }
+                            else:
+                                lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
+                                for entry in lexicon_entries:
+                                    if not isinstance(entry, dict):
+                                        continue
+                                    entry_id = str(entry.get("id", "")).strip()
+                                    pos = str(entry.get("pos", "")).strip()
+                                    if not entry_id or entry_id.startswith("PART:") or pos == "PART":
+                                        continue
+                                    meaning = str(entry.get("meaning", "")).strip()
+                                    label = f"{entry_id} · {meaning}" if meaning else entry_id
+                                    root_ids.append(entry_id)
+                                    root_label_map[entry_id] = label
+                                selected_root = st.selectbox(
+                                    "Root to derive from",
+                                    options=root_ids if root_ids else ["(none)"],
+                                    format_func=lambda value: root_label_map.get(value, value),
+                                    key=f"family_custom_word_root_{selected_id}",
+                                    disabled=not root_ids,
+                                )
+                                if not root_ids:
+                                    st.warning("No eligible roots found to derive from.")
+                                    selected_root = ""
+
+                                affix_mode_label = st.selectbox(
+                                    "Affix mode",
+                                    options=["Auto", "Prefix", "Suffix", "Both"],
+                                    key=f"family_custom_word_affix_mode_{selected_id}",
+                                )
+                                affix_range = st.slider(
+                                    "Affix syllables",
+                                    min_value=1,
+                                    max_value=4,
+                                    value=(1, 1),
+                                    key=f"family_custom_word_affix_range_{selected_id}",
+                                )
+                                custom_meta = {
+                                    "mode": "rooted",
+                                    "root_id": selected_root,
+                                    "affix_mode": affix_mode_label.lower(),
+                                    "affix_syllable_range": [int(affix_range[0]), int(affix_range[1])],
+                                }
+
+                        preview_key = f"family_custom_word_preview_{selected_id}"
+                        preview_state = st.session_state.get(preview_key)
+                        can_generate = bool(meaning_tag.strip())
+                        if mode_label == "Use existing root":
+                            can_generate = can_generate and bool(custom_meta.get("root_id"))
+
+                        if st.button(
+                            "Generate candidate",
+                            key=f"family_custom_word_generate_{selected_id}",
+                            disabled=not can_generate,
+                        ):
+                            ipa = generate_custom_word_form(
+                                language_model=lexicon_model,
+                                custom_meta=custom_meta,
+                                phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
+                            )
+                            if not ipa:
+                                st.error("Could not generate a candidate. Try adjusting the settings.")
+                            else:
+                                st.session_state[preview_key] = {
+                                    "ipa": ipa,
+                                    "custom_meta": custom_meta,
+                                    "meaning": meaning_tag.strip(),
+                                    "pos": selected_pos,
+                                    "gloss": gloss_value,
+                                }
+                                preview_state = st.session_state[preview_key]
+
+                        if isinstance(preview_state, dict) and preview_state.get("ipa"):
+                            preview_ipa = str(preview_state.get("ipa", ""))
+                            preview_col_1, preview_col_2 = st.columns(2)
+                            with preview_col_1:
+                                st.markdown(f"**IPA**: `{preview_ipa}`")
+                            with preview_col_2:
+                                st.markdown(
+                                    f"**Sound-like**: `{ipa_text_to_sound_like(preview_ipa, use_segment_separators=False, profile_name=romanization_profile)}`"
+                                )
+
+                        add_disabled = not (isinstance(preview_state, dict) and preview_state.get("ipa")) or not meaning_tag.strip()
+                        if st.button(
+                            "Add to lexicon",
+                            key=f"family_custom_word_add_{selected_id}",
+                            disabled=add_disabled,
+                        ):
+                            entry = build_custom_entry(
+                                language_model=lexicon_model,
+                                meaning=meaning_tag.strip(),
+                                pos=selected_pos,
+                                gloss=gloss_value,
+                                custom_meta=preview_state.get("custom_meta") if isinstance(preview_state, dict) else None,
+                                ipa_override=preview_state.get("ipa") if isinstance(preview_state, dict) else None,
+                                phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
+                            )
+                            lexicon = lexicon_model.get("lexicon", [])
+                            if not isinstance(lexicon, list):
+                                lexicon = []
+                            lexicon.append(entry)
+                            lexicon_model["lexicon"] = lexicon
+                            lexicon_model = rebuild_indices(lexicon_model)
+                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                            save_family_language(selected_language, meta)
+                            st.session_state[preview_key] = None
+                            st.success("Custom entry added to the lexicon.")
+                            st.rerun()
+
+                        st.divider()
+                        st.markdown("**Lexicon overview**")
+
+                        lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
+                        if not isinstance(lexicon_entries, list):
+                            lexicon_entries = []
+
+                        search_term = st.text_input(
+                            "Search lexicon",
+                            key=f"family_lexicon_search_{selected_id}",
+                        )
+
+                        def entry_source_label(entry: Dict[str, Any]) -> str:
+                            if is_custom_entry(entry):
+                                return "Custom"
+                            entry_id = str(entry.get("id", ""))
+                            source = str(entry.get("source", ""))
+                            pos = str(entry.get("pos", ""))
+                            if source.startswith("concept-list:"):
+                                return "Concept roots"
+                            if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
+                                return "Particles"
+                            return "Other"
+
+                        source_order = ["Concept roots", "Custom", "Particles", "Other"]
+                        available_sources = sorted(
+                            {entry_source_label(entry) for entry in lexicon_entries if isinstance(entry, dict)}
+                        )
+                        source_options = [label for label in source_order if label in available_sources]
+                        selected_sources = st.multiselect(
+                            "Source filter",
+                            options=source_options if source_options else source_order,
+                            default=source_options,
+                            key=f"family_lexicon_sources_{selected_id}",
+                        )
+
+                        pos_codes = sorted(
+                            {
+                                str(entry.get("pos", "")).strip()
+                                for entry in lexicon_entries
+                                if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                            }
+                        )
+                        selected_pos_codes = st.multiselect(
+                            "Part of speech filter",
+                            options=pos_codes,
+                            default=pos_codes,
+                            format_func=format_pos_label,
+                            key=f"family_lexicon_pos_{selected_id}",
+                        )
+
+                        def matches_search(entry: Dict[str, Any], needle: str) -> bool:
+                            if not needle:
+                                return True
+                            hay = " ".join(
+                                [
+                                    str(entry.get("id", "")),
+                                    str(entry.get("meaning", "")),
+                                    str(entry.get("gloss", "")),
+                                    str(entry.get("ipa", "")),
+                                ]
+                            ).lower()
+                            return needle in hay
+
+                        filtered_entries: List[Dict[str, Any]] = []
+                        needle = search_term.strip().lower()
+                        for entry in lexicon_entries:
+                            if not isinstance(entry, dict):
+                                continue
+                            if selected_sources and entry_source_label(entry) not in selected_sources:
+                                continue
+                            entry_pos = str(entry.get("pos", "")).strip()
+                            if selected_pos_codes and entry_pos not in selected_pos_codes:
+                                continue
+                            if not matches_search(entry, needle):
+                                continue
+                            filtered_entries.append(entry)
+
+                        st.caption("Edits and deletions apply only to custom entries.")
+                        st.caption(f"Showing {len(filtered_entries)} of {len(lexicon_entries)} entries.")
+                        overview_rows = [
+                            {
+                                "Entry": str(entry.get("id", "")),
+                                "IPA": str(entry.get("ipa", "")),
+                                "Sound-like": ipa_text_to_sound_like(
+                                    str(entry.get("ipa", "")),
+                                    use_segment_separators=False,
+                                    profile_name=romanization_profile,
+                                ),
+                                "Gloss": str(entry.get("gloss", "")),
+                                "Meaning tag": str(entry.get("meaning", "")),
+                                "POS": str(entry.get("pos", "")),
+                                "Source": entry_source_label(entry),
+                                "Custom": "Yes" if is_custom_entry(entry) else "No",
+                                "Delete": False,
+                                "Re-roll": False,
+                            }
+                            for entry in filtered_entries
+                        ]
+                        edited_rows = st.data_editor(
+                            overview_rows,
+                            hide_index=True,
+                            use_container_width=True,
+                            key=f"family_lexicon_table_{selected_id}",
+                            column_config={
+                                "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
+                                "Delete": st.column_config.CheckboxColumn("Delete", default=False),
+                                "Entry": st.column_config.TextColumn("Entry", disabled=True),
+                                "IPA": st.column_config.TextColumn("IPA", disabled=True),
+                                "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
+                                "Gloss": st.column_config.TextColumn("Gloss"),
+                                "Meaning tag": st.column_config.TextColumn("Meaning tag"),
+                                "POS": st.column_config.SelectboxColumn("POS", options=pos_options),
+                                "Source": st.column_config.TextColumn("Source", disabled=True),
+                                "Custom": st.column_config.TextColumn("Custom", disabled=True),
+                            },
+                        )
+                        if hasattr(edited_rows, "to_dict"):
+                            edited_rows = edited_rows.to_dict(orient="records")
+                        if not isinstance(edited_rows, list):
+                            edited_rows = []
+
+                        entry_map = {
+                            str(entry.get("id", "")).strip(): entry
+                            for entry in lexicon_entries
+                            if isinstance(entry, dict)
+                        }
+                        pending_changes = False
+                        for row in edited_rows:
+                            if not isinstance(row, dict):
+                                continue
+                            row_id = str(row.get("Entry", "")).strip()
+                            entry = entry_map.get(row_id)
+                            if not entry:
+                                continue
+                            if row.get("Delete") is True:
+                                pending_changes = True
+                                break
+                            row_meaning = str(row.get("Meaning tag", "")).strip()
+                            row_gloss = str(row.get("Gloss", "")).strip()
+                            row_pos = str(row.get("POS", "")).strip()
+                            if (
+                                row_meaning != str(entry.get("meaning", "")).strip()
+                                or row_gloss != str(entry.get("gloss", "")).strip()
+                                or row_pos != str(entry.get("pos", "")).strip()
+                            ):
+                                pending_changes = True
+                                break
+
+                        if st.button(
+                            "Apply edits / deletions",
+                            key=f"family_lexicon_apply_{selected_id}",
+                            disabled=not pending_changes,
+                        ):
+                            delete_ids: List[str] = []
+                            edit_count = 0
+                            ignored_edits = 0
+                            ignored_deletes = 0
+                            overrides = meta.get("lexicon_overrides", {})
+                            if not isinstance(overrides, dict):
+                                overrides = {}
+                            for row in edited_rows:
+                                if not isinstance(row, dict):
+                                    continue
+                                row_id = str(row.get("Entry", "")).strip()
+                                entry = entry_map.get(row_id)
+                                if not entry:
+                                    continue
+                                wants_delete = row.get("Delete") is True
+                                if wants_delete:
+                                    if is_custom_entry(entry):
+                                        delete_ids.append(row_id)
+                                        overrides.pop(row_id, None)
+                                    else:
+                                        ignored_deletes += 1
+                                    continue
+                                row_meaning = str(row.get("Meaning tag", "")).strip()
+                                row_gloss = str(row.get("Gloss", "")).strip()
+                                row_pos = str(row.get("POS", "")).strip()
+                                if is_custom_entry(entry):
+                                    changed = False
+                                    if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
+                                        entry["meaning"] = row_meaning
+                                        changed = True
+                                    if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
+                                        entry["gloss"] = row_gloss
+                                        changed = True
+                                    if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
+                                        entry["pos"] = row_pos
+                                        changed = True
+                                    if changed:
+                                        edit_count += 1
+                                else:
+                                    if (
+                                        row_meaning != str(entry.get("meaning", "")).strip()
+                                        or row_gloss != str(entry.get("gloss", "")).strip()
+                                        or row_pos != str(entry.get("pos", "")).strip()
+                                    ):
+                                        ignored_edits += 1
+
+                            if delete_ids:
+                                lexicon_model["lexicon"] = [
+                                    entry
+                                    for entry in lexicon_entries
+                                    if str(entry.get("id", "")).strip() not in set(delete_ids)
+                                ]
+                            meta["lexicon_overrides"] = overrides
+                            lexicon_model = rebuild_indices(lexicon_model)
+                            selected_language["meta"] = meta
+                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                            save_family_language(selected_language, meta)
+                            if ignored_edits:
+                                st.warning(f"Ignored {ignored_edits} edit(s) on locked entries.")
+                            if ignored_deletes:
+                                st.warning(f"Ignored {ignored_deletes} delete(s) on locked entries.")
+                            if edit_count or delete_ids:
+                                st.success("Lexicon updates applied.")
+                            st.rerun()
+
+                        overview_rerolls = [
+                            str(row.get("Entry", "")).strip()
+                            for row in edited_rows
+                            if isinstance(row, dict) and row.get("Re-roll") is True
+                        ]
+
+                        csv_rows = [
+                            {
+                                "id": str(entry.get("id", "")),
+                                "ipa": str(entry.get("ipa", "")),
+                                "sound_like": ipa_text_to_sound_like(
+                                    str(entry.get("ipa", "")),
+                                    use_segment_separators=False,
+                                    profile_name=romanization_profile,
+                                ),
+                                "meaning": str(entry.get("meaning", "")),
+                                "gloss": str(entry.get("gloss", "")),
+                                "pos": str(entry.get("pos", "")),
+                                "source": entry_source_label(entry),
+                            }
+                            for entry in filtered_entries
+                            if isinstance(entry, dict)
+                        ]
+                        lexicon_csv = build_lexicon_csv(csv_rows)
+                        st.download_button(
+                            label="Download lexicon CSV",
+                            data=lexicon_csv,
+                            file_name=f"{sanitize_name(meta.get('name', selected_id))}_lexicon.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                        )
+                        if st.button(
+                            f"Re-roll {len(overview_rerolls)} selected",
+                            key=f"family_reroll_{selected_id}",
+                            disabled=not overview_rerolls,
+                        ):
+                            overrides = meta.get("lexicon_overrides", {})
+                            if not isinstance(overrides, dict):
+                                overrides = {}
+                            for entry_id in overview_rerolls:
+                                reroll_lexicon_entry(
+                                    lexicon_model,
+                                    entry_id=entry_id,
+                                    phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
+                                )
+                                overrides[entry_id] = find_entry_ipa(lexicon_model, entry_id)
+                            meta["lexicon_overrides"] = overrides
+                            selected_language["meta"] = meta
+                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                            save_family_language(selected_language, meta)
+                            st.success("Re-rolled entries saved.")
+                            st.rerun()
+
+                    with detail_tabs[2]:
+                        st.markdown("**Sample sentences**")
+                        sample_sentence_count = st.number_input(
+                            "Sentence samples",
+                            min_value=1,
+                            max_value=20,
+                            value=5,
+                            step=1,
+                            key=f"family_sentence_count_{selected_id}",
+                        )
+                        words_range = st.slider(
+                            "Words per sentence",
+                            min_value=2,
+                            max_value=12,
+                            value=(4, 8),
+                            key=f"family_words_range_{selected_id}",
+                        )
+                        if st.button("Generate sentences", key=f"family_generate_sentences_{selected_id}"):
+                            sentences = build_sample_sentences(
+                                vowels=model.get("inventory", {}).get("vowels", []),
+                                consonants=model.get("inventory", {}).get("consonants", []),
+                                sample_count=int(sample_sentence_count),
+                                syllable_range=tuple(model.get("syllable_range", [1, 2])),
+                                words_range=tuple(words_range),
+                                syllable_separator=str(model.get("syllable_separator", "")),
+                                style_name=str(model.get("style_name", DEFAULT_STYLE_PRESET)),
+                                concept_list_name=str(model.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
+                                grammar_profile_name=str(model.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
+                                language_model=model,
+                                phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
+                            )
+                            st.session_state[f"family_sentences_{selected_id}"] = sentences
+                        sentences = st.session_state.get(f"family_sentences_{selected_id}", [])
+                        if sentences:
+                            st.dataframe(
+                                [
+                                    {
+                                        "IPA": s.get("ipa", ""),
+                                        "Gloss": s.get("gloss", ""),
+                                        "Template": s.get("template", ""),
+                                        "Sound-like": ipa_text_to_sound_like(
+                                            str(s.get("ipa", "")),
+                                            use_segment_separators=False,
+                                            profile_name=romanization_profile,
+                                        ),
+                                    }
+                                    for s in sentences
+                                ],
+                                hide_index=True,
+                                use_container_width=True,
+                            )
+                        else:
+                            st.info("No sentences generated yet.")
 
     with help_col:
         st.markdown("### Help")

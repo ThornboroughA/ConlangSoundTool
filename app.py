@@ -28,12 +28,18 @@ from sample_text_generator import (
     DEFAULT_GRAMMAR_PROFILE,
     DEFAULT_STYLE_PRESET,
     GRAMMAR_PROFILES,
+    POS_LABELS,
     STYLE_PRESETS,
+    build_custom_entry,
     build_language_model,
     build_sample_sentences,
     build_sample_words,
+    concept_gloss,
+    generate_custom_word_form,
+    is_custom_entry,
     language_model_summary,
     model_matches,
+    rebuild_indices,
     reroll_lexicon_entry,
     validate_generation_config,
 )
@@ -1163,6 +1169,81 @@ def find_entry_ipa(language: Dict[str, Any], entry_id: str) -> str:
     return ""
 
 
+def extract_custom_entries(language_model: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not isinstance(language_model, dict):
+        return []
+    lexicon = language_model.get("lexicon", [])
+    if not isinstance(lexicon, list):
+        return []
+    return [entry for entry in lexicon if isinstance(entry, dict) and is_custom_entry(entry)]
+
+
+def merge_custom_entries(language_model: Dict[str, Any], custom_entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(language_model, dict):
+        return language_model
+    lexicon = language_model.get("lexicon", [])
+    if not isinstance(lexicon, list):
+        lexicon = []
+    base_entries = [entry for entry in lexicon if isinstance(entry, dict) and not is_custom_entry(entry)]
+    merged: List[Dict[str, Any]] = list(base_entries)
+    seen_ids = {str(entry.get("id", "")).strip() for entry in base_entries if isinstance(entry, dict)}
+    for entry in custom_entries or []:
+        if not isinstance(entry, dict):
+            continue
+        entry_id = str(entry.get("id", "")).strip()
+        if not entry_id or entry_id in seen_ids:
+            continue
+        merged.append(entry)
+        seen_ids.add(entry_id)
+    language_model["lexicon"] = merged
+    return rebuild_indices(language_model)
+
+
+def ensure_language_model(
+    cached_model: Optional[Dict[str, Any]],
+    vowels: Sequence[str],
+    consonants: Sequence[str],
+    syllable_range: Tuple[int, int],
+    syllable_separator: str,
+    style_name: str,
+    concept_list_name: str,
+    grammar_profile_name: str,
+    phonotactic_profile_overrides: Optional[Dict[str, Any]],
+    force_rebuild: bool = False,
+) -> Dict[str, Any]:
+    custom_entries = extract_custom_entries(cached_model)
+
+    if force_rebuild or not isinstance(cached_model, dict):
+        model = build_language_model(
+            vowels=vowels,
+            consonants=consonants,
+            syllable_range=syllable_range,
+            syllable_separator=syllable_separator,
+            style_name=style_name,
+            concept_list_name=concept_list_name,
+            grammar_profile_name=grammar_profile_name,
+            phonotactic_profile_overrides=phonotactic_profile_overrides,
+        )
+        if custom_entries:
+            model = merge_custom_entries(model, custom_entries)
+        return rebuild_indices(model)
+
+    if model_matches(
+        cached_model,
+        vowels=vowels,
+        consonants=consonants,
+        syllable_range=syllable_range,
+        syllable_separator=syllable_separator,
+        style_name=style_name,
+        concept_list_name=concept_list_name,
+        grammar_profile_name=grammar_profile_name,
+        phonotactic_profile_overrides=phonotactic_profile_overrides,
+    ):
+        return rebuild_indices(cached_model)
+
+    return rebuild_indices(cached_model)
+
+
 def display_segment_table(
     title: str,
     segments: List[str],
@@ -1903,22 +1984,22 @@ def render_single_language_ui() -> None:
 
             generate_any_samples = generate_word_samples or generate_sentence_samples or generate_both_samples
             if generate_any_samples and not sample_generation_disabled:
-                if not model_is_current:
-                    cached_model = build_language_model(
-                        vowels=latest_vowels,
-                        consonants=latest_consonants,
-                        syllable_range=sample_syllable_range,
-                        syllable_separator=syllable_separator,
-                        style_name=selected_style,
-                        concept_list_name=selected_concept_list,
-                        grammar_profile_name=selected_grammar_profile,
-                        phonotactic_profile_overrides=phonotactic_overrides,
-                    )
-                    st.session_state["sample_language_model"] = cached_model
+                force_rebuild = generate_word_samples or generate_both_samples or not model_is_current
+                cached_model = ensure_language_model(
+                    cached_model=cached_model,
+                    vowels=latest_vowels,
+                    consonants=latest_consonants,
+                    syllable_range=sample_syllable_range,
+                    syllable_separator=syllable_separator,
+                    style_name=selected_style,
+                    concept_list_name=selected_concept_list,
+                    grammar_profile_name=selected_grammar_profile,
+                    phonotactic_profile_overrides=phonotactic_overrides,
+                    force_rebuild=force_rebuild,
+                )
+                st.session_state["sample_language_model"] = cached_model
 
             if (generate_word_samples or generate_both_samples) and not sample_generation_disabled:
-                if generate_word_samples and not generate_both_samples:
-                    st.session_state.pop("sample_language_model", None)
                 st.session_state["sample_words"] = build_sample_words(
                     latest_vowels,
                     latest_consonants,
@@ -1928,9 +2009,11 @@ def render_single_language_ui() -> None:
                     style_name=selected_style,
                     concept_list_name=selected_concept_list,
                     grammar_profile_name=selected_grammar_profile,
-                    language_model=st.session_state.get("sample_language_model"),
+                    language_model=cached_model,
                     phonotactic_profile_overrides=phonotactic_overrides,
                 )
+                if not generate_both_samples:
+                    st.session_state.pop("sample_sentences", None)
 
             if (generate_sentence_samples or generate_both_samples) and not sample_generation_disabled:
                 st.session_state["sample_sentences"] = build_sample_sentences(
@@ -1943,7 +2026,7 @@ def render_single_language_ui() -> None:
                     style_name=selected_style,
                     concept_list_name=selected_concept_list,
                     grammar_profile_name=selected_grammar_profile,
-                    language_model=st.session_state.get("sample_language_model"),
+                    language_model=cached_model,
                     phonotactic_profile_overrides=phonotactic_overrides,
                 )
 
@@ -2055,6 +2138,327 @@ def render_single_language_ui() -> None:
                 )
             else:
                 st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
+
+            st.divider()
+            st.markdown("**Custom word builder**")
+
+            lexicon_model = cached_model
+            if not isinstance(lexicon_model, dict):
+                lexicon_model = ensure_language_model(
+                    cached_model=None,
+                    vowels=latest_vowels,
+                    consonants=latest_consonants,
+                    syllable_range=sample_syllable_range,
+                    syllable_separator=syllable_separator,
+                    style_name=selected_style,
+                    concept_list_name=selected_concept_list,
+                    grammar_profile_name=selected_grammar_profile,
+                    phonotactic_profile_overrides=phonotactic_overrides,
+                    force_rebuild=True,
+                )
+                st.session_state["sample_language_model"] = lexicon_model
+                cached_model = lexicon_model
+
+            if cached_model and not model_is_current:
+                st.caption("Using the last generated lexicon model. Generate samples to rebuild if settings changed.")
+
+            pos_order = ["N", "V", "ADJ", "ADV", "PRON", "NUM", "DEM", "ADP", "NEG", "CONJ", "INT", "PART"]
+            pos_options = [pos for pos in pos_order if pos in POS_LABELS]
+            pos_options.extend([pos for pos in POS_LABELS.keys() if pos not in pos_options])
+
+            def format_pos_label(value: str) -> str:
+                label = POS_LABELS.get(value, value)
+                return f"{label} ({value})" if value and label != value else label
+
+            builder_col_1, builder_col_2 = st.columns(2)
+            with builder_col_1:
+                meaning_tag = st.text_input("Meaning tag", key="custom_word_meaning")
+                selected_pos = st.selectbox(
+                    "Part of speech",
+                    options=pos_options,
+                    format_func=format_pos_label,
+                    key="custom_word_pos",
+                )
+                auto_gloss = st.checkbox("Auto gloss", value=True, key="custom_word_auto_gloss")
+                gloss_input = st.text_input("Gloss", key="custom_word_gloss", disabled=auto_gloss)
+                gloss_value = ""
+                if auto_gloss and meaning_tag.strip():
+                    gloss_value = concept_gloss(meaning_tag.strip(), selected_pos)
+                    st.caption(f"Gloss: {gloss_value}")
+                elif gloss_input.strip():
+                    gloss_value = gloss_input.strip()
+
+            with builder_col_2:
+                mode_label = st.radio(
+                    "Build mode",
+                    options=["Random", "Use existing root"],
+                    horizontal=True,
+                    key="custom_word_mode",
+                )
+                custom_meta: Dict[str, Any] = {}
+                root_ids: List[str] = []
+                root_label_map: Dict[str, str] = {}
+                if mode_label == "Random":
+                    custom_range = st.slider(
+                        "Syllables per word",
+                        min_value=1,
+                        max_value=5,
+                        value=sample_syllable_range,
+                        key="custom_word_random_range",
+                    )
+                    custom_meta = {"mode": "random", "syllable_range": [int(custom_range[0]), int(custom_range[1])]}
+                else:
+                    lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
+                    for entry in lexicon_entries:
+                        if not isinstance(entry, dict):
+                            continue
+                        entry_id = str(entry.get("id", "")).strip()
+                        pos = str(entry.get("pos", "")).strip()
+                        if not entry_id or entry_id.startswith("PART:") or pos == "PART":
+                            continue
+                        meaning = str(entry.get("meaning", "")).strip()
+                        label = f"{entry_id} · {meaning}" if meaning else entry_id
+                        root_ids.append(entry_id)
+                        root_label_map[entry_id] = label
+                    selected_root = st.selectbox(
+                        "Root to derive from",
+                        options=root_ids if root_ids else ["(none)"],
+                        format_func=lambda value: root_label_map.get(value, value),
+                        key="custom_word_root_id",
+                        disabled=not root_ids,
+                    )
+                    if not root_ids:
+                        st.warning("No eligible roots found to derive from.")
+                        selected_root = ""
+
+                    affix_mode_label = st.selectbox(
+                        "Affix mode",
+                        options=["Auto", "Prefix", "Suffix", "Both"],
+                        key="custom_word_affix_mode",
+                    )
+                    affix_range = st.slider(
+                        "Affix syllables",
+                        min_value=1,
+                        max_value=4,
+                        value=(1, 1),
+                        key="custom_word_affix_range",
+                    )
+                    custom_meta = {
+                        "mode": "rooted",
+                        "root_id": selected_root,
+                        "affix_mode": affix_mode_label.lower(),
+                        "affix_syllable_range": [int(affix_range[0]), int(affix_range[1])],
+                    }
+
+            preview_state = st.session_state.get("custom_word_preview")
+            can_generate = bool(meaning_tag.strip()) and not sample_generation_disabled
+            if mode_label == "Use existing root":
+                can_generate = can_generate and bool(custom_meta.get("root_id"))
+
+            generate_candidate = st.button(
+                "Generate candidate",
+                key="custom_word_generate",
+                disabled=not can_generate,
+            )
+            if generate_candidate:
+                ipa = generate_custom_word_form(
+                    language_model=lexicon_model,
+                    custom_meta=custom_meta,
+                    phonotactic_profile_overrides=phonotactic_overrides,
+                )
+                if not ipa:
+                    st.error("Could not generate a candidate. Try adjusting the settings.")
+                else:
+                    st.session_state["custom_word_preview"] = {
+                        "ipa": ipa,
+                        "custom_meta": custom_meta,
+                        "meaning": meaning_tag.strip(),
+                        "pos": selected_pos,
+                        "gloss": gloss_value,
+                    }
+                    preview_state = st.session_state["custom_word_preview"]
+
+            if isinstance(preview_state, dict) and preview_state.get("ipa"):
+                preview_ipa = str(preview_state.get("ipa", ""))
+                preview_col_1, preview_col_2 = st.columns(2)
+                with preview_col_1:
+                    st.markdown(f"**IPA**: `{preview_ipa}`")
+                with preview_col_2:
+                    st.markdown(
+                        f"**Sound-like**: `{ipa_text_to_sound_like(preview_ipa, use_segment_separators=False, profile_name=romanization_profile)}`"
+                    )
+
+            add_disabled = not (isinstance(preview_state, dict) and preview_state.get("ipa")) or not meaning_tag.strip()
+            if st.button("Add to lexicon", key="custom_word_add", disabled=add_disabled):
+                entry = build_custom_entry(
+                    language_model=lexicon_model,
+                    meaning=meaning_tag.strip(),
+                    pos=selected_pos,
+                    gloss=gloss_value,
+                    custom_meta=preview_state.get("custom_meta") if isinstance(preview_state, dict) else None,
+                    ipa_override=preview_state.get("ipa") if isinstance(preview_state, dict) else None,
+                    phonotactic_profile_overrides=phonotactic_overrides,
+                )
+                lexicon = lexicon_model.get("lexicon", [])
+                if not isinstance(lexicon, list):
+                    lexicon = []
+                lexicon.append(entry)
+                lexicon_model["lexicon"] = lexicon
+                lexicon_model = rebuild_indices(lexicon_model)
+                st.session_state["sample_language_model"] = lexicon_model
+                st.session_state["custom_word_preview"] = None
+                st.session_state.pop("sample_sentences", None)
+                st.success("Custom entry added to the lexicon.")
+                st.rerun()
+
+            st.divider()
+            st.markdown("**Lexicon overview**")
+
+            lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
+            if not isinstance(lexicon_entries, list):
+                lexicon_entries = []
+
+            search_term = st.text_input("Search lexicon", key="lexicon_overview_search")
+
+            def entry_source_label(entry: Dict[str, Any]) -> str:
+                if is_custom_entry(entry):
+                    return "Custom"
+                entry_id = str(entry.get("id", ""))
+                source = str(entry.get("source", ""))
+                pos = str(entry.get("pos", ""))
+                if source.startswith("concept-list:"):
+                    return "Concept roots"
+                if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
+                    return "Particles"
+                return "Other"
+
+            source_order = ["Concept roots", "Custom", "Particles", "Other"]
+            available_sources = sorted({entry_source_label(entry) for entry in lexicon_entries if isinstance(entry, dict)})
+            source_options = [label for label in source_order if label in available_sources]
+            selected_sources = st.multiselect(
+                "Source filter",
+                options=source_options if source_options else source_order,
+                default=source_options,
+                key="lexicon_overview_sources",
+            )
+
+            pos_codes = sorted(
+                {
+                    str(entry.get("pos", "")).strip()
+                    for entry in lexicon_entries
+                    if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                }
+            )
+            selected_pos_codes = st.multiselect(
+                "Part of speech filter",
+                options=pos_codes,
+                default=pos_codes,
+                format_func=format_pos_label,
+                key="lexicon_overview_pos",
+            )
+
+            def matches_search(entry: Dict[str, Any], needle: str) -> bool:
+                if not needle:
+                    return True
+                hay = " ".join(
+                    [
+                        str(entry.get("id", "")),
+                        str(entry.get("meaning", "")),
+                        str(entry.get("gloss", "")),
+                        str(entry.get("ipa", "")),
+                    ]
+                ).lower()
+                return needle in hay
+
+            filtered_entries: List[Dict[str, Any]] = []
+            needle = search_term.strip().lower()
+            for entry in lexicon_entries:
+                if not isinstance(entry, dict):
+                    continue
+                if selected_sources and entry_source_label(entry) not in selected_sources:
+                    continue
+                entry_pos = str(entry.get("pos", "")).strip()
+                if selected_pos_codes and entry_pos not in selected_pos_codes:
+                    continue
+                if not matches_search(entry, needle):
+                    continue
+                filtered_entries.append(entry)
+
+            st.caption(f"Showing {len(filtered_entries)} of {len(lexicon_entries)} entries.")
+            overview_rows = [
+                {
+                    "Entry": str(entry.get("id", "")),
+                    "IPA": str(entry.get("ipa", "")),
+                    "Sound-like": ipa_text_to_sound_like(
+                        str(entry.get("ipa", "")),
+                        use_segment_separators=show_segment_separators,
+                        profile_name=romanization_profile,
+                    ),
+                    "Gloss": str(entry.get("gloss", "")),
+                    "Meaning tag": str(entry.get("meaning", "")),
+                    "Part of speech": format_pos_label(str(entry.get("pos", ""))),
+                    "Source": entry_source_label(entry),
+                    "Re-roll": False,
+                }
+                for entry in filtered_entries
+            ]
+            edited_overview_rows = st.data_editor(
+                overview_rows,
+                hide_index=True,
+                use_container_width=True,
+                key="lexicon_overview_table",
+                column_config={
+                    "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
+                    "Entry": st.column_config.TextColumn("Entry", disabled=True),
+                    "IPA": st.column_config.TextColumn("IPA", disabled=True),
+                    "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
+                    "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
+                    "Meaning tag": st.column_config.TextColumn("Meaning tag", disabled=True),
+                    "Part of speech": st.column_config.TextColumn("Part of speech", disabled=True),
+                    "Source": st.column_config.TextColumn("Source", disabled=True),
+                },
+            )
+
+            if hasattr(edited_overview_rows, "to_dict"):
+                edited_overview_rows = edited_overview_rows.to_dict(orient="records")
+            if not isinstance(edited_overview_rows, list):
+                edited_overview_rows = []
+
+            overview_rerolls = [
+                str(row.get("Entry", "")).strip()
+                for row in edited_overview_rows
+                if isinstance(row, dict) and row.get("Re-roll") is True
+            ]
+            reroll_overview_button = st.button(
+                f"Re-roll {len(overview_rerolls)} selected entries",
+                key="lexicon_overview_reroll",
+                disabled=not overview_rerolls or sample_generation_disabled,
+            )
+            if reroll_overview_button:
+                for entry_id in overview_rerolls:
+                    reroll_lexicon_entry(
+                        lexicon_model,
+                        entry_id=entry_id,
+                        phonotactic_profile_overrides=phonotactic_overrides,
+                    )
+                lexicon_model = rebuild_indices(lexicon_model)
+                st.session_state["sample_language_model"] = lexicon_model
+                if sample_words:
+                    st.session_state["sample_words"] = build_sample_words(
+                        latest_vowels,
+                        latest_consonants,
+                        sample_count=max(1, int(concept_entry_count)),
+                        syllable_range=sample_syllable_range,
+                        syllable_separator=syllable_separator,
+                        style_name=selected_style,
+                        concept_list_name=selected_concept_list,
+                        grammar_profile_name=selected_grammar_profile,
+                        language_model=lexicon_model,
+                        phonotactic_profile_overrides=phonotactic_overrides,
+                    )
+                st.session_state.pop("sample_sentences", None)
+                st.success("Selected entries re-rolled.")
+                st.rerun()
 
     with tab_export:
         st.markdown('<div class="section-kicker">Step 4</div>', unsafe_allow_html=True)

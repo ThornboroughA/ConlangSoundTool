@@ -1902,6 +1902,181 @@ def _new_entry(entry_id: str, ipa: str, meaning: str, gloss: str, pos: str, sour
     }
 
 
+def is_custom_entry(entry: Dict[str, Any]) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    source = str(entry.get("source", "")).lower()
+    if source.startswith("custom"):
+        return True
+    return isinstance(entry.get("custom"), dict)
+
+
+def next_custom_entry_id(lexicon: Sequence[Dict[str, Any]], prefix: str = "CUSTOM") -> str:
+    prefix_value = str(prefix).strip().upper() or "CUSTOM"
+    pattern = re.compile(rf"^{re.escape(prefix_value)}:(\d+)$")
+    max_id = 0
+    if isinstance(lexicon, Sequence) and not isinstance(lexicon, (str, bytes)):
+        for entry in lexicon:
+            if not isinstance(entry, dict):
+                continue
+            entry_id = str(entry.get("id", "")).strip().upper()
+            match = pattern.match(entry_id)
+            if match:
+                max_id = max(max_id, int(match.group(1)))
+    return f"{prefix_value}:{max_id + 1:03d}"
+
+
+def _parse_syllable_range(value: object, default_range: Tuple[int, int]) -> Tuple[int, int]:
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        try:
+            return normalize_range((int(value[0]), int(value[1])), minimum=1)
+        except (TypeError, ValueError):
+            pass
+    return normalize_range(default_range, minimum=1)
+
+
+def generate_custom_word_form(
+    language_model: Dict[str, Any],
+    custom_meta: Dict[str, Any],
+    phonotactic_profile_overrides: Optional[Dict[str, object]] = None,
+    exclude_entry_id: Optional[str] = None,
+) -> str:
+    if not isinstance(language_model, dict):
+        return ""
+    if not isinstance(custom_meta, dict):
+        custom_meta = {}
+
+    inventory = language_model.get("inventory", {})
+    if not isinstance(inventory, dict):
+        inventory = {}
+    vowels = inventory.get("vowels", [])
+    consonants = inventory.get("consonants", [])
+    if not isinstance(vowels, list):
+        vowels = []
+    if not isinstance(consonants, list):
+        consonants = []
+
+    style_name = str(language_model.get("style_name", DEFAULT_STYLE_PRESET))
+    syllable_separator = str(language_model.get("syllable_separator", ""))
+    model_overrides = language_model.get("phonotactic_profile_overrides")
+    active_overrides = phonotactic_profile_overrides if phonotactic_profile_overrides is not None else model_overrides
+
+    used_forms: Set[str] = set()
+    lexicon = language_model.get("lexicon", [])
+    if isinstance(lexicon, list):
+        for entry in lexicon:
+            if not isinstance(entry, dict):
+                continue
+            entry_id = str(entry.get("id", "")).strip()
+            ipa = str(entry.get("ipa", "")).strip()
+            if not ipa:
+                continue
+            if exclude_entry_id and entry_id == exclude_entry_id:
+                used_forms.add(ipa)
+                continue
+            used_forms.add(ipa)
+
+    mode = str(custom_meta.get("mode", "random")).strip().lower()
+    if mode == "rooted":
+        root_id = str(custom_meta.get("root_id", "")).strip()
+        root_entry = None
+        if isinstance(lexicon, list) and root_id:
+            for entry in lexicon:
+                if isinstance(entry, dict) and str(entry.get("id", "")).strip() == root_id:
+                    root_entry = entry
+                    break
+        root_ipa = str(root_entry.get("ipa", "")).strip() if isinstance(root_entry, dict) else ""
+        if root_ipa:
+            affix_mode = str(custom_meta.get("affix_mode", "auto")).strip().lower()
+            if affix_mode not in {"prefix", "suffix", "both", "auto"}:
+                affix_mode = "auto"
+            affix_range = _parse_syllable_range(custom_meta.get("affix_syllable_range"), (1, 1))
+            for _ in range(40):
+                actual_mode = affix_mode
+                if affix_mode == "auto":
+                    actual_mode = random.choice(["prefix", "suffix", "both"])
+                prefix = ""
+                suffix = ""
+                if actual_mode in {"prefix", "both"}:
+                    prefix = generate_word(
+                        vowels=vowels,
+                        consonants=consonants,
+                        syllable_range=affix_range,
+                        syllable_separator=syllable_separator,
+                        style_name=style_name,
+                        phonotactic_profile_overrides=active_overrides if isinstance(active_overrides, dict) else None,
+                    )
+                if actual_mode in {"suffix", "both"}:
+                    suffix = generate_word(
+                        vowels=vowels,
+                        consonants=consonants,
+                        syllable_range=affix_range,
+                        syllable_separator=syllable_separator,
+                        style_name=style_name,
+                        phonotactic_profile_overrides=active_overrides if isinstance(active_overrides, dict) else None,
+                    )
+                candidate = _join_morphemes([prefix, root_ipa, suffix], separator=syllable_separator)
+                if not candidate or candidate in used_forms or _looks_noisy(candidate):
+                    continue
+                used_forms.add(candidate)
+                return candidate
+
+    model_range = _parse_syllable_range(language_model.get("syllable_range", [1, 1]), (1, 1))
+    random_range = _parse_syllable_range(custom_meta.get("syllable_range"), model_range)
+    return _generate_unique_word(
+        vowels=vowels,
+        consonants=consonants,
+        syllable_range=random_range,
+        syllable_separator=syllable_separator,
+        style_name=style_name,
+        used_forms=used_forms,
+        phonotactic_profile_overrides=active_overrides if isinstance(active_overrides, dict) else None,
+        apply_morphology=False,
+    )
+
+
+def build_custom_entry(
+    language_model: Dict[str, Any],
+    meaning: str,
+    pos: str,
+    gloss: Optional[str] = None,
+    custom_meta: Optional[Dict[str, Any]] = None,
+    entry_id: Optional[str] = None,
+    ipa_override: Optional[str] = None,
+    prefix: str = "CUSTOM",
+    phonotactic_profile_overrides: Optional[Dict[str, object]] = None,
+) -> Dict[str, str]:
+    lexicon = language_model.get("lexicon", []) if isinstance(language_model, dict) else []
+    if not entry_id:
+        entry_id = next_custom_entry_id(lexicon, prefix=prefix)
+
+    meaning_value = _normalize_meaning(meaning)
+    pos_value = _normalize_meaning(pos).upper() or "N"
+    gloss_value = _normalize_meaning(gloss).upper() if gloss else concept_gloss(meaning_value, pos_value)
+
+    meta = dict(custom_meta) if isinstance(custom_meta, dict) else {}
+    meta.setdefault("mode", "random")
+
+    ipa_value = str(ipa_override).strip() if ipa_override else ""
+    if not ipa_value and isinstance(language_model, dict):
+        ipa_value = generate_custom_word_form(
+            language_model=language_model,
+            custom_meta=meta,
+            phonotactic_profile_overrides=phonotactic_profile_overrides,
+        )
+
+    entry = _new_entry(
+        entry_id=entry_id,
+        ipa=ipa_value,
+        meaning=meaning_value,
+        gloss=gloss_value,
+        pos=pos_value,
+        source="custom",
+    )
+    entry["custom"] = deepcopy(meta)
+    return entry
+
+
 def build_language_model(
     vowels: Sequence[str],
     consonants: Sequence[str],
@@ -2092,6 +2267,21 @@ def reroll_lexicon_entry(
         morphology_resources = morphology_resources_raw
     else:
         morphology_resources = None
+
+    if is_custom_entry(target_entry):
+        custom_meta = target_entry.get("custom", {})
+        if not isinstance(custom_meta, dict):
+            custom_meta = {"mode": "random", "syllable_range": list(root_syllable_range)}
+        new_ipa = generate_custom_word_form(
+            language_model=language_model,
+            custom_meta=custom_meta,
+            phonotactic_profile_overrides=active_overrides if isinstance(active_overrides, dict) else None,
+            exclude_entry_id=entry_id,
+        )
+        if new_ipa:
+            target_entry["ipa"] = new_ipa
+        target_entry["custom"] = custom_meta
+        return target_entry
 
     target_pos = str(target_entry.get("pos", "N"))
     is_root_word = str(target_entry.get("source", "")).startswith("concept-list:")

@@ -1,0 +1,60 @@
+{
+  "pack_id": "settlement_terms",
+  "pack_name": "Settlement Terms",
+  "category": "society",
+  "tier": "context",
+  "description": "Settlement and place-type terms for toponyms.",
+  "tags": ["settlement", "place"],
+  "entries": [
+    {
+      "concept_id": "settlement_terms.town",
+      "meaning": "town",
+      "pos": "N",
+      "gloss": "TOWN",
+      "tags": ["settlement"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "settlement_terms.village",
+      "meaning": "village",
+      "pos": "N",
+      "gloss": "VILLAGE",
+      "tags": ["settlement"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "settlement_terms.fort",
+      "meaning": "fort",
+      "pos": "N",
+      "gloss": "FORT",
+      "tags": ["settlement", "fortification"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "settlement_terms.port",
+      "meaning": "port",
+      "pos": "N",
+      "gloss": "PORT",
+      "tags": ["settlement", "coast"],
+      "biomes": ["coast"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "settlement_terms.market",
+      "meaning": "market town",
+      "pos": "N",
+      "gloss": "MARKET",
+      "tags": ["settlement", "commerce"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "pack_id": "food_agriculture",
+  "pack_name": "Food & Agriculture",
+  "category": "food",
+  "tier": "context",
+  "description": "Staple foods and farming concepts.",
+  "tags": ["food", "agriculture"],
+  "entries": [
+    {
+      "concept_id": "food_agriculture.grain",
+      "meaning": "grain",
+      "pos": "N",
+      "gloss": "GRAIN",
+      "tags": ["food", "agriculture"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "food_agriculture.bread",
+      "meaning": "bread",
+      "pos": "N",
+      "gloss": "BREAD",
+      "tags": ["food", "staple"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "food_agriculture.milk",
+      "meaning": "milk",
+      "pos": "N",
+      "gloss": "MILK",
+      "tags": ["food", "animal"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "food_agriculture.honey",
+      "meaning": "honey",
+      "pos": "N",
+      "gloss": "HONEY",
+      "tags": ["food", "sweet"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "food_agriculture.fish",
+      "meaning": "fish",
+      "pos": "N",
+      "gloss": "FISH",
+      "tags": ["food", "water"],
+      "biomes": ["coast"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "food_agriculture.salt",
+      "meaning": "salt",
+      "pos": "N",
+      "gloss": "SALT",
+      "tags": ["food", "trade"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "food_agriculture.feast",
+      "meaning": "feast",
+      "pos": "N",
+      "gloss": "FEAST",
+      "tags": ["food", "festival"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.5
+    },
+    {
+      "concept_id": "food_agriculture.farm",
+      "meaning": "farm",
+      "pos": "N",
+      "gloss": "FARM",
+      "tags": ["agriculture", "place"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    }
+  ]
+}

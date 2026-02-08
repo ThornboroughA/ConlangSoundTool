@@ -1,0 +1,90 @@
+{
+  "pack_id": "time_counting",
+  "pack_name": "Time & Counting",
+  "category": "time",
+  "tier": "context",
+  "description": "Seasons, day parts, and temporal markers.",
+  "tags": ["time"],
+  "entries": [
+    {
+      "concept_id": "time_counting.spring",
+      "meaning": "spring (season)",
+      "pos": "N",
+      "gloss": "SPRING",
+      "tags": ["time", "season"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "time_counting.summer",
+      "meaning": "summer",
+      "pos": "N",
+      "gloss": "SUMMER",
+      "tags": ["time", "season"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "time_counting.autumn",
+      "meaning": "autumn",
+      "pos": "N",
+      "gloss": "AUTUMN",
+      "tags": ["time", "season"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "time_counting.winter",
+      "meaning": "winter",
+      "pos": "N",
+      "gloss": "WINTER",
+      "tags": ["time", "season", "cold"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "time_counting.dawn",
+      "meaning": "dawn",
+      "pos": "N",
+      "gloss": "DAWN",
+      "tags": ["time", "daypart"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "time_counting.dusk",
+      "meaning": "dusk",
+      "pos": "N",
+      "gloss": "DUSK",
+      "tags": ["time", "daypart"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "time_counting.festival",
+      "meaning": "festival",
+      "pos": "N",
+      "gloss": "FESTIVAL",
+      "tags": ["time", "festival"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.5
+    },
+    {
+      "concept_id": "time_counting.year",
+      "meaning": "year",
+      "pos": "N",
+      "gloss": "YEAR",
+      "tags": ["time"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    }
+  ]
+}

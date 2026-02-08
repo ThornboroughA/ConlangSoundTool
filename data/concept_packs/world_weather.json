@@ -1,0 +1,90 @@
+{
+  "pack_id": "world_weather",
+  "pack_name": "Weather",
+  "category": "world",
+  "tier": "context",
+  "description": "Weather patterns and atmospheric events.",
+  "tags": ["weather"],
+  "entries": [
+    {
+      "concept_id": "world_weather.rain",
+      "meaning": "rain",
+      "pos": "N",
+      "gloss": "RAIN",
+      "tags": ["weather", "water"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_weather.storm",
+      "meaning": "storm",
+      "pos": "N",
+      "gloss": "STORM",
+      "tags": ["weather", "wind"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_weather.thunder",
+      "meaning": "thunder",
+      "pos": "N",
+      "gloss": "THUNDER",
+      "tags": ["weather", "sound"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "world_weather.lightning",
+      "meaning": "lightning",
+      "pos": "N",
+      "gloss": "LIGHTNING",
+      "tags": ["weather", "light"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "world_weather.wind",
+      "meaning": "wind",
+      "pos": "N",
+      "gloss": "WIND",
+      "tags": ["weather", "air"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_weather.fog",
+      "meaning": "fog",
+      "pos": "N",
+      "gloss": "FOG",
+      "tags": ["weather", "mist"],
+      "biomes": ["coast", "wetland"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "world_weather.snow",
+      "meaning": "snow",
+      "pos": "N",
+      "gloss": "SNOW",
+      "tags": ["weather", "cold"],
+      "biomes": ["tundra", "mountain"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "world_weather.drought",
+      "meaning": "drought",
+      "pos": "N",
+      "gloss": "DROUGHT",
+      "tags": ["weather", "dry"],
+      "biomes": ["desert"],
+      "register": "neutral",
+      "weight": 0.6
+    }
+  ]
+}

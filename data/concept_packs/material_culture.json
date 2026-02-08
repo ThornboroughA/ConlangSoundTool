@@ -1,0 +1,90 @@
+{
+  "pack_id": "material_culture",
+  "pack_name": "Material Culture",
+  "category": "material",
+  "tier": "context",
+  "description": "Tools, materials, and architecture.",
+  "tags": ["material", "craft"],
+  "entries": [
+    {
+      "concept_id": "material_culture.stone",
+      "meaning": "stone",
+      "pos": "N",
+      "gloss": "STONE",
+      "tags": ["material", "rock"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "material_culture.iron",
+      "meaning": "iron",
+      "pos": "N",
+      "gloss": "IRON",
+      "tags": ["material", "metal"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "material_culture.bronze",
+      "meaning": "bronze",
+      "pos": "N",
+      "gloss": "BRONZE",
+      "tags": ["material", "metal"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "material_culture.wood",
+      "meaning": "wood",
+      "pos": "N",
+      "gloss": "WOOD",
+      "tags": ["material"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "material_culture.cloth",
+      "meaning": "cloth",
+      "pos": "N",
+      "gloss": "CLOTH",
+      "tags": ["material", "textile"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "material_culture.hall",
+      "meaning": "hall",
+      "pos": "N",
+      "gloss": "HALL",
+      "tags": ["architecture", "settlement"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "material_culture.tower",
+      "meaning": "tower",
+      "pos": "N",
+      "gloss": "TOWER",
+      "tags": ["architecture", "settlement"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "material_culture.bridge",
+      "meaning": "bridge",
+      "pos": "N",
+      "gloss": "BRIDGE",
+      "tags": ["architecture", "settlement"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    }
+  ]
+}

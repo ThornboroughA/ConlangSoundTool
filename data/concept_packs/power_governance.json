@@ -1,0 +1,90 @@
+{
+  "pack_id": "power_governance",
+  "pack_name": "Power & Governance",
+  "category": "power",
+  "tier": "optional",
+  "description": "Titles, authority, law, and conflict.",
+  "tags": ["power", "governance"],
+  "entries": [
+    {
+      "concept_id": "power_governance.king",
+      "meaning": "king",
+      "pos": "N",
+      "gloss": "KING",
+      "tags": ["title", "leader", "power"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "power_governance.queen",
+      "meaning": "queen",
+      "pos": "N",
+      "gloss": "QUEEN",
+      "tags": ["title", "leader", "power"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "power_governance.law",
+      "meaning": "law",
+      "pos": "N",
+      "gloss": "LAW",
+      "tags": ["power", "justice"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "power_governance.judge",
+      "meaning": "judge",
+      "pos": "N",
+      "gloss": "JUDGE",
+      "tags": ["role", "justice"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "power_governance.army",
+      "meaning": "army",
+      "pos": "N",
+      "gloss": "ARMY",
+      "tags": ["war", "power"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "power_governance.guard",
+      "meaning": "guard",
+      "pos": "N",
+      "gloss": "GUARD",
+      "tags": ["war", "role"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "power_governance.oath",
+      "meaning": "oath",
+      "pos": "N",
+      "gloss": "OATH",
+      "tags": ["power", "honor"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "power_governance.battle",
+      "meaning": "battle",
+      "pos": "N",
+      "gloss": "BATTLE",
+      "tags": ["war", "conflict"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.5
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "pack_id": "kinship_basic",
+  "pack_name": "Kinship",
+  "category": "kinship",
+  "tier": "context",
+  "description": "Family and kin terms.",
+  "tags": ["kinship", "family"],
+  "entries": [
+    {
+      "concept_id": "kinship_basic.mother",
+      "meaning": "mother",
+      "pos": "N",
+      "gloss": "MOTHER",
+      "tags": ["kinship", "parent"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "kinship_basic.father",
+      "meaning": "father",
+      "pos": "N",
+      "gloss": "FATHER",
+      "tags": ["kinship", "parent"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "kinship_basic.son",
+      "meaning": "son",
+      "pos": "N",
+      "gloss": "SON",
+      "tags": ["kinship", "lineage", "person"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "kinship_basic.daughter",
+      "meaning": "daughter",
+      "pos": "N",
+      "gloss": "DAUGHTER",
+      "tags": ["kinship", "lineage", "person"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "kinship_basic.sibling",
+      "meaning": "sibling",
+      "pos": "N",
+      "gloss": "SIBLING",
+      "tags": ["kinship"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "kinship_basic.ancestor",
+      "meaning": "ancestor",
+      "pos": "N",
+      "gloss": "ANCESTOR",
+      "tags": ["kinship", "lineage", "ancestor"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "kinship_basic.clan",
+      "meaning": "clan",
+      "pos": "N",
+      "gloss": "CLAN",
+      "tags": ["kinship", "lineage", "clan"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "kinship_basic.house",
+      "meaning": "house (lineage)",
+      "pos": "N",
+      "gloss": "HOUSE",
+      "tags": ["kinship", "lineage"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.6
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "pack_id": "commerce_basic",
+  "pack_name": "Commerce",
+  "category": "commerce",
+  "tier": "optional",
+  "description": "Trade goods and exchange concepts.",
+  "tags": ["commerce", "trade"],
+  "entries": [
+    {
+      "concept_id": "commerce_basic.market",
+      "meaning": "market",
+      "pos": "N",
+      "gloss": "MARKET",
+      "tags": ["commerce", "settlement"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "commerce_basic.coin",
+      "meaning": "coin",
+      "pos": "N",
+      "gloss": "COIN",
+      "tags": ["commerce", "wealth"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "commerce_basic.trade",
+      "meaning": "trade",
+      "pos": "N",
+      "gloss": "TRADE",
+      "tags": ["commerce", "exchange"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "commerce_basic.caravan",
+      "meaning": "caravan",
+      "pos": "N",
+      "gloss": "CARAVAN",
+      "tags": ["commerce", "travel"],
+      "biomes": ["desert", "steppe"],
+      "register": "neutral",
+      "weight": 0.5
+    },
+    {
+      "concept_id": "commerce_basic.toll",
+      "meaning": "toll",
+      "pos": "N",
+      "gloss": "TOLL",
+      "tags": ["commerce", "law"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.4
+    }
+  ]
+}

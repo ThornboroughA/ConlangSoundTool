@@ -13,6 +13,8 @@ import random
 import re
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
+import concept_packs
+
 STYLE_PRESETS: Dict[str, Dict[str, object]] = {
     "Balanced": {
         "description": "Neutral blend of short and medium words.",
@@ -1366,7 +1368,10 @@ def language_model_summary(language_model: Optional[Dict[str, Any]]) -> Dict[str
 
     root_entries = 0
     for entry in lexicon:
-        if isinstance(entry, dict) and str(entry.get("source", "")).startswith("concept-list:"):
+        if not isinstance(entry, dict):
+            continue
+        source = str(entry.get("source", ""))
+        if source.startswith("concept-list:") or source.startswith("concept-pack:"):
             root_entries += 1
 
     return {
@@ -1420,7 +1425,31 @@ def concept_gloss(meaning: str, pos: str) -> str:
     return "_".join(tokens[:3]).upper()
 
 
-def resolve_concept_entries(concept_list_name: str) -> List[Dict[str, str]]:
+def _slugify(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", str(value).strip()).strip("_").lower()
+    return cleaned or "concept"
+
+
+def _core_concept_entry(meaning: str, pos: str, gloss: str) -> Dict[str, Any]:
+    concept_id = f"core.{_slugify(meaning)}"
+    return {
+        "concept_id": concept_id,
+        "meaning": meaning,
+        "pos": pos,
+        "gloss": gloss,
+        "tags": ["core"],
+        "source_pack": "core",
+        "register": "neutral",
+        "biomes": [],
+        "tier": "core",
+    }
+
+
+def resolve_concept_entries(
+    concept_list_name: str,
+    concept_pack_config: Optional[Dict[str, Any]] = None,
+    include_packs: bool = True,
+) -> List[Dict[str, Any]]:
     profile = concept_list_profile(concept_list_name)
     raw_entries = profile.get("entries", ())
     entries: List[Dict[str, str]] = []
@@ -1445,11 +1474,20 @@ def resolve_concept_entries(concept_list_name: str) -> List[Dict[str, str]]:
             gloss = _normalize_meaning(str(raw_entry.get("gloss", "")).upper()) or concept_gloss(meaning, pos)
             entries.append({"meaning": meaning, "pos": pos, "gloss": gloss})
 
-    if entries:
-        return entries
-    if concept_list_name == DEFAULT_CONCEPT_LIST:
-        return []
-    return resolve_concept_entries(DEFAULT_CONCEPT_LIST)
+    core_entries: List[Dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        meaning = str(entry.get("meaning", ""))
+        pos = str(entry.get("pos", "N"))
+        gloss = str(entry.get("gloss", "") or concept_gloss(meaning, pos))
+        core_entries.append(_core_concept_entry(meaning, pos, gloss))
+
+    if not core_entries and concept_list_name != DEFAULT_CONCEPT_LIST:
+        core_entries = resolve_concept_entries(DEFAULT_CONCEPT_LIST, concept_pack_config=None, include_packs=False)
+
+    pack_entries = concept_packs.select_pack_entries(concept_pack_config) if include_packs else []
+    return core_entries + pack_entries
 
 
 def _build_consonant_cluster(
@@ -1891,8 +1929,16 @@ def _generate_unique_word(
     return fallback
 
 
-def _new_entry(entry_id: str, ipa: str, meaning: str, gloss: str, pos: str, source: str) -> Dict[str, str]:
-    return {
+def _new_entry(
+    entry_id: str,
+    ipa: str,
+    meaning: str,
+    gloss: str,
+    pos: str,
+    source: str,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    entry: Dict[str, Any] = {
         "id": entry_id,
         "ipa": ipa,
         "meaning": meaning,
@@ -1900,6 +1946,9 @@ def _new_entry(entry_id: str, ipa: str, meaning: str, gloss: str, pos: str, sour
         "pos": pos,
         "source": source,
     }
+    if isinstance(extra, dict):
+        entry.update(extra)
+    return entry
 
 
 def build_language_model(
@@ -1910,6 +1959,7 @@ def build_language_model(
     style_name: str,
     concept_list_name: str = DEFAULT_CONCEPT_LIST,
     grammar_profile_name: str = DEFAULT_GRAMMAR_PROFILE,
+    concept_pack_config: Optional[Dict[str, Any]] = None,
     phonotactic_profile_overrides: Optional[Dict[str, object]] = None,
 ) -> Dict[str, Any]:
     root_syllable_range = normalize_range(syllable_range, minimum=1)
@@ -1920,7 +1970,7 @@ def build_language_model(
         phonotactic_profile_overrides=phonotactic_profile_overrides,
     )
 
-    concept_entries = resolve_concept_entries(concept_list_name)
+    concept_entries = resolve_concept_entries(concept_list_name, concept_pack_config=concept_pack_config)
     used_forms: Set[str] = set()
     lexicon: List[Dict[str, str]] = []
     by_pos: Dict[str, List[Dict[str, str]]] = {}
@@ -1950,13 +2000,24 @@ def build_language_model(
             pos=pos,
             apply_morphology=bool(morphology_resources.get("enabled", False)),
         )
+        concept_id = str(concept.get("concept_id", f"core.{index:03d}"))
+        source_pack = str(concept.get("source_pack", "core"))
+        entry_id = f"ROOT:{concept_id}" if source_pack == "core" else f"PACK:{source_pack}:{concept_id}"
         entry = _new_entry(
-            entry_id=f"ROOT:{index:03d}",
+            entry_id=entry_id,
             ipa=ipa,
             meaning=meaning,
             gloss=gloss,
             pos=pos,
-            source=f"concept-list:{concept_list_name}",
+            source=f"concept-pack:{source_pack}" if source_pack != "core" else f"concept-list:{concept_list_name}",
+            extra={
+                "concept_id": concept_id,
+                "tags": list(concept.get("tags", [])),
+                "source_pack": source_pack,
+                "register": concept.get("register", "neutral"),
+                "biomes": list(concept.get("biomes", [])),
+                "tier": concept.get("tier", "core"),
+            },
         )
         lexicon.append(entry)
         by_pos.setdefault(pos, []).append(entry)
@@ -1989,6 +2050,7 @@ def build_language_model(
     return {
         "style_name": style_name,
         "concept_list_name": concept_list_name,
+        "concept_pack_config": _canonicalize_config(concept_pack_config or {}),
         "grammar_profile_name": grammar_profile_name,
         "syllable_range": [root_syllable_range[0], root_syllable_range[1]],
         "syllable_separator": syllable_separator,
@@ -2013,6 +2075,7 @@ def model_matches(
     style_name: str,
     concept_list_name: str = DEFAULT_CONCEPT_LIST,
     grammar_profile_name: str = DEFAULT_GRAMMAR_PROFILE,
+    concept_pack_config: Optional[Dict[str, Any]] = None,
     phonotactic_profile_overrides: Optional[Dict[str, object]] = None,
 ) -> bool:
     if not isinstance(language_model, dict):
@@ -2026,9 +2089,13 @@ def model_matches(
     if cached_overrides is None:
         cached_overrides = language_model.get("phonotactics_overrides")
 
+    expected_pack_config = _canonicalize_config(concept_pack_config or {})
+    cached_pack_config = _canonicalize_config(language_model.get("concept_pack_config", {}))
+
     return (
         language_model.get("style_name") == style_name
         and language_model.get("concept_list_name") == concept_list_name
+        and cached_pack_config == expected_pack_config
         and language_model.get("grammar_profile_name") == grammar_profile_name
         and language_model.get("syllable_separator") == syllable_separator
         and language_model.get("syllable_range") == [expected_min, expected_max]
@@ -2094,7 +2161,8 @@ def reroll_lexicon_entry(
         morphology_resources = None
 
     target_pos = str(target_entry.get("pos", "N"))
-    is_root_word = str(target_entry.get("source", "")).startswith("concept-list:")
+    source_label = str(target_entry.get("source", ""))
+    is_root_word = source_label.startswith("concept-list:") or source_label.startswith("concept-pack:")
     reroll_range = root_syllable_range if is_root_word else particle_syllables
 
     used_forms = {
@@ -2322,6 +2390,7 @@ def build_sample_words(
     style_name: str,
     concept_list_name: str = DEFAULT_CONCEPT_LIST,
     grammar_profile_name: str = DEFAULT_GRAMMAR_PROFILE,
+    concept_pack_config: Optional[Dict[str, Any]] = None,
     language_model: Optional[Dict[str, Any]] = None,
     phonotactic_profile_overrides: Optional[Dict[str, object]] = None,
 ) -> List[Dict[str, str]]:
@@ -2335,6 +2404,7 @@ def build_sample_words(
             style_name=style_name,
             concept_list_name=concept_list_name,
             grammar_profile_name=grammar_profile_name,
+            concept_pack_config=concept_pack_config,
             phonotactic_profile_overrides=phonotactic_profile_overrides,
         )
 
@@ -2345,7 +2415,9 @@ def build_sample_words(
     concept_entries = [
         entry
         for entry in lexicon
-        if isinstance(entry, dict) and str(entry.get("source", "")).startswith("concept-list:")
+        if isinstance(entry, dict) and (
+            str(entry.get("source", "")).startswith("concept-list:") or str(entry.get("source", "")).startswith("concept-pack:")
+        )
     ]
     concept_entries.sort(key=lambda entry: str(entry.get("id", "")))
     if concept_entries:
@@ -2370,6 +2442,7 @@ def build_sample_sentences(
     style_name: str,
     concept_list_name: str = DEFAULT_CONCEPT_LIST,
     grammar_profile_name: str = DEFAULT_GRAMMAR_PROFILE,
+    concept_pack_config: Optional[Dict[str, Any]] = None,
     language_model: Optional[Dict[str, Any]] = None,
     phonotactic_profile_overrides: Optional[Dict[str, object]] = None,
 ) -> List[Dict[str, str]]:
@@ -2383,6 +2456,7 @@ def build_sample_sentences(
             style_name=style_name,
             concept_list_name=concept_list_name,
             grammar_profile_name=grammar_profile_name,
+            concept_pack_config=concept_pack_config,
             phonotactic_profile_overrides=phonotactic_profile_overrides,
         )
 

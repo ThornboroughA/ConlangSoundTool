@@ -1,0 +1,90 @@
+{
+  "pack_id": "flora_basic",
+  "pack_name": "Flora",
+  "category": "world",
+  "tier": "context",
+  "description": "Common plants, trees, and herbs.",
+  "tags": ["flora", "plant"],
+  "entries": [
+    {
+      "concept_id": "flora_basic.oak",
+      "meaning": "oak",
+      "pos": "N",
+      "gloss": "OAK",
+      "tags": ["flora", "tree"],
+      "biomes": ["temperate_forest"],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "flora_basic.pine",
+      "meaning": "pine",
+      "pos": "N",
+      "gloss": "PINE",
+      "tags": ["flora", "tree"],
+      "biomes": ["temperate_forest", "tundra", "mountain"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "flora_basic.birch",
+      "meaning": "birch",
+      "pos": "N",
+      "gloss": "BIRCH",
+      "tags": ["flora", "tree"],
+      "biomes": ["temperate_forest"],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "flora_basic.willow",
+      "meaning": "willow",
+      "pos": "N",
+      "gloss": "WILLOW",
+      "tags": ["flora", "tree"],
+      "biomes": ["temperate_forest", "wetland"],
+      "register": "poetic",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "flora_basic.rose",
+      "meaning": "rose",
+      "pos": "N",
+      "gloss": "ROSE",
+      "tags": ["flora", "flower", "beauty"],
+      "biomes": ["temperate_forest", "grassland"],
+      "register": "poetic",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "flora_basic.lily",
+      "meaning": "lily",
+      "pos": "N",
+      "gloss": "LILY",
+      "tags": ["flora", "flower", "purity"],
+      "biomes": ["wetland"],
+      "register": "poetic",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "flora_basic.cedar",
+      "meaning": "cedar",
+      "pos": "N",
+      "gloss": "CEDAR",
+      "tags": ["flora", "tree"],
+      "biomes": ["mountain", "temperate_forest"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "flora_basic.sage",
+      "meaning": "sage",
+      "pos": "N",
+      "gloss": "SAGE",
+      "tags": ["flora", "herb", "wisdom"],
+      "biomes": ["steppe", "temperate_forest"],
+      "register": "neutral",
+      "weight": 0.6
+    }
+  ]
+}

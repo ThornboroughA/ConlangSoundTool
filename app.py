@@ -16,8 +16,10 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import streamlit as st
 
+import concept_packs
 import family_generator
 import language_diff
+import name_generator
 import project_io
 import sound_inventory_generator as generator
 import sound_change_engine
@@ -1374,6 +1376,12 @@ def render_inventory_metrics(inventory: Dict[str, List[str]], applied_rule_count
     metric_cols[3].metric("Rules Applied", f"{applied_rule_count}")
 
 
+def set_project_state(project: Dict[str, Any], project_dir: Path) -> None:
+    st.session_state["family_project"] = project
+    st.session_state["family_project_dir"] = str(project_dir)
+    st.session_state["family_languages_cache"] = None
+
+
 def render_single_language_ui() -> None:
     romanization_profile = st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE)
     if romanization_profile not in ROMANIZATION_PROFILES:
@@ -2167,8 +2175,489 @@ def render_single_language_ui() -> None:
                 st.rerun()
 
 
+def render_family_wizard() -> None:
+    st.markdown("### New Family Wizard")
+    preset_names = list_json_names(generator.PRESETS_DIR)
+    rule_names = list_json_names(generator.RULES_DIR)
+    if not preset_names:
+        st.error("No preset files found. Add JSON files to presets/ and reload.")
+        return
+
+    tab_phonology, tab_packs, tab_family, tab_generate = st.tabs(
+        ["1. Phonology Setup", "2. Concept Packs", "3. Family Parameters", "4. Generate Family"]
+    )
+
+    with tab_phonology:
+        st.markdown("**Inventory sources**")
+        selected_presets = st.multiselect(
+            "Presets to mix",
+            options=preset_names,
+            default=default_preset_selection(preset_names),
+            key="wizard_presets",
+            help="Pick one or more source inventories to seed the proto language.",
+        )
+
+        weights: List[float] = []
+        if selected_presets:
+            st.markdown("**Preset weights**")
+            default_weight = round(1.0 / len(selected_presets), 2)
+            for preset_name in selected_presets:
+                weight = st.slider(
+                    f"{preset_name} weight",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=default_weight,
+                    step=0.05,
+                    key=f"wizard_weight_{preset_name}",
+                )
+                weights.append(weight)
+
+        random_weight = st.slider(
+            "Random weight (master pool)",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.15,
+            step=0.05,
+            key="wizard_random_weight",
+        )
+
+        master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
+        master_preset = st.selectbox(
+            "Master preset for random picks",
+            options=preset_names,
+            index=master_default,
+            key="wizard_master_preset",
+        )
+
+        selected_rules = st.multiselect(
+            "Sound-change rules (optional)",
+            options=rule_names,
+            key="wizard_rules",
+        )
+
+        total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
+        render_mix_metrics(
+            selected_presets=selected_presets,
+            selected_rules=selected_rules,
+            random_weight=random_weight,
+            total_weight=total_weight,
+        )
+
+        with st.expander("Source inventory reference", expanded=False):
+            render_mix_reference_panel(
+                selected_presets=selected_presets,
+                weights=weights,
+                random_weight=random_weight,
+                master_preset=master_preset,
+                profile_name=st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE),
+            )
+
+        st.divider()
+        st.markdown("**Lexicon settings**")
+        style_names = list(STYLE_PRESETS.keys())
+        concept_list_names = list(CONCEPT_LIST_PRESETS.keys())
+        grammar_profile_names = list(GRAMMAR_PROFILES.keys())
+
+        st.selectbox(
+            "Style preset",
+            options=style_names,
+            index=style_names.index(st.session_state.get("wizard_style_name", DEFAULT_STYLE_PRESET))
+            if st.session_state.get("wizard_style_name", DEFAULT_STYLE_PRESET) in style_names
+            else 0,
+            key="wizard_style_name",
+        )
+        st.selectbox(
+            "Core concept list",
+            options=concept_list_names,
+            index=concept_list_names.index(st.session_state.get("wizard_concept_list", DEFAULT_CONCEPT_LIST))
+            if st.session_state.get("wizard_concept_list", DEFAULT_CONCEPT_LIST) in concept_list_names
+            else 0,
+            key="wizard_concept_list",
+        )
+        st.selectbox(
+            "Grammar profile",
+            options=grammar_profile_names,
+            index=grammar_profile_names.index(st.session_state.get("wizard_grammar_profile", DEFAULT_GRAMMAR_PROFILE))
+            if st.session_state.get("wizard_grammar_profile", DEFAULT_GRAMMAR_PROFILE) in grammar_profile_names
+            else 0,
+            key="wizard_grammar_profile",
+        )
+
+        st.slider(
+            "Root syllable range",
+            min_value=1,
+            max_value=4,
+            value=st.session_state.get("wizard_syllable_range", (1, 2)),
+            key="wizard_syllable_range",
+        )
+        st.text_input(
+            "Syllable separator",
+            value=st.session_state.get("wizard_syllable_separator", ""),
+            key="wizard_syllable_separator",
+        )
+
+        st.divider()
+        use_seed = st.checkbox("Use fixed random seed", value=False, key="wizard_use_seed")
+        seed_value = st.number_input(
+            "Seed value",
+            min_value=0,
+            max_value=2_147_483_647,
+            value=42,
+            step=1,
+            disabled=not use_seed,
+            key="wizard_seed_value",
+        )
+
+        generate_inventory = st.button("Generate Inventory", type="primary", key="wizard_generate_inventory")
+        if generate_inventory:
+            if not selected_presets:
+                st.error("Pick at least one preset before generating.")
+            elif total_weight <= 0:
+                st.error("At least one preset/random weight must be greater than zero.")
+            else:
+                try:
+                    if use_seed:
+                        random.seed(int(seed_value))
+
+                    mixed_inventory = generator.mix_inventories(
+                        preset_names=selected_presets,
+                        weights=weights,
+                        random_weight=random_weight,
+                        master_preset_name=master_preset,
+                    )
+
+                    if selected_rules:
+                        mixed_inventory = generator.apply_rules(mixed_inventory, selected_rules)
+
+                    st.session_state["wizard_inventory"] = mixed_inventory
+                    st.session_state["wizard_rule_sets"] = selected_rules
+                    st.success("Inventory generated for proto language.")
+                except Exception as exc:  # pragma: no cover - UI safety net
+                    st.error(f"Could not generate inventory: {exc}")
+
+        wizard_inventory = st.session_state.get("wizard_inventory")
+        if isinstance(wizard_inventory, dict):
+            render_inventory_metrics(wizard_inventory, len(st.session_state.get("wizard_rule_sets", [])))
+        else:
+            st.info("Generate an inventory to continue.")
+
+    with tab_packs:
+        st.markdown("**Concept pack selection**")
+        packs = concept_packs.load_packs()
+        if not packs:
+            st.error("No concept packs found. Add JSON files to data/concept_packs/.")
+        else:
+            grouped = concept_packs.list_packs_by_category(packs)
+            selected_pack_ids = st.session_state.get(
+                "wizard_enabled_packs",
+                list(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("enabled_packs", [])),
+            )
+            enabled_packs: List[str] = []
+
+            for category, pack_list in grouped.items():
+                if not pack_list:
+                    continue
+                with st.expander(f"{category.title()} Packs", expanded=False):
+                    options = [pack.get("pack_id", "") for pack in pack_list if pack.get("pack_id")]
+                    label_map = {
+                        pack.get("pack_id"): f"{pack.get('pack_name')} ({pack.get('pack_id')})" for pack in pack_list
+                    }
+                    defaults = [pack_id for pack_id in options if pack_id in selected_pack_ids]
+                    selected = st.multiselect(
+                        f"{category.title()} selection",
+                        options=options,
+                        default=defaults,
+                        format_func=lambda pack_id: label_map.get(pack_id, pack_id),
+                        key=f"wizard_pack_{category}",
+                    )
+                    enabled_packs.extend(selected)
+
+            biome_options = [
+                "temperate_forest",
+                "tropical_forest",
+                "grassland",
+                "steppe",
+                "desert",
+                "tundra",
+                "mountain",
+                "coast",
+                "wetland",
+            ]
+            selected_biomes = st.multiselect(
+                "Biome filters",
+                options=biome_options,
+                default=st.session_state.get(
+                    "wizard_biomes",
+                    concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("biome_filters", []),
+                ),
+                key="wizard_biomes",
+            )
+
+            context_limit = st.slider(
+                "Context tier size",
+                min_value=50,
+                max_value=400,
+                value=int(concept_packs.DEFAULT_TIER_LIMITS.get("context", 200)),
+                step=10,
+                key="wizard_context_limit",
+            )
+            optional_limit = st.slider(
+                "Optional tier size",
+                min_value=0,
+                max_value=200,
+                value=int(concept_packs.DEFAULT_TIER_LIMITS.get("optional", 100)),
+                step=10,
+                key="wizard_optional_limit",
+            )
+
+            register_defaults = concept_packs.DEFAULT_REGISTER_BIAS
+            reg_cols = st.columns(3)
+            sacred_bias = reg_cols[0].slider("Sacred bias", 0.0, 1.5, float(register_defaults.get("sacred", 0.75)), 0.05)
+            poetic_bias = reg_cols[1].slider("Poetic bias", 0.0, 1.5, float(register_defaults.get("poetic", 0.8)), 0.05)
+            archaic_bias = reg_cols[2].slider("Archaic bias", 0.0, 1.5, float(register_defaults.get("archaic", 0.7)), 0.05)
+            formal_bias = reg_cols[0].slider("Formal bias", 0.0, 1.5, float(register_defaults.get("formal", 0.85)), 0.05)
+            taboo_bias = reg_cols[1].slider("Taboo bias", 0.0, 1.5, float(register_defaults.get("taboo", 0.4)), 0.05)
+
+            pack_seed = st.number_input(
+                "Pack selection seed",
+                min_value=0,
+                max_value=2_147_483_647,
+                value=int(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("random_seed", 42)),
+                step=1,
+                key="wizard_pack_seed",
+            )
+
+            concept_pack_config = {
+                "enabled_packs": sorted(set(enabled_packs)),
+                "tier_limits": {
+                    "core": concept_packs.DEFAULT_TIER_LIMITS.get("core", 100),
+                    "context": context_limit,
+                    "optional": optional_limit,
+                },
+                "biome_filters": list(selected_biomes),
+                "register_bias": {
+                    "neutral": register_defaults.get("neutral", 1.0),
+                    "formal": formal_bias,
+                    "poetic": poetic_bias,
+                    "archaic": archaic_bias,
+                    "sacred": sacred_bias,
+                    "taboo": taboo_bias,
+                },
+                "random_seed": int(pack_seed),
+            }
+            st.session_state["wizard_enabled_packs"] = concept_pack_config["enabled_packs"]
+            st.session_state["wizard_concept_pack_config"] = concept_pack_config
+
+            selected_entries = concept_packs.select_pack_entries(concept_pack_config)
+            coverage = concept_packs.pack_coverage(selected_entries)
+            st.caption(f"Selected pack entries: {len(selected_entries)}")
+            if coverage:
+                st.dataframe(
+                    [{"Category": category, "Count": count} for category, count in sorted(coverage.items())],
+                    hide_index=True,
+                    use_container_width=True,
+                )
+
+    with tab_family:
+        st.markdown("**Family parameters**")
+        st.number_input(
+            "Extant language count",
+            min_value=2,
+            max_value=500,
+            value=50,
+            step=1,
+            key="wizard_extant_count",
+        )
+        st.number_input(
+            "Minimum branch years",
+            min_value=50,
+            max_value=2000,
+            value=100,
+            step=10,
+            key="wizard_min_branch_years",
+        )
+        st.number_input(
+            "Events per 1000 years",
+            min_value=1.0,
+            max_value=15.0,
+            value=6.0,
+            step=0.5,
+            key="wizard_events_per_1000",
+        )
+        st.number_input(
+            "Time span (years)",
+            min_value=100,
+            max_value=10000,
+            value=2000,
+            step=50,
+            key="wizard_time_span_years",
+        )
+        st.number_input(
+            "Project seed",
+            min_value=0,
+            max_value=2_147_483_647,
+            value=42,
+            step=1,
+            key="wizard_project_seed",
+        )
+
+        template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
+        st.multiselect(
+            "Sound change templates",
+            options=template_options,
+            default=template_options,
+            key="wizard_sound_templates",
+        )
+        st.selectbox(
+            "Tree type",
+            options=["binary"],
+            index=0,
+            key="wizard_tree_type",
+        )
+
+        st.divider()
+        st.markdown("**Name generation settings**")
+        name_config = dict(name_generator.DEFAULT_NAME_CONFIG)
+        counts = name_config.get("counts_by_type", {})
+        personal_defaults = counts.get("personal", {}) if isinstance(counts, dict) else {}
+        toponym_defaults = counts.get("toponym", {}) if isinstance(counts, dict) else {}
+
+        personal_cols = st.columns(3)
+        personal_given = personal_cols[0].number_input("Given names", min_value=0, max_value=200, value=int(personal_defaults.get("given", 50)), step=5)
+        personal_family = personal_cols[1].number_input("Family names", min_value=0, max_value=200, value=int(personal_defaults.get("family", 20)), step=5)
+        personal_title = personal_cols[2].number_input("Titles", min_value=0, max_value=100, value=int(personal_defaults.get("title", 10)), step=5)
+
+        topo_cols = st.columns(3)
+        topo_settlement = topo_cols[0].number_input("Settlements", min_value=0, max_value=200, value=int(toponym_defaults.get("settlement", 30)), step=5)
+        topo_hydronym = topo_cols[1].number_input("Hydronyms", min_value=0, max_value=200, value=int(toponym_defaults.get("hydronym", 15)), step=5)
+        topo_terrain = topo_cols[2].number_input("Terrain names", min_value=0, max_value=200, value=int(toponym_defaults.get("terrain", 15)), step=5)
+
+        bias_cols = st.columns(3)
+        bias_self = bias_cols[0].slider("Self bias", 0.0, 1.0, float(name_config["archaic_bias"].get("self", 0.7)), 0.05)
+        bias_parent = bias_cols[1].slider("Parent bias", 0.0, 1.0, float(name_config["archaic_bias"].get("parent", 0.2)), 0.05)
+        bias_proto = bias_cols[2].slider("Proto bias", 0.0, 1.0, float(name_config["archaic_bias"].get("proto", 0.1)), 0.05)
+
+        name_config["counts_by_type"] = {
+            "personal": {"given": personal_given, "family": personal_family, "title": personal_title},
+            "toponym": {"settlement": topo_settlement, "hydronym": topo_hydronym, "terrain": topo_terrain},
+        }
+        name_config["archaic_bias"] = {"self": bias_self, "parent": bias_parent, "proto": bias_proto}
+        st.session_state["wizard_name_config"] = name_config
+
+    with tab_generate:
+        st.markdown("**Project setup**")
+        project_root = st.text_input(
+            "Project root folder",
+            value=st.session_state.get("family_project_root", "outputs/projects"),
+            key="wizard_project_root",
+        )
+        project_name = st.text_input(
+            "Project name",
+            value=st.session_state.get("wizard_project_name", "MyLanguageFamily"),
+            key="wizard_project_name",
+        )
+        proto_name = st.text_input("Proto language name", value=f"Proto {project_name}", key="wizard_proto_name")
+
+        loaded_project = st.session_state.get("family_project")
+        loaded_project_dir = st.session_state.get("family_project_dir")
+        use_loaded_project = False
+        overwrite_proto = False
+        if isinstance(loaded_project, dict) and loaded_project_dir:
+            use_loaded_project = st.checkbox(
+                "Use loaded project (overwrite proto)",
+                value=True,
+                key="wizard_use_loaded_project",
+            )
+            overwrite_proto = st.checkbox(
+                "Overwrite existing proto",
+                value=True,
+                key="wizard_overwrite_proto",
+            )
+            if use_loaded_project:
+                st.caption(f"Using loaded project: {loaded_project.get('project_name', '(unknown)')}")
+
+        inventory_ready = isinstance(st.session_state.get("wizard_inventory"), dict)
+        pack_config = st.session_state.get("wizard_concept_pack_config", concept_packs.DEFAULT_CONCEPT_PACK_CONFIG)
+
+        if st.button("Generate Family", type="primary", use_container_width=True, disabled=not inventory_ready):
+            if not inventory_ready:
+                st.error("Generate the proto inventory first.")
+            else:
+                try:
+                    if use_loaded_project and isinstance(loaded_project, dict) and loaded_project_dir:
+                        project_dir = Path(loaded_project_dir)
+                        project = project_io.load_project(project_dir)
+                    else:
+                        project = project_io.create_project(
+                            root_dir=Path(project_root),
+                            project_name=project_name,
+                            seed=int(st.session_state.get("wizard_project_seed", 42)),
+                            time_span_years=int(st.session_state.get("wizard_time_span_years", 2000)),
+                        )
+                        project_dir = Path(project_root) / project["project_slug"]
+                    project["concept_pack_config"] = dict(pack_config)
+                    project["name_config"] = dict(st.session_state.get("wizard_name_config", name_generator.DEFAULT_NAME_CONFIG))
+                    project["culture_profile"] = project.get("culture_profile", {})
+                    project_io.save_project(project)
+
+                    wizard_inventory = st.session_state.get("wizard_inventory", {})
+                    model = build_language_model(
+                        vowels=wizard_inventory.get("vowels", []),
+                        consonants=wizard_inventory.get("consonants", []),
+                        syllable_range=tuple(st.session_state.get("wizard_syllable_range", (1, 2))),
+                        syllable_separator=str(st.session_state.get("wizard_syllable_separator", "")),
+                        style_name=str(st.session_state.get("wizard_style_name", DEFAULT_STYLE_PRESET)),
+                        concept_list_name=str(st.session_state.get("wizard_concept_list", DEFAULT_CONCEPT_LIST)),
+                        grammar_profile_name=str(st.session_state.get("wizard_grammar_profile", DEFAULT_GRAMMAR_PROFILE)),
+                        concept_pack_config=pack_config,
+                    )
+                    proto_snapshot = build_language_snapshot(
+                        language_name=proto_name,
+                        inventory=wizard_inventory,
+                        language_model=model,
+                        language_id="proto",
+                    )
+
+                    languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+                    proto_path = languages_dir / "proto.json"
+                    if proto_path.exists() and not overwrite_proto and use_loaded_project:
+                        st.error("Proto already exists. Enable overwrite to replace it.")
+                        return
+                    project_io.save_language(proto_snapshot, proto_path)
+                    project["root_language_id"] = "proto"
+                    project["language_index"] = [{"language_id": "proto", "filename": "proto.json"}]
+                    project_io.save_project(project)
+
+                    family_config = {
+                        "extant_language_count": int(st.session_state.get("wizard_extant_count", 50)),
+                        "min_branch_years": int(st.session_state.get("wizard_min_branch_years", 100)),
+                        "events_per_1000_years": float(st.session_state.get("wizard_events_per_1000", 6.0)),
+                        "sound_change_templates_enabled": list(st.session_state.get("wizard_sound_templates", [])),
+                        "tree_type": str(st.session_state.get("wizard_tree_type", "binary")),
+                        "time_span_years": int(st.session_state.get("wizard_time_span_years", 2000)),
+                        "extant_year": int(st.session_state.get("wizard_time_span_years", 2000)),
+                        "seed": int(st.session_state.get("wizard_project_seed", 42)),
+                    }
+
+                    family_generator.generate_family(
+                        project_dir=project_dir,
+                        proto_language_path=languages_dir / "proto.json",
+                        family_config=family_config,
+                    )
+                    project = project_io.load_project(project_dir)
+                    set_project_state(project, project_dir)
+                    st.success("Language family generated.")
+                except FileExistsError as exc:
+                    st.error(f"{exc} Load the project first or enable 'Use loaded project'.")
+                except Exception as exc:  # pragma: no cover - UI safety net
+                    st.error(f"Could not generate family: {exc}")
+
+
+
 def render_language_family_ui() -> None:
     st.subheader("Language Family Generator")
+    render_family_wizard()
+    st.divider()
     romanization_profile = st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE)
     if romanization_profile not in ROMANIZATION_PROFILES:
         romanization_profile = DEFAULT_ROMANIZATION_PROFILE
@@ -2177,19 +2666,20 @@ def render_language_family_ui() -> None:
     if notice:
         st.success(notice)
 
-    def _set_project_state(project: Dict[str, Any], project_dir: Path) -> None:
-        st.session_state["family_project"] = project
-        st.session_state["family_project_dir"] = str(project_dir)
-        st.session_state["family_languages_cache"] = None
+    romanization_profile = st.selectbox(
+        "Romanization profile",
+        options=list(ROMANIZATION_PROFILES.keys()),
+        index=list(ROMANIZATION_PROFILES.keys()).index(romanization_profile)
+        if romanization_profile in ROMANIZATION_PROFILES
+        else 0,
+        key="romanization_profile",
+        help="Display-only: how IPA renders to sound-like text.",
+    )
 
     help_topics = {
         "project_root": {
             "title": "Project root",
             "body": "Where family projects are stored. Each project is a folder containing project.json.",
-        },
-        "proto_source": {
-            "title": "Proto source",
-            "body": "Choose whether to seed the family from the current single-language state or a saved snapshot.",
         },
         "parent_select": {
             "title": "Parent language",
@@ -2226,10 +2716,11 @@ def render_language_family_ui() -> None:
         if st.button("?", key=key):
             st.session_state["help_topic"] = topic_key
 
-    setup_col_1, setup_col_2 = st.columns([1.4, 1.0], gap="large")
+    setup_col_1 = st.container()
 
     with setup_col_1:
         st.markdown("### Project")
+        st.info("Use the Family Wizard above to create a proto language and initial tree.")
         project_root = st.text_input(
             "Project root folder",
             value=st.session_state.get("family_project_root", "outputs/projects"),
@@ -2267,7 +2758,7 @@ def render_language_family_ui() -> None:
                         seed=int(new_project_seed),
                         time_span_years=int(new_project_timespan),
                     )
-                    _set_project_state(project, project_root_path / project["project_slug"])
+                    set_project_state(project, project_root_path / project["project_slug"])
                     st.success("Project created and loaded.")
                 except FileExistsError as exc:
                     st.error(str(exc))
@@ -2283,7 +2774,7 @@ def render_language_family_ui() -> None:
                 project_dir = project_root_path / selected_project
                 try:
                     project = project_io.load_project(project_dir)
-                    _set_project_state(project, project_dir)
+                    set_project_state(project, project_dir)
                     st.success(f"Loaded project: {selected_project}")
                 except Exception as exc:  # pragma: no cover - UI safety net
                     st.error(f"Could not load project: {exc}")
@@ -2303,90 +2794,6 @@ def render_language_family_ui() -> None:
     project = st.session_state.get("family_project")
     project_dir_value = st.session_state.get("family_project_dir")
     project_dir = Path(project_dir_value) if project_dir_value else None
-
-    with setup_col_2:
-        st.markdown("### Proto")
-        proto_source = st.radio(
-            "Proto source",
-            options=["Use current single-language state", "Upload snapshot JSON"],
-            horizontal=True,
-            key="family_proto_source",
-        )
-        help_button("proto_source")
-        proto_snapshot: Optional[Dict[str, Any]] = None
-
-        if proto_source == "Use current single-language state":
-            latest_inventory = st.session_state.get("last_inventory")
-            if isinstance(latest_inventory, dict):
-                model = st.session_state.get("sample_language_model")
-                proto_snapshot = build_language_snapshot(
-                    language_name=st.session_state.get("last_language_name", "ProtoLanguage"),
-                    inventory=latest_inventory,
-                    language_model=model if isinstance(model, dict) else None,
-                    language_id="proto",
-                )
-                st.caption(f"Proto ready: {snapshot_summary(proto_snapshot)}")
-            else:
-                st.info("Generate a single language inventory first.")
-        else:
-            uploaded_proto = st.file_uploader(
-                "Upload snapshot JSON",
-                type="json",
-                key="family_proto_upload",
-            )
-            if uploaded_proto:
-                try:
-                    proto_snapshot = json.load(uploaded_proto)
-                    if not isinstance(proto_snapshot, dict):
-                        raise ValueError("Snapshot must be a JSON object.")
-                    if "inventory" not in proto_snapshot:
-                        raise ValueError("Snapshot missing inventory field.")
-                    st.caption(f"Proto loaded: {snapshot_summary(proto_snapshot)}")
-                except Exception as exc:
-                    st.error(f"Could not load snapshot: {exc}")
-
-        if proto_snapshot and isinstance(project, dict) and project_dir:
-            overwrite_proto = st.checkbox("Overwrite existing proto", value=False)
-            if st.button("Save Proto", use_container_width=True):
-                meta = proto_snapshot.get("meta", {})
-                if not isinstance(meta, dict):
-                    meta = {}
-                language_id = sanitize_name(str(meta.get("language_id") or "proto")) or "proto"
-                language_name = str(meta.get("name") or proto_snapshot.get("name") or language_id)
-                meta.update(
-                    {
-                        "language_id": language_id,
-                        "name": language_name,
-                        "year": 0,
-                        "parent_id": None,
-                        "changeset_id": None,
-                        "created_at": meta.get("created_at") or datetime.now().isoformat(),
-                        "notes": meta.get("notes", ""),
-                        "lexicon_overrides": meta.get("lexicon_overrides", {}),
-                    }
-                )
-
-                languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
-                target_path = languages_dir / f"{language_id}.json"
-                if target_path.exists() and not overwrite_proto:
-                    st.error("Proto file already exists. Enable overwrite to replace it.")
-                else:
-                    normalized = project_io.normalize_language_snapshot(proto_snapshot)
-                    normalized["meta"] = meta
-                    project_io.save_language(normalized, target_path)
-                    project["root_language_id"] = language_id
-                    language_index = project.get("language_index", [])
-                    if not isinstance(language_index, list):
-                        language_index = []
-                    if not any(
-                        isinstance(item, dict) and item.get("language_id") == language_id for item in language_index
-                    ):
-                        language_index.append({"language_id": language_id, "filename": f"{language_id}.json"})
-                    project["language_index"] = language_index
-                    project_io.save_project(project)
-                    _set_project_state(project, project_dir)
-                    st.session_state["family_notice"] = f"Saved proto language: {language_id}"
-                    st.rerun()
 
     st.divider()
 
@@ -2843,6 +3250,33 @@ def render_language_family_ui() -> None:
                     meta_cols[2].metric("Changeset", str(meta.get("changeset_id", "—")))
                     meta_cols[3].metric("Lexicon", str(len(selected_language.get("lexicon", []))))
 
+                    rebuild_cols = st.columns([1.3, 1.0])
+                    with rebuild_cols[0]:
+                        rebuild_names = st.checkbox(
+                            "Regenerate names on subtree rebuild",
+                            value=True,
+                            key=f"family_rebuild_names_{selected_id}",
+                        )
+                    with rebuild_cols[1]:
+                        if st.button("Rebuild subtree", key=f"family_rebuild_subtree_{selected_id}"):
+                            family_generator.rebuild_subtree(project_dir, selected_id)
+                            project = project_io.load_project(project_dir)
+                            st.session_state["family_project"] = project
+                            st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                            if rebuild_names:
+                                languages = st.session_state.get("family_languages_cache", {})
+                                name_config = project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)
+                                templates = name_generator.load_templates()
+                                name_generator.rebuild_names_subtree(
+                                    project_dir=project_dir,
+                                    root_language_id=selected_id,
+                                    languages=languages,
+                                    name_config=name_config,
+                                    templates=templates,
+                                )
+                            st.success("Subtree rebuilt.")
+                            st.rerun()
+
                     inventory = selected_language.get("inventory", {})
                     display_col_1, display_col_2 = st.columns(2)
                     with display_col_1:
@@ -2976,6 +3410,230 @@ def render_language_family_ui() -> None:
                         st.success("Re-rolled entries saved.")
                         st.rerun()
 
+                    st.markdown("**Names**")
+                    name_config = project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)
+                    templates = name_generator.load_templates()
+                    names_payload = name_generator.load_names(project_dir, selected_id)
+                    existing_names = []
+                    if isinstance(names_payload, dict):
+                        existing_names = names_payload.get("names", []) if isinstance(names_payload.get("names", []), list) else []
+
+                    with st.expander("Name settings", expanded=False):
+                        counts = name_config.get("counts_by_type", {}) if isinstance(name_config, dict) else {}
+                        personal_defaults = counts.get("personal", {}) if isinstance(counts, dict) else {}
+                        toponym_defaults = counts.get("toponym", {}) if isinstance(counts, dict) else {}
+
+                        personal_cols = st.columns(3)
+                        personal_given = personal_cols[0].number_input(
+                            "Given names",
+                            min_value=0,
+                            max_value=200,
+                            value=int(personal_defaults.get("given", 50)),
+                            step=5,
+                            key=f"name_given_{selected_id}",
+                        )
+                        personal_family = personal_cols[1].number_input(
+                            "Family names",
+                            min_value=0,
+                            max_value=200,
+                            value=int(personal_defaults.get("family", 20)),
+                            step=5,
+                            key=f"name_family_{selected_id}",
+                        )
+                        personal_title = personal_cols[2].number_input(
+                            "Titles",
+                            min_value=0,
+                            max_value=100,
+                            value=int(personal_defaults.get("title", 10)),
+                            step=5,
+                            key=f"name_title_{selected_id}",
+                        )
+
+                        topo_cols = st.columns(3)
+                        topo_settlement = topo_cols[0].number_input(
+                            "Settlements",
+                            min_value=0,
+                            max_value=200,
+                            value=int(toponym_defaults.get("settlement", 30)),
+                            step=5,
+                            key=f"name_settlement_{selected_id}",
+                        )
+                        topo_hydronym = topo_cols[1].number_input(
+                            "Hydronyms",
+                            min_value=0,
+                            max_value=200,
+                            value=int(toponym_defaults.get("hydronym", 15)),
+                            step=5,
+                            key=f"name_hydronym_{selected_id}",
+                        )
+                        topo_terrain = topo_cols[2].number_input(
+                            "Terrain names",
+                            min_value=0,
+                            max_value=200,
+                            value=int(toponym_defaults.get("terrain", 15)),
+                            step=5,
+                            key=f"name_terrain_{selected_id}",
+                        )
+
+                        bias_cols = st.columns(3)
+                        archaic_bias = name_config.get("archaic_bias", {}) if isinstance(name_config, dict) else {}
+                        bias_self = bias_cols[0].slider(
+                            "Self bias",
+                            0.0,
+                            1.0,
+                            float(archaic_bias.get("self", 0.7)),
+                            0.05,
+                            key=f"name_bias_self_{selected_id}",
+                        )
+                        bias_parent = bias_cols[1].slider(
+                            "Parent bias",
+                            0.0,
+                            1.0,
+                            float(archaic_bias.get("parent", 0.2)),
+                            0.05,
+                            key=f"name_bias_parent_{selected_id}",
+                        )
+                        bias_proto = bias_cols[2].slider(
+                            "Proto bias",
+                            0.0,
+                            1.0,
+                            float(archaic_bias.get("proto", 0.1)),
+                            0.05,
+                            key=f"name_bias_proto_{selected_id}",
+                        )
+
+                        if st.button("Save name settings", key=f"name_save_config_{selected_id}"):
+                            updated_config = dict(name_config)
+                            updated_config["counts_by_type"] = {
+                                "personal": {
+                                    "given": personal_given,
+                                    "family": personal_family,
+                                    "title": personal_title,
+                                },
+                                "toponym": {
+                                    "settlement": topo_settlement,
+                                    "hydronym": topo_hydronym,
+                                    "terrain": topo_terrain,
+                                },
+                            }
+                            updated_config["archaic_bias"] = {
+                                "self": bias_self,
+                                "parent": bias_parent,
+                                "proto": bias_proto,
+                            }
+                            project["name_config"] = updated_config
+                            project_io.save_project(project)
+                            st.session_state["family_project"] = project
+                            st.success("Name settings saved.")
+
+                    def _ancestor_models() -> Dict[str, Dict[str, Any]]:
+                        ancestors: Dict[str, Dict[str, Any]] = {}
+                        parent_id = meta.get("parent_id")
+                        if parent_id and parent_id in languages:
+                            ancestors["parent"] = languages[parent_id]
+                        root_id = project.get("root_language_id")
+                        if root_id and root_id in languages and root_id != selected_id:
+                            ancestors["proto"] = languages[root_id]
+                        return ancestors
+
+                    name_actions = st.columns(3)
+                    if name_actions[0].button("Generate names", key=f"name_generate_{selected_id}"):
+                        rng = random.Random(int(project.get("seed", 42)))
+                        generated = name_generator.generate_names(
+                            language_model=selected_language,
+                            name_config=project.get("name_config", name_generator.DEFAULT_NAME_CONFIG),
+                            templates=templates,
+                            ancestors=_ancestor_models(),
+                            rng=rng,
+                        )
+                        payload = name_generator.names_payload(
+                            language_id=selected_id,
+                            names=generated,
+                            config_hash=name_generator.config_hash(project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)),
+                        )
+                        name_generator.save_names(project_dir, payload)
+                        st.success("Names generated.")
+                        st.rerun()
+
+                    if existing_names:
+                        name_rows = [
+                            {
+                                "Name ID": str(entry.get("name_id", "")),
+                                "IPA": str(entry.get("form_ipa", "")),
+                                "Sound-like": ipa_text_to_sound_like(
+                                    str(entry.get("form_ipa", "")),
+                                    use_segment_separators=False,
+                                    profile_name=romanization_profile,
+                                ),
+                                "Gloss": str(entry.get("gloss", "")),
+                                "Type": str(entry.get("name_type", "")),
+                                "Subtype": str(entry.get("subtype", "")),
+                                "Template": str(entry.get("template_id", "")),
+                                "Locked": bool(entry.get("locked", False)),
+                            }
+                            for entry in existing_names
+                            if isinstance(entry, dict)
+                        ]
+                        edited_names = st.data_editor(
+                            name_rows,
+                            hide_index=True,
+                            use_container_width=True,
+                            key=f"family_names_{selected_id}",
+                            column_config={
+                                "Locked": st.column_config.CheckboxColumn("Locked", default=False),
+                                "Name ID": st.column_config.TextColumn("Name ID", disabled=True),
+                                "IPA": st.column_config.TextColumn("IPA", disabled=True),
+                                "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
+                                "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
+                                "Type": st.column_config.TextColumn("Type", disabled=True),
+                                "Subtype": st.column_config.TextColumn("Subtype", disabled=True),
+                                "Template": st.column_config.TextColumn("Template", disabled=True),
+                            },
+                        )
+                        if hasattr(edited_names, "to_dict"):
+                            edited_names = edited_names.to_dict(orient="records")
+
+                        if name_actions[1].button("Save locks", key=f"name_save_locks_{selected_id}"):
+                            locked_map = {
+                                str(row.get("Name ID", "")): bool(row.get("Locked", False))
+                                for row in edited_names
+                                if isinstance(row, dict)
+                            }
+                            for entry in existing_names:
+                                if not isinstance(entry, dict):
+                                    continue
+                                entry_id = str(entry.get("name_id", ""))
+                                if entry_id in locked_map:
+                                    entry["locked"] = locked_map[entry_id]
+                            payload = name_generator.names_payload(
+                                language_id=selected_id,
+                                names=existing_names,
+                                config_hash=name_generator.config_hash(project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)),
+                            )
+                            name_generator.save_names(project_dir, payload)
+                            st.success("Name locks saved.")
+                            st.rerun()
+
+                        if name_actions[2].button("Regenerate unlocked", key=f"name_regen_{selected_id}"):
+                            rng = random.Random(int(project.get("seed", 42)))
+                            generated = name_generator.generate_names(
+                                language_model=selected_language,
+                                name_config=project.get("name_config", name_generator.DEFAULT_NAME_CONFIG),
+                                templates=templates,
+                                ancestors=_ancestor_models(),
+                                rng=rng,
+                            )
+                            merged = name_generator.merge_locked(existing_names, generated)
+                            payload = name_generator.names_payload(
+                                language_id=selected_id,
+                                names=merged,
+                                config_hash=name_generator.config_hash(project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)),
+                            )
+                            name_generator.save_names(project_dir, payload)
+                            st.success("Unlocked names regenerated.")
+                            st.rerun()
+                    else:
+                        st.info("No names generated yet.")
     with help_col:
         st.markdown("### Help")
         topic_key = st.session_state.get("help_topic")
@@ -2991,17 +3649,7 @@ def main() -> None:
     st.set_page_config(page_title="Sound Inventory Generator", page_icon="🔤", layout="wide")
     inject_custom_css()
     render_hero()
-
-    mode = st.sidebar.radio(
-        "Mode",
-        options=["Single Language", "Language Family"],
-        index=0,
-        key="app_mode",
-    )
-    if mode == "Language Family":
-        render_language_family_ui()
-    else:
-        render_single_language_ui()
+    render_language_family_ui()
 
 
 if __name__ == "__main__":

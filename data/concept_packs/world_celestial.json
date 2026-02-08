@@ -1,0 +1,60 @@
+{
+  "pack_id": "world_celestial",
+  "pack_name": "Celestial",
+  "category": "world",
+  "tier": "context",
+  "description": "Sky features and celestial bodies.",
+  "tags": ["celestial", "sky"],
+  "entries": [
+    {
+      "concept_id": "world_celestial.sun",
+      "meaning": "sun",
+      "pos": "N",
+      "gloss": "SUN",
+      "tags": ["celestial", "light"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_celestial.moon",
+      "meaning": "moon",
+      "pos": "N",
+      "gloss": "MOON",
+      "tags": ["celestial", "night"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_celestial.star",
+      "meaning": "star",
+      "pos": "N",
+      "gloss": "STAR",
+      "tags": ["celestial", "night"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_celestial.dawn",
+      "meaning": "dawn",
+      "pos": "N",
+      "gloss": "DAWN",
+      "tags": ["celestial", "daypart"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "world_celestial.dusk",
+      "meaning": "dusk",
+      "pos": "N",
+      "gloss": "DUSK",
+      "tags": ["celestial", "daypart"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.8
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "pack_id": "world_hydrology",
+  "pack_name": "Hydrology",
+  "category": "world",
+  "tier": "context",
+  "description": "Rivers, lakes, and water features.",
+  "tags": ["hydrology", "water"],
+  "entries": [
+    {
+      "concept_id": "world_hydrology.river",
+      "meaning": "river",
+      "pos": "N",
+      "gloss": "RIVER",
+      "tags": ["hydrology", "water"],
+      "biomes": ["temperate_forest", "tropical_forest", "grassland"],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_hydrology.stream",
+      "meaning": "stream",
+      "pos": "N",
+      "gloss": "STREAM",
+      "tags": ["hydrology", "water"],
+      "biomes": ["temperate_forest", "mountain"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_hydrology.lake",
+      "meaning": "lake",
+      "pos": "N",
+      "gloss": "LAKE",
+      "tags": ["hydrology", "water"],
+      "biomes": ["temperate_forest", "tundra"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_hydrology.sea",
+      "meaning": "sea",
+      "pos": "N",
+      "gloss": "SEA",
+      "tags": ["hydrology", "water", "coast"],
+      "biomes": ["coast"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_hydrology.spring",
+      "meaning": "spring (water source)",
+      "pos": "N",
+      "gloss": "SPRING",
+      "tags": ["hydrology", "source"],
+      "biomes": ["mountain", "temperate_forest"],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "world_hydrology.delta",
+      "meaning": "river delta",
+      "pos": "N",
+      "gloss": "DELTA",
+      "tags": ["hydrology", "coast"],
+      "biomes": ["coast", "wetland"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "world_hydrology.ford",
+      "meaning": "ford",
+      "pos": "N",
+      "gloss": "FORD",
+      "tags": ["hydrology", "crossing"],
+      "biomes": ["temperate_forest", "grassland"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "world_hydrology.harbor",
+      "meaning": "harbor",
+      "pos": "N",
+      "gloss": "HARBOR",
+      "tags": ["hydrology", "settlement"],
+      "biomes": ["coast"],
+      "register": "neutral",
+      "weight": 0.6
+    }
+  ]
+}

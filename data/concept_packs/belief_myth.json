@@ -1,0 +1,90 @@
+{
+  "pack_id": "belief_myth",
+  "pack_name": "Belief & Myth",
+  "category": "belief",
+  "tier": "optional",
+  "description": "Deities, sacred concepts, rituals, and taboos.",
+  "tags": ["belief", "sacred"],
+  "entries": [
+    {
+      "concept_id": "belief_myth.sun_god",
+      "meaning": "sun god",
+      "pos": "N",
+      "gloss": "SUN_GOD",
+      "tags": ["deity", "celestial", "light"],
+      "biomes": [],
+      "register": "sacred",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "belief_myth.moon_goddess",
+      "meaning": "moon goddess",
+      "pos": "N",
+      "gloss": "MOON_GODDESS",
+      "tags": ["deity", "celestial", "night"],
+      "biomes": [],
+      "register": "sacred",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "belief_myth.storm_god",
+      "meaning": "storm god",
+      "pos": "N",
+      "gloss": "STORM_GOD",
+      "tags": ["deity", "weather"],
+      "biomes": [],
+      "register": "sacred",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "belief_myth.shrine",
+      "meaning": "shrine",
+      "pos": "N",
+      "gloss": "SHRINE",
+      "tags": ["sacred", "place"],
+      "biomes": [],
+      "register": "sacred",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "belief_myth.ritual",
+      "meaning": "ritual",
+      "pos": "N",
+      "gloss": "RITUAL",
+      "tags": ["sacred", "practice"],
+      "biomes": [],
+      "register": "sacred",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "belief_myth.purity",
+      "meaning": "purity",
+      "pos": "N",
+      "gloss": "PURITY",
+      "tags": ["sacred", "virtue"],
+      "biomes": [],
+      "register": "sacred",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "belief_myth.taboo",
+      "meaning": "taboo",
+      "pos": "N",
+      "gloss": "TABOO",
+      "tags": ["sacred", "taboo"],
+      "biomes": [],
+      "register": "taboo",
+      "weight": 0.4
+    },
+    {
+      "concept_id": "belief_myth.afterlife",
+      "meaning": "afterlife",
+      "pos": "N",
+      "gloss": "AFTERLIFE",
+      "tags": ["sacred", "death"],
+      "biomes": [],
+      "register": "sacred",
+      "weight": 0.5
+    }
+  ]
+}

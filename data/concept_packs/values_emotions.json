@@ -1,0 +1,90 @@
+{
+  "pack_id": "values_emotions",
+  "pack_name": "Values & Emotions",
+  "category": "values",
+  "tier": "context",
+  "description": "Virtues, vices, ideals, and emotions.",
+  "tags": ["values"],
+  "entries": [
+    {
+      "concept_id": "values_emotions.bravery",
+      "meaning": "bravery",
+      "pos": "N",
+      "gloss": "BRAVERY",
+      "tags": ["virtue", "honor"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "values_emotions.wisdom",
+      "meaning": "wisdom",
+      "pos": "N",
+      "gloss": "WISDOM",
+      "tags": ["virtue", "knowledge"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "values_emotions.honor",
+      "meaning": "honor",
+      "pos": "N",
+      "gloss": "HONOR",
+      "tags": ["virtue", "honor"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "values_emotions.joy",
+      "meaning": "joy",
+      "pos": "N",
+      "gloss": "JOY",
+      "tags": ["emotion", "positive"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "values_emotions.sorrow",
+      "meaning": "sorrow",
+      "pos": "N",
+      "gloss": "SORROW",
+      "tags": ["emotion", "negative"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "values_emotions.fear",
+      "meaning": "fear",
+      "pos": "N",
+      "gloss": "FEAR",
+      "tags": ["emotion", "negative"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "values_emotions.love",
+      "meaning": "love",
+      "pos": "N",
+      "gloss": "LOVE",
+      "tags": ["emotion", "positive"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "values_emotions.mercy",
+      "meaning": "mercy",
+      "pos": "N",
+      "gloss": "MERCY",
+      "tags": ["virtue", "care"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.6
+    }
+  ]
+}

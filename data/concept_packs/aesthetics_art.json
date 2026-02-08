@@ -1,0 +1,60 @@
+{
+  "pack_id": "aesthetics_art",
+  "pack_name": "Aesthetics & Art",
+  "category": "aesthetic",
+  "tier": "optional",
+  "description": "Artistic concepts and beauty terms.",
+  "tags": ["aesthetic", "art"],
+  "entries": [
+    {
+      "concept_id": "aesthetics_art.song",
+      "meaning": "song",
+      "pos": "N",
+      "gloss": "SONG",
+      "tags": ["art", "music"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "aesthetics_art.poem",
+      "meaning": "poem",
+      "pos": "N",
+      "gloss": "POEM",
+      "tags": ["art", "poetic"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "aesthetics_art.paint",
+      "meaning": "painting",
+      "pos": "N",
+      "gloss": "PAINTING",
+      "tags": ["art", "visual"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "aesthetics_art.beauty",
+      "meaning": "beauty",
+      "pos": "N",
+      "gloss": "BEAUTY",
+      "tags": ["aesthetic", "virtue"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "aesthetics_art.grace",
+      "meaning": "grace",
+      "pos": "N",
+      "gloss": "GRACE",
+      "tags": ["aesthetic", "virtue"],
+      "biomes": [],
+      "register": "poetic",
+      "weight": 0.5
+    }
+  ]
+}

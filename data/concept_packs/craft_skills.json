@@ -1,0 +1,60 @@
+{
+  "pack_id": "craft_skills",
+  "pack_name": "Crafts & Skills",
+  "category": "craft",
+  "tier": "optional",
+  "description": "Craft skills and artisanal concepts.",
+  "tags": ["craft", "skill"],
+  "entries": [
+    {
+      "concept_id": "craft_skills.smith",
+      "meaning": "smith",
+      "pos": "N",
+      "gloss": "SMITH",
+      "tags": ["craft", "role", "metal"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "craft_skills.weaver",
+      "meaning": "weaver",
+      "pos": "N",
+      "gloss": "WEAVER",
+      "tags": ["craft", "role", "textile"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "craft_skills.potter",
+      "meaning": "potter",
+      "pos": "N",
+      "gloss": "POTTER",
+      "tags": ["craft", "role", "clay"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "craft_skills.shipwright",
+      "meaning": "shipwright",
+      "pos": "N",
+      "gloss": "SHIPWRIGHT",
+      "tags": ["craft", "role", "water"],
+      "biomes": ["coast"],
+      "register": "neutral",
+      "weight": 0.5
+    },
+    {
+      "concept_id": "craft_skills.gemcutter",
+      "meaning": "gemcutter",
+      "pos": "N",
+      "gloss": "GEMCUTTER",
+      "tags": ["craft", "role", "aesthetic"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.4
+    }
+  ]
+}

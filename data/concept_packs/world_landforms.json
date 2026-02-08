@@ -1,0 +1,110 @@
+{
+  "pack_id": "world_landforms",
+  "pack_name": "Landforms",
+  "category": "world",
+  "tier": "context",
+  "description": "Common landforms and terrain features.",
+  "tags": ["landform", "terrain"],
+  "entries": [
+    {
+      "concept_id": "world_landforms.mountain",
+      "meaning": "mountain",
+      "pos": "N",
+      "gloss": "MOUNTAIN",
+      "tags": ["landform", "high"],
+      "biomes": ["temperate_forest", "tundra", "mountain"],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_landforms.hill",
+      "meaning": "hill",
+      "pos": "N",
+      "gloss": "HILL",
+      "tags": ["landform"],
+      "biomes": ["temperate_forest", "grassland"],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_landforms.valley",
+      "meaning": "valley",
+      "pos": "N",
+      "gloss": "VALLEY",
+      "tags": ["landform", "low"],
+      "biomes": ["temperate_forest", "grassland", "mountain"],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_landforms.plain",
+      "meaning": "plain",
+      "pos": "N",
+      "gloss": "PLAIN",
+      "tags": ["landform", "open"],
+      "biomes": ["grassland", "steppe"],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_landforms.forest",
+      "meaning": "forest",
+      "pos": "N",
+      "gloss": "FOREST",
+      "tags": ["landform", "forest"],
+      "biomes": ["temperate_forest", "tropical_forest"],
+      "register": "neutral",
+      "weight": 1.0
+    },
+    {
+      "concept_id": "world_landforms.desert",
+      "meaning": "desert",
+      "pos": "N",
+      "gloss": "DESERT",
+      "tags": ["landform", "dry"],
+      "biomes": ["desert"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_landforms.cliff",
+      "meaning": "cliff",
+      "pos": "N",
+      "gloss": "CLIFF",
+      "tags": ["landform", "rock"],
+      "biomes": ["coast", "mountain"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_landforms.canyon",
+      "meaning": "canyon",
+      "pos": "N",
+      "gloss": "CANYON",
+      "tags": ["landform", "rock"],
+      "biomes": ["desert"],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "world_landforms.island",
+      "meaning": "island",
+      "pos": "N",
+      "gloss": "ISLAND",
+      "tags": ["landform", "coast"],
+      "biomes": ["coast"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "world_landforms.marsh",
+      "meaning": "marsh",
+      "pos": "N",
+      "gloss": "MARSH",
+      "tags": ["landform", "wetland"],
+      "biomes": ["wetland"],
+      "register": "neutral",
+      "weight": 0.8
+    }
+  ]
+}

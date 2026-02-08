@@ -421,6 +421,7 @@ def rebuild_subtree(project_dir: Path, root_language_id: str) -> None:
             for key in [
                 "style_name",
                 "concept_list_name",
+                "concept_pack_config",
                 "grammar_profile_name",
                 "syllable_range",
                 "syllable_separator",
@@ -481,6 +482,7 @@ def _apply_overrides(child: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[s
     for key in [
         "style_name",
         "concept_list_name",
+        "concept_pack_config",
         "grammar_profile_name",
         "syllable_range",
         "syllable_separator",

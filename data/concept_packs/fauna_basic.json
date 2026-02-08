@@ -1,0 +1,90 @@
+{
+  "pack_id": "fauna_basic",
+  "pack_name": "Fauna",
+  "category": "world",
+  "tier": "context",
+  "description": "Common animals and symbolic beasts.",
+  "tags": ["fauna", "animal"],
+  "entries": [
+    {
+      "concept_id": "fauna_basic.wolf",
+      "meaning": "wolf",
+      "pos": "N",
+      "gloss": "WOLF",
+      "tags": ["fauna", "animal", "wild"],
+      "biomes": ["temperate_forest", "tundra"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "fauna_basic.deer",
+      "meaning": "deer",
+      "pos": "N",
+      "gloss": "DEER",
+      "tags": ["fauna", "animal"],
+      "biomes": ["temperate_forest", "grassland"],
+      "register": "neutral",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "fauna_basic.bear",
+      "meaning": "bear",
+      "pos": "N",
+      "gloss": "BEAR",
+      "tags": ["fauna", "animal", "strength"],
+      "biomes": ["temperate_forest", "tundra"],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "fauna_basic.hawk",
+      "meaning": "hawk",
+      "pos": "N",
+      "gloss": "HAWK",
+      "tags": ["fauna", "animal", "sky"],
+      "biomes": ["grassland", "mountain"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "fauna_basic.fox",
+      "meaning": "fox",
+      "pos": "N",
+      "gloss": "FOX",
+      "tags": ["fauna", "animal", "cunning"],
+      "biomes": ["temperate_forest", "grassland"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "fauna_basic.horse",
+      "meaning": "horse",
+      "pos": "N",
+      "gloss": "HORSE",
+      "tags": ["fauna", "animal", "domestic"],
+      "biomes": ["grassland", "steppe"],
+      "register": "neutral",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "fauna_basic.falcon",
+      "meaning": "falcon",
+      "pos": "N",
+      "gloss": "FALCON",
+      "tags": ["fauna", "animal", "sky", "noble"],
+      "biomes": ["mountain"],
+      "register": "poetic",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "fauna_basic.serpent",
+      "meaning": "serpent",
+      "pos": "N",
+      "gloss": "SERPENT",
+      "tags": ["fauna", "animal", "myth"],
+      "biomes": ["tropical_forest", "desert"],
+      "register": "poetic",
+      "weight": 0.6
+    }
+  ]
+}

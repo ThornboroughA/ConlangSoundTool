@@ -1,0 +1,146 @@
+[
+  {
+    "template_id": "theophoric_deity_epithet",
+    "name_type": "personal",
+    "subtype": "given",
+    "description": "Deity + epithet or virtue.",
+    "parts": [
+      {"tags_any": ["deity"]},
+      {"tags_any": ["virtue", "honor", "sacred", "beauty"]}
+    ],
+    "joiner": "",
+    "weight": 1.0
+  },
+  {
+    "template_id": "virtue_person",
+    "name_type": "personal",
+    "subtype": "given",
+    "description": "Virtue + person marker.",
+    "parts": [
+      {"tags_any": ["virtue", "honor", "wisdom"]},
+      {"tags_any": ["person", "lineage", "clan"]}
+    ],
+    "joiner": "",
+    "weight": 0.8
+  },
+  {
+    "template_id": "nature_beauty",
+    "name_type": "personal",
+    "subtype": "given",
+    "description": "Flora/fauna + beauty or grace.",
+    "parts": [
+      {"tags_any": ["flora", "fauna"]},
+      {"tags_any": ["beauty", "grace", "aesthetic"]}
+    ],
+    "joiner": "",
+    "weight": 0.7
+  },
+  {
+    "template_id": "seasonal_birth",
+    "name_type": "personal",
+    "subtype": "given",
+    "description": "Season + daypart.",
+    "parts": [
+      {"tags_any": ["season"]},
+      {"tags_any": ["daypart"]}
+    ],
+    "joiner": "",
+    "weight": 0.6
+  },
+  {
+    "template_id": "clan_patronymic",
+    "name_type": "personal",
+    "subtype": "family",
+    "description": "Clan/lineage + ancestor marker.",
+    "parts": [
+      {"tags_any": ["clan", "lineage"]},
+      {"tags_any": ["ancestor", "person"]}
+    ],
+    "joiner": "",
+    "weight": 0.7
+  },
+  {
+    "template_id": "title_power",
+    "name_type": "personal",
+    "subtype": "title",
+    "description": "Power title + honor concept.",
+    "parts": [
+      {"tags_any": ["title", "leader", "power"]},
+      {"tags_any": ["honor", "virtue", "law"]}
+    ],
+    "joiner": " ",
+    "weight": 0.6
+  },
+  {
+    "template_id": "landform_settlement",
+    "name_type": "toponym",
+    "subtype": "settlement",
+    "description": "Landform + settlement term.",
+    "parts": [
+      {"tags_any": ["landform"]},
+      {"tags_any": ["settlement"]}
+    ],
+    "joiner": " ",
+    "weight": 1.0
+  },
+  {
+    "template_id": "hydrology_settlement",
+    "name_type": "toponym",
+    "subtype": "settlement",
+    "description": "Hydrology + settlement term.",
+    "parts": [
+      {"tags_any": ["hydrology"]},
+      {"tags_any": ["settlement"]}
+    ],
+    "joiner": " ",
+    "weight": 0.9
+  },
+  {
+    "template_id": "flora_settlement",
+    "name_type": "toponym",
+    "subtype": "settlement",
+    "description": "Flora + settlement term.",
+    "parts": [
+      {"tags_any": ["flora"]},
+      {"tags_any": ["settlement"]}
+    ],
+    "joiner": " ",
+    "weight": 0.8
+  },
+  {
+    "template_id": "material_fortification",
+    "name_type": "toponym",
+    "subtype": "settlement",
+    "description": "Material + fortification.",
+    "parts": [
+      {"tags_any": ["material", "metal", "stone", "wood"]},
+      {"tags_any": ["fortification", "settlement"]}
+    ],
+    "joiner": " ",
+    "weight": 0.7
+  },
+  {
+    "template_id": "hydrology_terrain",
+    "name_type": "toponym",
+    "subtype": "hydronym",
+    "description": "Hydrology + landform.",
+    "parts": [
+      {"tags_any": ["hydrology"]},
+      {"tags_any": ["landform", "coast"]}
+    ],
+    "joiner": " ",
+    "weight": 0.7
+  },
+  {
+    "template_id": "celestial_terrain",
+    "name_type": "toponym",
+    "subtype": "terrain",
+    "description": "Celestial + landform.",
+    "parts": [
+      {"tags_any": ["celestial"]},
+      {"tags_any": ["landform"]}
+    ],
+    "joiner": " ",
+    "weight": 0.6
+  }
+]

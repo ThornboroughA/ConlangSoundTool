@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import concept_packs
+import name_generator
 from sample_text_generator import (
     DEFAULT_CONCEPT_LIST,
     DEFAULT_GRAMMAR_PROFILE,
@@ -42,6 +44,23 @@ def sanitize_slug(value: str) -> str:
     return cleaned or "project"
 
 
+def _normalize_segment_list(raw_segments: Any) -> list:
+    if not isinstance(raw_segments, list):
+        return []
+    normalized: list = []
+    for item in raw_segments:
+        if isinstance(item, str):
+            segment = item.strip()
+            if segment:
+                normalized.append(segment)
+            continue
+        if isinstance(item, dict):
+            segment = str(item.get("segment", "")).strip()
+            if segment:
+                normalized.append(segment)
+    return normalized
+
+
 def normalize_language_snapshot(language: Dict[str, Any]) -> Dict[str, Any]:
     """Strip runtime-only fields and ensure required snapshot keys exist."""
     meta = language.get("meta", {})
@@ -56,13 +75,14 @@ def normalize_language_snapshot(language: Dict[str, Any]) -> Dict[str, Any]:
         "meta": meta,
         "style_name": str(language.get("style_name", DEFAULT_STYLE_PRESET)),
         "concept_list_name": str(language.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
+        "concept_pack_config": language.get("concept_pack_config", {}),
         "grammar_profile_name": str(language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
         "syllable_range": list(language.get("syllable_range", [1, 1])),
         "syllable_separator": str(language.get("syllable_separator", "")),
         "phonotactic_profile_overrides": language.get("phonotactic_profile_overrides", {}),
         "inventory": {
-            "vowels": list(inventory.get("vowels", [])) if isinstance(inventory.get("vowels", []), list) else [],
-            "consonants": list(inventory.get("consonants", [])) if isinstance(inventory.get("consonants", []), list) else [],
+            "vowels": _normalize_segment_list(inventory.get("vowels", [])),
+            "consonants": _normalize_segment_list(inventory.get("consonants", [])),
         },
         "lexicon": list(language.get("lexicon", [])) if isinstance(language.get("lexicon", []), list) else [],
     }
@@ -97,6 +117,10 @@ def create_project(root_dir: Path, project_name: str, seed: int, time_span_years
         "next_language_counter": 1,
         "paths": {"languages_dir": "languages", "changesets_dir": "changesets"},
         "family_config": dict(DEFAULT_FAMILY_CONFIG),
+        "concept_pack_config": dict(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG),
+        "name_config": dict(name_generator.DEFAULT_NAME_CONFIG),
+        "culture_profile": {},
+        "name_schema_version": 1,
         "language_index": [],
         "_project_dir": str(project_dir),
     }
@@ -111,6 +135,10 @@ def load_project(project_dir: Path) -> Dict[str, Any]:
         project = json.load(file)
     if not isinstance(project, dict):
         raise ValueError("Project file must contain a JSON object.")
+    project.setdefault("concept_pack_config", dict(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG))
+    project.setdefault("name_config", dict(name_generator.DEFAULT_NAME_CONFIG))
+    project.setdefault("culture_profile", {})
+    project.setdefault("name_schema_version", 1)
     project["_project_dir"] = str(project_dir)
     return project
 
@@ -161,8 +189,8 @@ def hydrate_language_model(language: Dict[str, Any]) -> Dict[str, Any]:
     inventory = model.get("inventory", {})
     if not isinstance(inventory, dict):
         inventory = {}
-    inventory.setdefault("vowels", [])
-    inventory.setdefault("consonants", [])
+    inventory["vowels"] = _normalize_segment_list(inventory.get("vowels", []))
+    inventory["consonants"] = _normalize_segment_list(inventory.get("consonants", []))
     model["inventory"] = inventory
 
     lexicon = model.get("lexicon", [])
@@ -172,6 +200,7 @@ def hydrate_language_model(language: Dict[str, Any]) -> Dict[str, Any]:
 
     model.setdefault("style_name", DEFAULT_STYLE_PRESET)
     model.setdefault("concept_list_name", DEFAULT_CONCEPT_LIST)
+    model.setdefault("concept_pack_config", {})
     model.setdefault("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)
     model.setdefault("syllable_separator", "")
     model.setdefault("syllable_range", [1, 1])

@@ -1,0 +1,90 @@
+{
+  "pack_id": "society_roles",
+  "pack_name": "Society Roles",
+  "category": "society",
+  "tier": "context",
+  "description": "Common social roles, professions, and status markers.",
+  "tags": ["society", "role"],
+  "entries": [
+    {
+      "concept_id": "society_roles.chief",
+      "meaning": "chief",
+      "pos": "N",
+      "gloss": "CHIEF",
+      "tags": ["role", "leader"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "society_roles.elder",
+      "meaning": "elder",
+      "pos": "N",
+      "gloss": "ELDER",
+      "tags": ["role", "age"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.9
+    },
+    {
+      "concept_id": "society_roles.warrior",
+      "meaning": "warrior",
+      "pos": "N",
+      "gloss": "WARRIOR",
+      "tags": ["role", "war"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "society_roles.hunter",
+      "meaning": "hunter",
+      "pos": "N",
+      "gloss": "HUNTER",
+      "tags": ["role", "subsistence"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.8
+    },
+    {
+      "concept_id": "society_roles.healer",
+      "meaning": "healer",
+      "pos": "N",
+      "gloss": "HEALER",
+      "tags": ["role", "care"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.7
+    },
+    {
+      "concept_id": "society_roles.merchant",
+      "meaning": "merchant",
+      "pos": "N",
+      "gloss": "MERCHANT",
+      "tags": ["role", "commerce"],
+      "biomes": [],
+      "register": "neutral",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "society_roles.scribe",
+      "meaning": "scribe",
+      "pos": "N",
+      "gloss": "SCRIBE",
+      "tags": ["role", "knowledge"],
+      "biomes": [],
+      "register": "formal",
+      "weight": 0.6
+    },
+    {
+      "concept_id": "society_roles.sailor",
+      "meaning": "sailor",
+      "pos": "N",
+      "gloss": "SAILOR",
+      "tags": ["role", "water"],
+      "biomes": ["coast"],
+      "register": "neutral",
+      "weight": 0.5
+    }
+  ]
+}

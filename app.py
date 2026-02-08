@@ -8,6 +8,7 @@ import io
 import json
 import random
 import re
+import unicodedata
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -208,17 +209,17 @@ IPA_TO_ROMAN_ASCII: Dict[str, str] = {
     # Vowels
     "a": "a",
     "ɑ": "aa",
-    "aː": "a:",
+    "aː": "aa",
     "a˞": "ar",
     "a̟˞": "ar",
     "ɐ": "a",
     "æ": "ae",
-    "æː": "ae:",
+    "æː": "aeae",
     "e": "e",
     "eɪ": "ei",
     "ɛ": "e",
-    "ɛː": "e:",
-    "eː": "e:",
+    "ɛː": "ee",
+    "eː": "ee",
     "e̞": "e",
     "ə": "e",
     "ə˞": "er",
@@ -226,17 +227,17 @@ IPA_TO_ROMAN_ASCII: Dict[str, str] = {
     "ɜ": "er",
     "ɪ": "i",
     "i": "i",
-    "iː": "i:",
+    "iː": "ii",
     "o": "o",
     "oʊ": "ou",
     "ɔ": "o",
-    "ɔː": "o:",
+    "ɔː": "oo",
     "ɒ": "o",
-    "oː": "o:",
+    "oː": "oo",
     "o̞": "o",
     "ʊ": "u",
     "u": "u",
-    "uː": "u:",
+    "uː": "uu",
     "u˞": "ur",
     "ʌ": "u",
     "y": "u",
@@ -245,10 +246,10 @@ IPA_TO_ROMAN_ASCII: Dict[str, str] = {
     "ɨ": "y",
     "ʉ": "u",
     "ɯ": "eu",
-    "ɯː": "eu:",
+    "ɯː": "eueu",
     "ɯ̃": "eu~",
     "ɤ": "eo",
-    "ɤː": "eo:",
+    "ɤː": "eoeo",
     "ɤ˞": "eor",
     "ɤ̟": "eo",
     "ɵ̞": "oe",
@@ -375,6 +376,15 @@ PHOIBLE_CORE_WEIGHT_DEFAULT = 1.0
 PHOIBLE_MARGINAL_WEIGHT_DEFAULT = 0.35
 PHOIBLE_MAX_RESULTS = 200
 
+ROMANIZATION_FALLBACK_VOWELS = set("aeiouyæœɨöü")
+ROMANIZATION_FALLBACK_VOWELS |= set("āēīōūȳǣôŏăŭ")
+ROMANIZATION_ASCII_VOWELS = set("aeiouy")
+IPA_TIE_BARS = {"͡", "͜"}
+IPA_MODIFIER_DIACRITICS = {
+    "ʰ", "ʱ", "ʲ", "ʷ", "ˠ", "ˤ", "ˀ", "ʼ", "ː", "ˑ", "˞",
+    "ˈ", "ˌ", "̥", "̬", "̃", "̩", "̯", "̪", "̺", "̻", "̹", "̜", "̟", "̠",
+}
+
 def romanization_map(profile_name: str) -> Dict[str, str]:
     """Return the chosen IPA->romanization map with safe fallback."""
     return ROMANIZATION_PROFILES.get(profile_name, ROMANIZATION_PROFILES[DEFAULT_ROMANIZATION_PROFILE])
@@ -387,10 +397,145 @@ def segment_keys(profile_name: str) -> List[str]:
 
 def hint_for_segment(segment: str, profile_name: str = DEFAULT_ROMANIZATION_PROFILE) -> Dict[str, str]:
     """Return romanization metadata for an IPA segment."""
-    mapped = romanization_map(profile_name).get(segment)
+    mapped = romanize_segment(segment, profile_name=profile_name)
     if mapped:
         return {"sound_like": mapped, "example": ""}
-    return {"sound_like": "(no romanization yet)", "example": ""}
+    return {"sound_like": segment, "example": ""}
+
+
+def _apply_macron(text: str) -> str:
+    macron_map = {
+        "a": "ā",
+        "e": "ē",
+        "i": "ī",
+        "o": "ō",
+        "u": "ū",
+        "y": "ȳ",
+        "æ": "ǣ",
+        "ö": "ȫ",
+        "ü": "ǖ",
+        "ô": "ô̄",
+        "ŏ": "ō",
+        "ă": "ā",
+        "ŭ": "ū",
+        "ɨ": "ɨ̄",
+        "ə": "ə̄",
+        "œ": "œ̄",
+    }
+    chars = list(text)
+    for index in range(len(chars) - 1, -1, -1):
+        char = chars[index]
+        if char in macron_map:
+            chars[index] = macron_map[char]
+            return "".join(chars)
+        if char in ROMANIZATION_FALLBACK_VOWELS:
+            chars[index] = char + "̄"
+            return "".join(chars)
+    return text
+
+
+def _apply_nasalization(text: str, profile_name: str) -> str:
+    if profile_name == "ASCII":
+        return f"{text}~"
+    chars = list(text)
+    for index in range(len(chars) - 1, -1, -1):
+        char = chars[index]
+        if char in ROMANIZATION_FALLBACK_VOWELS:
+            chars[index] = char + "̃"
+            return "".join(chars)
+    return f"{text}̃"
+
+
+def _apply_length(text: str, profile_name: str) -> str:
+    if not text:
+        return text
+    if profile_name == "ASCII":
+        return text + text
+    if any(char in ROMANIZATION_FALLBACK_VOWELS for char in text):
+        return _apply_macron(text)
+    return text + text[-1]
+
+
+def romanize_segment(segment: str, profile_name: str = DEFAULT_ROMANIZATION_PROFILE) -> str:
+    mapping = romanization_map(profile_name)
+    if segment in mapping:
+        return mapping[segment]
+    return romanize_ipa_fallback(segment, profile_name=profile_name, mapping=mapping)
+
+
+def romanize_ipa_fallback(segment: str, profile_name: str, mapping: Dict[str, str]) -> str:
+    raw = segment.strip()
+    if not raw:
+        return raw
+    if "|" in raw:
+        raw = raw.split("|", 1)[0].strip()
+    if raw in mapping:
+        return mapping[raw]
+
+    raw = raw.replace("͡", "").replace("͜", "")
+    length_flag = "ː" in raw or "ˑ" in raw or "͈" in raw
+    aspiration_flag = "ʰ" in raw or "ʱ" in raw
+    palatal_flag = "ʲ" in raw
+    labial_flag = "ʷ" in raw
+    rhotic_flag = "˞" in raw
+    ejective_flag = "ˀ" in raw or "ʼ" in raw
+    nasal_flag = "̃" in raw
+
+    decomposed = unicodedata.normalize("NFD", raw)
+    base_chars: List[str] = []
+    for char in decomposed:
+        if char in IPA_TIE_BARS:
+            continue
+        if unicodedata.combining(char):
+            continue
+        if char in IPA_MODIFIER_DIACRITICS:
+            continue
+        base_chars.append(char)
+
+    base = "".join(base_chars)
+    if not base:
+        return raw
+
+    if base in mapping:
+        roman = mapping[base]
+    else:
+        roman_parts = []
+        for char in base:
+            roman_parts.append(mapping.get(char, char))
+        roman = "".join(roman_parts)
+
+    if nasal_flag:
+        roman = _apply_nasalization(roman, profile_name=profile_name)
+    if length_flag:
+        roman = _apply_length(roman, profile_name=profile_name)
+    if palatal_flag:
+        roman += "y"
+    if labial_flag:
+        roman += "w"
+    if rhotic_flag:
+        roman += "r"
+    if aspiration_flag:
+        roman += "h"
+    if ejective_flag:
+        roman += "’" if profile_name != "ASCII" else "'"
+
+    return roman
+
+
+def _consume_fallback_segment(text: str, index: int) -> Tuple[Tuple[str, str], int]:
+    base = text[index]
+    if base.isspace():
+        return ("literal", base), index + 1
+    segment = base
+    cursor = index + 1
+    while cursor < len(text):
+        char = text[cursor]
+        if unicodedata.combining(char) or char in IPA_MODIFIER_DIACRITICS:
+            segment += char
+            cursor += 1
+            continue
+        break
+    return ("segment", segment), cursor
 
 
 def tokenize_ipa_text(text: str, profile_name: str = DEFAULT_ROMANIZATION_PROFILE) -> List[Tuple[str, str]]:
@@ -408,8 +553,8 @@ def tokenize_ipa_text(text: str, profile_name: str = DEFAULT_ROMANIZATION_PROFIL
             tokens.append(("segment", match))
             index += len(match)
         else:
-            tokens.append(("literal", text[index]))
-            index += 1
+            token, index = _consume_fallback_segment(text, index)
+            tokens.append(token)
     return tokens
 
 
@@ -425,6 +570,8 @@ def ipa_text_to_sound_like(
     for token_type, value in tokenize_ipa_text(text, profile_name=profile_name):
         if token_type == "segment":
             mapped = hint_for_segment(value, profile_name=profile_name)["sound_like"]
+            if profile_name == "ASCII":
+                mapped = re.sub(r"[^A-Za-z]", "", mapped)
             if previous_was_segment and use_segment_separators:
                 parts.append("-")
             parts.append(mapped)
@@ -1770,6 +1917,8 @@ def render_single_language_ui() -> None:
                     st.session_state["sample_language_model"] = cached_model
 
             if (generate_word_samples or generate_both_samples) and not sample_generation_disabled:
+                if generate_word_samples and not generate_both_samples:
+                    st.session_state.pop("sample_language_model", None)
                 st.session_state["sample_words"] = build_sample_words(
                     latest_vowels,
                     latest_consonants,

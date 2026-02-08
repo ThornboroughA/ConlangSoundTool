@@ -36,11 +36,19 @@
       "representation": 1.0
     },
     {
-      "segment": "d̪|d",
+      "segment": "d̪",
       "representation": 1.0
     },
     {
-      "segment": "d̪ʲ|dʲ",
+      "segment": "d",
+      "representation": 1.0
+    },
+    {
+      "segment": "d̪ʲ",
+      "representation": 1.0
+    },
+    {
+      "segment": "dʲ",
       "representation": 1.0
     },
     {
@@ -52,11 +60,19 @@
       "representation": 1.0
     },
     {
-      "segment": "l̪ʲ|lʲ",
+      "segment": "l̪ʲ",
       "representation": 1.0
     },
     {
-      "segment": "l̪ˠ|lˠ",
+      "segment": "lʲ",
+      "representation": 1.0
+    },
+    {
+      "segment": "l̪ˠ",
+      "representation": 1.0
+    },
+    {
+      "segment": "lˠ",
       "representation": 1.0
     },
     {
@@ -64,7 +80,11 @@
       "representation": 1.0
     },
     {
-      "segment": "n̪|n",
+      "segment": "n̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "n",
       "representation": 1.0
     },
     {
@@ -72,19 +92,35 @@
       "representation": 1.0
     },
     {
-      "segment": "s̪|s",
+      "segment": "s̪",
       "representation": 1.0
     },
     {
-      "segment": "s̪ʲ|sʲ",
+      "segment": "s",
       "representation": 1.0
     },
     {
-      "segment": "t̪|t",
+      "segment": "s̪ʲ",
       "representation": 1.0
     },
     {
-      "segment": "t̪ʲ|tʲ",
+      "segment": "sʲ",
+      "representation": 1.0
+    },
+    {
+      "segment": "t̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "t",
+      "representation": 1.0
+    },
+    {
+      "segment": "t̪ʲ",
+      "representation": 1.0
+    },
+    {
+      "segment": "tʲ",
       "representation": 1.0
     },
     {

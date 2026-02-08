@@ -72,7 +72,11 @@
       "representation": 0.2
     },
     {
-      "segment": "r̪|r",
+      "segment": "r̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "r",
       "representation": 1.0
     },
     {

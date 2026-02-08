@@ -56,7 +56,11 @@
       "representation": 1.0
     },
     {
-      "segment": "l̪|l",
+      "segment": "l̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "l",
       "representation": 1.0
     },
     {
@@ -76,23 +80,43 @@
       "representation": 1.0
     },
     {
-      "segment": "s̪|s",
+      "segment": "s̪",
       "representation": 1.0
     },
     {
-      "segment": "t̪s̪|ts",
+      "segment": "s",
       "representation": 1.0
     },
     {
-      "segment": "t̪s̪ʰ|tsʰ",
+      "segment": "t̪s̪",
       "representation": 1.0
     },
     {
-      "segment": "t̪|t",
+      "segment": "ts",
       "representation": 1.0
     },
     {
-      "segment": "t̪ʰ|tʰ",
+      "segment": "t̪s̪ʰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "tsʰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "t̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "t",
+      "representation": 1.0
+    },
+    {
+      "segment": "t̪ʰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "tʰ",
       "representation": 1.0
     },
     {

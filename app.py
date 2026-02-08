@@ -10,6 +10,7 @@ import random
 import re
 import unicodedata
 import urllib.request
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -2175,85 +2176,331 @@ def render_single_language_ui() -> None:
                 st.rerun()
 
 
-def render_family_wizard() -> None:
-    st.markdown("### New Family Wizard")
+def _ensure_family_defaults() -> None:
+    active_project = st.session_state.get("family_project")
+    active_project_dir = st.session_state.get("family_project_dir")
+    active_slug = None
+    if isinstance(active_project, dict):
+        active_slug = active_project.get("project_slug")
+
+    if active_slug and st.session_state.get("wizard_active_project") != active_slug:
+        st.session_state["wizard_active_project"] = active_slug
+        st.session_state["wizard_project_name"] = str(active_project.get("project_name", "MyLanguageFamily"))
+        st.session_state["wizard_project_slug"] = str(active_slug)
+        if active_project_dir:
+            st.session_state["wizard_project_root"] = str(Path(active_project_dir).parent)
+        st.session_state["wizard_project_seed"] = int(active_project.get("seed", 42))
+        st.session_state["wizard_time_span_years"] = int(active_project.get("time_span_years", 2000))
+        st.session_state["wizard_concept_pack_config"] = dict(
+            active_project.get("concept_pack_config", concept_packs.DEFAULT_CONCEPT_PACK_CONFIG)
+        )
+        st.session_state["wizard_enabled_packs"] = list(
+            st.session_state["wizard_concept_pack_config"].get("enabled_packs", [])
+        )
+        st.session_state["wizard_proto_name"] = f"Proto {st.session_state['wizard_project_name']}"
+
+    if "wizard_project_name" not in st.session_state:
+        st.session_state["wizard_project_name"] = "MyLanguageFamily"
+    if "wizard_project_root" not in st.session_state:
+        if active_project_dir:
+            st.session_state["wizard_project_root"] = str(Path(active_project_dir).parent)
+        else:
+            st.session_state["wizard_project_root"] = st.session_state.get("family_project_root", "outputs/projects")
+    if "wizard_project_slug" not in st.session_state:
+        st.session_state["wizard_project_slug"] = project_io.sanitize_slug(
+            st.session_state.get("wizard_project_name", "MyLanguageFamily")
+        )
+    if "wizard_proto_name" not in st.session_state:
+        base_name = st.session_state.get("wizard_project_name", "MyLanguageFamily")
+        st.session_state["wizard_proto_name"] = f"Proto {base_name}"
+    if "wizard_style_name" not in st.session_state:
+        st.session_state["wizard_style_name"] = DEFAULT_STYLE_PRESET
+    if "wizard_concept_list" not in st.session_state:
+        st.session_state["wizard_concept_list"] = DEFAULT_CONCEPT_LIST
+    if "wizard_grammar_profile" not in st.session_state:
+        st.session_state["wizard_grammar_profile"] = DEFAULT_GRAMMAR_PROFILE
+    if "wizard_syllable_range" not in st.session_state:
+        st.session_state["wizard_syllable_range"] = (1, 2)
+    if "wizard_syllable_separator" not in st.session_state:
+        st.session_state["wizard_syllable_separator"] = ""
+    if "wizard_concept_pack_config" not in st.session_state:
+        st.session_state["wizard_concept_pack_config"] = dict(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG)
+    if "wizard_enabled_packs" not in st.session_state:
+        st.session_state["wizard_enabled_packs"] = list(
+            st.session_state["wizard_concept_pack_config"].get("enabled_packs", [])
+        )
+    if "wizard_pack_seed" not in st.session_state:
+        st.session_state["wizard_pack_seed"] = int(
+            st.session_state["wizard_concept_pack_config"].get("random_seed", 42)
+        )
+    if "wizard_use_existing_project" not in st.session_state:
+        st.session_state["wizard_use_existing_project"] = False
+    if "wizard_overwrite_proto" not in st.session_state:
+        st.session_state["wizard_overwrite_proto"] = False
+    if "wizard_project_seed" not in st.session_state:
+        st.session_state["wizard_project_seed"] = 42
+    if "wizard_time_span_years" not in st.session_state:
+        st.session_state["wizard_time_span_years"] = 2000
+
+
+def _build_wizard_preview(
+    inventory: Dict[str, Any],
+    style_name: str,
+    concept_list_name: str,
+    grammar_profile_name: str,
+    syllable_range: Tuple[int, int],
+    syllable_separator: str,
+    concept_pack_config: Optional[Dict[str, Any]] = None,
+) -> None:
+    preview_pack_config = {"enabled_packs": []}
+    model = build_language_model(
+        vowels=inventory.get("vowels", []),
+        consonants=inventory.get("consonants", []),
+        syllable_range=syllable_range,
+        syllable_separator=syllable_separator,
+        style_name=style_name,
+        concept_list_name=concept_list_name,
+        grammar_profile_name=grammar_profile_name,
+        concept_pack_config=preview_pack_config,
+    )
+    preview_words = build_sample_words(
+        inventory.get("vowels", []),
+        inventory.get("consonants", []),
+        sample_count=12,
+        syllable_range=syllable_range,
+        syllable_separator=syllable_separator,
+        style_name=style_name,
+        concept_list_name=concept_list_name,
+        grammar_profile_name=grammar_profile_name,
+        language_model=model,
+    )
+    preview_sentences = build_sample_sentences(
+        inventory.get("vowels", []),
+        inventory.get("consonants", []),
+        sample_count=2,
+        syllable_range=syllable_range,
+        words_range=(4, 8),
+        syllable_separator=syllable_separator,
+        style_name=style_name,
+        concept_list_name=concept_list_name,
+        grammar_profile_name=grammar_profile_name,
+        language_model=model,
+    )
+    st.session_state["wizard_preview_words"] = preview_words[:12]
+    st.session_state["wizard_preview_sentences"] = preview_sentences[:2]
+
+
+def render_start_tab() -> None:
+    _ensure_family_defaults()
+    st.markdown("### Start")
+    st.caption("Create a proto language quickly. Advanced options are tucked away below.")
+
     preset_names = list_json_names(generator.PRESETS_DIR)
     rule_names = list_json_names(generator.RULES_DIR)
     if not preset_names:
         st.error("No preset files found. Add JSON files to presets/ and reload.")
         return
 
-    tab_phonology, tab_packs, tab_family, tab_generate = st.tabs(
-        ["1. Phonology Setup", "2. Concept Packs", "3. Family Parameters", "4. Generate Family"]
+    st.markdown("**Required**")
+    project_cols = st.columns(2)
+    with project_cols[0]:
+        project_name = st.text_input(
+            "Project name",
+            value=st.session_state.get("wizard_project_name", "MyLanguageFamily"),
+            key="wizard_project_name",
+        )
+        project_slug = st.text_input(
+            "Project slug",
+            value=st.session_state.get("wizard_project_slug", project_io.sanitize_slug(project_name)),
+            key="wizard_project_slug",
+        )
+    with project_cols[1]:
+        project_root = st.text_input(
+            "Project root folder",
+            value=st.session_state.get("wizard_project_root", "outputs/projects"),
+            key="wizard_project_root",
+        )
+        proto_name = st.text_input(
+            "Proto language name",
+            value=st.session_state.get("wizard_proto_name", f"Proto {project_name}"),
+            key="wizard_proto_name",
+        )
+
+    st.markdown("**Phonology setup**")
+    selected_presets = st.multiselect(
+        "Presets to mix",
+        options=preset_names,
+        default=default_preset_selection(preset_names),
+        key="wizard_presets",
+        help="Pick one or more source inventories to seed the proto language.",
     )
 
-    with tab_phonology:
-        st.markdown("**Inventory sources**")
-        selected_presets = st.multiselect(
-            "Presets to mix",
-            options=preset_names,
-            default=default_preset_selection(preset_names),
-            key="wizard_presets",
-            help="Pick one or more source inventories to seed the proto language.",
-        )
-
-        weights: List[float] = []
-        if selected_presets:
-            st.markdown("**Preset weights**")
-            default_weight = round(1.0 / len(selected_presets), 2)
-            for preset_name in selected_presets:
-                weight = st.slider(
-                    f"{preset_name} weight",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=default_weight,
-                    step=0.05,
-                    key=f"wizard_weight_{preset_name}",
-                )
-                weights.append(weight)
-
-        random_weight = st.slider(
-            "Random weight (master pool)",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.15,
-            step=0.05,
-            key="wizard_random_weight",
-        )
-
-        master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
-        master_preset = st.selectbox(
-            "Master preset for random picks",
-            options=preset_names,
-            index=master_default,
-            key="wizard_master_preset",
-        )
-
-        selected_rules = st.multiselect(
-            "Sound-change rules (optional)",
-            options=rule_names,
-            key="wizard_rules",
-        )
-
-        total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
-        render_mix_metrics(
-            selected_presets=selected_presets,
-            selected_rules=selected_rules,
-            random_weight=random_weight,
-            total_weight=total_weight,
-        )
-
-        with st.expander("Source inventory reference", expanded=False):
-            render_mix_reference_panel(
-                selected_presets=selected_presets,
-                weights=weights,
-                random_weight=random_weight,
-                master_preset=master_preset,
-                profile_name=st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE),
+    weights: List[float] = []
+    if selected_presets:
+        st.markdown("**Preset weights**")
+        default_weight = round(1.0 / len(selected_presets), 2)
+        for preset_name in selected_presets:
+            weight = st.slider(
+                f"{preset_name} weight",
+                min_value=0.0,
+                max_value=1.0,
+                value=default_weight,
+                step=0.05,
+                key=f"wizard_weight_{preset_name}",
             )
+            weights.append(weight)
 
-        st.divider()
-        st.markdown("**Lexicon settings**")
+    random_weight = st.slider(
+        "Random weight (master pool)",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.15,
+        step=0.05,
+        key="wizard_random_weight",
+    )
+
+    master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
+    master_preset = st.selectbox(
+        "Master preset for random picks",
+        options=preset_names,
+        index=master_default,
+        key="wizard_master_preset",
+    )
+
+    selected_rules = st.multiselect(
+        "Sound-change rules (optional)",
+        options=rule_names,
+        key="wizard_rules",
+    )
+
+    total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
+    render_mix_metrics(
+        selected_presets=selected_presets,
+        selected_rules=selected_rules,
+        random_weight=random_weight,
+        total_weight=total_weight,
+    )
+
+    with st.expander("Source inventory reference", expanded=False):
+        render_mix_reference_panel(
+            selected_presets=selected_presets,
+            weights=weights,
+            random_weight=random_weight,
+            master_preset=master_preset,
+            profile_name=st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE),
+        )
+
+    use_seed = st.checkbox("Use fixed random seed", value=False, key="wizard_use_seed")
+    seed_value = st.number_input(
+        "Seed value",
+        min_value=0,
+        max_value=2_147_483_647,
+        value=42,
+        step=1,
+        disabled=not use_seed,
+        key="wizard_seed_value",
+    )
+
+    generate_inventory = st.button("Generate Inventory", type="primary", key="wizard_generate_inventory")
+    if generate_inventory:
+        if not selected_presets:
+            st.error("Pick at least one preset before generating.")
+        elif total_weight <= 0:
+            st.error("At least one preset/random weight must be greater than zero.")
+        else:
+            try:
+                if use_seed:
+                    random.seed(int(seed_value))
+
+                mixed_inventory = generator.mix_inventories(
+                    preset_names=selected_presets,
+                    weights=weights,
+                    random_weight=random_weight,
+                    master_preset_name=master_preset,
+                )
+
+                if selected_rules:
+                    mixed_inventory = generator.apply_rules(mixed_inventory, selected_rules)
+
+                st.session_state["wizard_inventory"] = mixed_inventory
+                st.session_state["wizard_rule_sets"] = selected_rules
+                _build_wizard_preview(
+                    inventory=mixed_inventory,
+                    style_name=str(st.session_state.get("wizard_style_name", DEFAULT_STYLE_PRESET)),
+                    concept_list_name=str(st.session_state.get("wizard_concept_list", DEFAULT_CONCEPT_LIST)),
+                    grammar_profile_name=str(st.session_state.get("wizard_grammar_profile", DEFAULT_GRAMMAR_PROFILE)),
+                    syllable_range=tuple(st.session_state.get("wizard_syllable_range", (1, 2))),
+                    syllable_separator=str(st.session_state.get("wizard_syllable_separator", "")),
+                    concept_pack_config=st.session_state.get(
+                        "wizard_concept_pack_config", concept_packs.DEFAULT_CONCEPT_PACK_CONFIG
+                    ),
+                )
+                st.success("Inventory generated for proto language.")
+            except Exception as exc:  # pragma: no cover - UI safety net
+                st.error(f"Could not generate inventory: {exc}")
+
+    wizard_inventory = st.session_state.get("wizard_inventory")
+    if isinstance(wizard_inventory, dict):
+        render_inventory_metrics(wizard_inventory, len(st.session_state.get("wizard_rule_sets", [])))
+        st.markdown("**Preview**")
+        if st.button("Refresh preview", key="wizard_preview_refresh"):
+            _build_wizard_preview(
+                inventory=wizard_inventory,
+                style_name=str(st.session_state.get("wizard_style_name", DEFAULT_STYLE_PRESET)),
+                concept_list_name=str(st.session_state.get("wizard_concept_list", DEFAULT_CONCEPT_LIST)),
+                grammar_profile_name=str(st.session_state.get("wizard_grammar_profile", DEFAULT_GRAMMAR_PROFILE)),
+                syllable_range=tuple(st.session_state.get("wizard_syllable_range", (1, 2))),
+                syllable_separator=str(st.session_state.get("wizard_syllable_separator", "")),
+                concept_pack_config=st.session_state.get(
+                    "wizard_concept_pack_config", concept_packs.DEFAULT_CONCEPT_PACK_CONFIG
+                ),
+            )
+        preview_words = st.session_state.get("wizard_preview_words", [])
+        preview_sentences = st.session_state.get("wizard_preview_sentences", [])
+        if preview_words:
+            st.dataframe(
+                [
+                    {
+                        "IPA": str(word.get("ipa", "")),
+                        "Sound-like": ipa_text_to_sound_like(
+                            str(word.get("ipa", "")),
+                            use_segment_separators=False,
+                            profile_name=st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE),
+                        ),
+                        "Gloss": str(word.get("gloss", "")),
+                        "Meaning": str(word.get("meaning", "")),
+                    }
+                    for word in preview_words
+                    if isinstance(word, dict)
+                ],
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            st.caption("Preview words will appear after inventory generation.")
+        if preview_sentences:
+            st.dataframe(
+                [
+                    {
+                        "IPA": str(sentence.get("ipa", "")),
+                        "Gloss": str(sentence.get("gloss", "")),
+                    }
+                    for sentence in preview_sentences
+                    if isinstance(sentence, dict)
+                ],
+                hide_index=True,
+                use_container_width=True,
+            )
+    else:
+        st.info("Generate an inventory to continue.")
+
+    project_root_path = Path(project_root)
+    project_slug = project_io.sanitize_slug(project_slug)
+    project_dir = project_root_path / project_slug
+    project_exists = project_dir.exists()
+
+    with st.expander("Advanced settings", expanded=project_exists):
+        st.markdown("**Lexicon defaults**")
         style_names = list(STYLE_PRESETS.keys())
         concept_list_names = list(CONCEPT_LIST_PRESETS.keys())
         grammar_profile_names = list(GRAMMAR_PROFILES.keys())
@@ -2296,199 +2543,12 @@ def render_family_wizard() -> None:
             key="wizard_syllable_separator",
         )
 
-        st.divider()
-        use_seed = st.checkbox("Use fixed random seed", value=False, key="wizard_use_seed")
-        seed_value = st.number_input(
-            "Seed value",
-            min_value=0,
-            max_value=2_147_483_647,
-            value=42,
-            step=1,
-            disabled=not use_seed,
-            key="wizard_seed_value",
-        )
-
-        generate_inventory = st.button("Generate Inventory", type="primary", key="wizard_generate_inventory")
-        if generate_inventory:
-            if not selected_presets:
-                st.error("Pick at least one preset before generating.")
-            elif total_weight <= 0:
-                st.error("At least one preset/random weight must be greater than zero.")
-            else:
-                try:
-                    if use_seed:
-                        random.seed(int(seed_value))
-
-                    mixed_inventory = generator.mix_inventories(
-                        preset_names=selected_presets,
-                        weights=weights,
-                        random_weight=random_weight,
-                        master_preset_name=master_preset,
-                    )
-
-                    if selected_rules:
-                        mixed_inventory = generator.apply_rules(mixed_inventory, selected_rules)
-
-                    st.session_state["wizard_inventory"] = mixed_inventory
-                    st.session_state["wizard_rule_sets"] = selected_rules
-                    st.success("Inventory generated for proto language.")
-                except Exception as exc:  # pragma: no cover - UI safety net
-                    st.error(f"Could not generate inventory: {exc}")
-
-        wizard_inventory = st.session_state.get("wizard_inventory")
-        if isinstance(wizard_inventory, dict):
-            render_inventory_metrics(wizard_inventory, len(st.session_state.get("wizard_rule_sets", [])))
-        else:
-            st.info("Generate an inventory to continue.")
-
-    with tab_packs:
-        st.markdown("**Concept pack selection**")
-        packs = concept_packs.load_packs()
-        if not packs:
-            st.error("No concept packs found. Add JSON files to data/concept_packs/.")
-        else:
-            grouped = concept_packs.list_packs_by_category(packs)
-            selected_pack_ids = st.session_state.get(
-                "wizard_enabled_packs",
-                list(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("enabled_packs", [])),
-            )
-            enabled_packs: List[str] = []
-
-            for category, pack_list in grouped.items():
-                if not pack_list:
-                    continue
-                with st.expander(f"{category.title()} Packs", expanded=False):
-                    options = [pack.get("pack_id", "") for pack in pack_list if pack.get("pack_id")]
-                    label_map = {
-                        pack.get("pack_id"): f"{pack.get('pack_name')} ({pack.get('pack_id')})" for pack in pack_list
-                    }
-                    defaults = [pack_id for pack_id in options if pack_id in selected_pack_ids]
-                    selected = st.multiselect(
-                        f"{category.title()} selection",
-                        options=options,
-                        default=defaults,
-                        format_func=lambda pack_id: label_map.get(pack_id, pack_id),
-                        key=f"wizard_pack_{category}",
-                    )
-                    enabled_packs.extend(selected)
-
-            biome_options = [
-                "temperate_forest",
-                "tropical_forest",
-                "grassland",
-                "steppe",
-                "desert",
-                "tundra",
-                "mountain",
-                "coast",
-                "wetland",
-            ]
-            selected_biomes = st.multiselect(
-                "Biome filters",
-                options=biome_options,
-                default=st.session_state.get(
-                    "wizard_biomes",
-                    concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("biome_filters", []),
-                ),
-                key="wizard_biomes",
-            )
-
-            context_limit = st.slider(
-                "Context tier size",
-                min_value=50,
-                max_value=400,
-                value=int(concept_packs.DEFAULT_TIER_LIMITS.get("context", 200)),
-                step=10,
-                key="wizard_context_limit",
-            )
-            optional_limit = st.slider(
-                "Optional tier size",
-                min_value=0,
-                max_value=200,
-                value=int(concept_packs.DEFAULT_TIER_LIMITS.get("optional", 100)),
-                step=10,
-                key="wizard_optional_limit",
-            )
-
-            register_defaults = concept_packs.DEFAULT_REGISTER_BIAS
-            reg_cols = st.columns(3)
-            sacred_bias = reg_cols[0].slider("Sacred bias", 0.0, 1.5, float(register_defaults.get("sacred", 0.75)), 0.05)
-            poetic_bias = reg_cols[1].slider("Poetic bias", 0.0, 1.5, float(register_defaults.get("poetic", 0.8)), 0.05)
-            archaic_bias = reg_cols[2].slider("Archaic bias", 0.0, 1.5, float(register_defaults.get("archaic", 0.7)), 0.05)
-            formal_bias = reg_cols[0].slider("Formal bias", 0.0, 1.5, float(register_defaults.get("formal", 0.85)), 0.05)
-            taboo_bias = reg_cols[1].slider("Taboo bias", 0.0, 1.5, float(register_defaults.get("taboo", 0.4)), 0.05)
-
-            pack_seed = st.number_input(
-                "Pack selection seed",
-                min_value=0,
-                max_value=2_147_483_647,
-                value=int(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("random_seed", 42)),
-                step=1,
-                key="wizard_pack_seed",
-            )
-
-            concept_pack_config = {
-                "enabled_packs": sorted(set(enabled_packs)),
-                "tier_limits": {
-                    "core": concept_packs.DEFAULT_TIER_LIMITS.get("core", 100),
-                    "context": context_limit,
-                    "optional": optional_limit,
-                },
-                "biome_filters": list(selected_biomes),
-                "register_bias": {
-                    "neutral": register_defaults.get("neutral", 1.0),
-                    "formal": formal_bias,
-                    "poetic": poetic_bias,
-                    "archaic": archaic_bias,
-                    "sacred": sacred_bias,
-                    "taboo": taboo_bias,
-                },
-                "random_seed": int(pack_seed),
-            }
-            st.session_state["wizard_enabled_packs"] = concept_pack_config["enabled_packs"]
-            st.session_state["wizard_concept_pack_config"] = concept_pack_config
-
-            selected_entries = concept_packs.select_pack_entries(concept_pack_config)
-            coverage = concept_packs.pack_coverage(selected_entries)
-            st.caption(f"Selected pack entries: {len(selected_entries)}")
-            if coverage:
-                st.dataframe(
-                    [{"Category": category, "Count": count} for category, count in sorted(coverage.items())],
-                    hide_index=True,
-                    use_container_width=True,
-                )
-
-    with tab_family:
-        st.markdown("**Family parameters**")
+        st.markdown("**Family timeline**")
         st.number_input(
-            "Extant language count",
-            min_value=2,
-            max_value=500,
-            value=50,
-            step=1,
-            key="wizard_extant_count",
-        )
-        st.number_input(
-            "Minimum branch years",
-            min_value=50,
-            max_value=2000,
-            value=100,
-            step=10,
-            key="wizard_min_branch_years",
-        )
-        st.number_input(
-            "Events per 1000 years",
-            min_value=1.0,
-            max_value=15.0,
-            value=6.0,
-            step=0.5,
-            key="wizard_events_per_1000",
-        )
-        st.number_input(
-            "Time span (years)",
+            "Family time span (years)",
             min_value=100,
             max_value=10000,
-            value=2000,
+            value=int(st.session_state.get("wizard_time_span_years", 2000)),
             step=50,
             key="wizard_time_span_years",
         )
@@ -2496,185 +2556,540 @@ def render_family_wizard() -> None:
             "Project seed",
             min_value=0,
             max_value=2_147_483_647,
-            value=42,
+            value=int(st.session_state.get("wizard_project_seed", 42)),
             step=1,
             key="wizard_project_seed",
+        )
+        st.markdown("**Existing project handling**")
+        st.checkbox(
+            "Use existing project if folder already exists",
+            value=project_exists,
+            key="wizard_use_existing_project",
+        )
+        st.checkbox(
+            "Overwrite proto if it already exists",
+            value=False,
+            key="wizard_overwrite_proto",
+        )
+
+    if project_exists and not st.session_state.get("wizard_use_existing_project"):
+        st.warning("Project folder already exists. Enable 'Use existing project' in Advanced settings to continue.")
+
+    inventory_ready = isinstance(st.session_state.get("wizard_inventory"), dict)
+    if st.button("Generate Proto & Start Family", type="primary", use_container_width=True, disabled=not inventory_ready):
+        if not inventory_ready:
+            st.error("Generate the proto inventory first.")
+        else:
+            try:
+                if project_exists and st.session_state.get("wizard_use_existing_project"):
+                    project = project_io.load_project(project_dir)
+                else:
+                    project = project_io.create_project(
+                        root_dir=Path(project_root),
+                        project_name=project_name,
+                        seed=int(st.session_state.get("wizard_project_seed", 42)),
+                        time_span_years=int(st.session_state.get("wizard_time_span_years", 2000)),
+                        project_slug=project_slug,
+                    )
+                project_dir = Path(project_root) / project["project_slug"]
+
+                wizard_inventory = st.session_state.get("wizard_inventory", {})
+                proto_pack_config = {"enabled_packs": []}
+                model = build_language_model(
+                    vowels=wizard_inventory.get("vowels", []),
+                    consonants=wizard_inventory.get("consonants", []),
+                    syllable_range=tuple(st.session_state.get("wizard_syllable_range", (1, 2))),
+                    syllable_separator=str(st.session_state.get("wizard_syllable_separator", "")),
+                    style_name=str(st.session_state.get("wizard_style_name", DEFAULT_STYLE_PRESET)),
+                    concept_list_name=str(st.session_state.get("wizard_concept_list", DEFAULT_CONCEPT_LIST)),
+                    grammar_profile_name=str(st.session_state.get("wizard_grammar_profile", DEFAULT_GRAMMAR_PROFILE)),
+                    concept_pack_config=proto_pack_config,
+                )
+                proto_snapshot = build_language_snapshot(
+                    language_name=proto_name,
+                    inventory=wizard_inventory,
+                    language_model=model,
+                    language_id="proto",
+                )
+
+                languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+                proto_path = languages_dir / "proto.json"
+                if proto_path.exists() and not st.session_state.get("wizard_overwrite_proto"):
+                    st.error("Proto already exists. Enable overwrite to replace it.")
+                    return
+                project_io.save_language(proto_snapshot, proto_path)
+
+                project["root_language_id"] = "proto"
+                index = project.get("language_index", [])
+                if not isinstance(index, list):
+                    index = []
+                if not any(isinstance(item, dict) and item.get("language_id") == "proto" for item in index):
+                    index.append({"language_id": "proto", "filename": "proto.json"})
+                project["language_index"] = index
+                project_io.save_project(project)
+
+                set_project_state(project, project_dir)
+                st.session_state["family_project_root"] = str(project_root)
+                st.session_state["family_selected_id"] = "proto"
+                st.session_state["family_notice"] = "Proto language created. Continue in Enrich to expand meaning."
+                st.success("Proto language created.")
+            except FileExistsError as exc:
+                st.error(str(exc))
+            except Exception as exc:  # pragma: no cover - UI safety net
+                st.error(f"Could not create proto language: {exc}")
+
+
+def render_enrich_tab() -> None:
+    st.markdown("### Enrich")
+    st.caption("Add cultural meaning with concept packs and expand the proto lexicon.")
+
+    project = st.session_state.get("family_project")
+    project_dir_value = st.session_state.get("family_project_dir")
+    project_dir = Path(project_dir_value) if project_dir_value else None
+    if not isinstance(project, dict) or not project_dir:
+        st.info("Create or load a project in Start or Manage to unlock enrichment.")
+        return
+
+    packs = concept_packs.load_packs()
+    if not packs:
+        st.error("No concept packs found. Add JSON files to data/concept_packs/.")
+        return
+
+    show_desc = st.checkbox("Show pack descriptions", key="enrich_show_desc")
+
+    section_order = [
+        "World & Environment",
+        "Life & Subsistence",
+        "Society & Kinship",
+        "Power & Conflict",
+        "Belief & Ritual",
+        "Values & Aesthetics",
+        "Material & Craft",
+        "Time & Number",
+    ]
+    category_to_section = {
+        "world": "World & Environment",
+        "food": "Life & Subsistence",
+        "society": "Society & Kinship",
+        "kinship": "Society & Kinship",
+        "power": "Power & Conflict",
+        "belief": "Belief & Ritual",
+        "values": "Values & Aesthetics",
+        "aesthetic": "Values & Aesthetics",
+        "material": "Material & Craft",
+        "craft": "Material & Craft",
+        "commerce": "Material & Craft",
+        "time": "Time & Number",
+    }
+    pack_section_override = {
+        "flora_basic": "Life & Subsistence",
+        "fauna_basic": "Life & Subsistence",
+        "food_agriculture": "Life & Subsistence",
+        "settlement_terms": "Society & Kinship",
+    }
+
+    packs_by_section: Dict[str, List[Dict[str, Any]]] = {section: [] for section in section_order}
+    for pack in packs.values():
+        pack_id = str(pack.get("pack_id", ""))
+        if pack_id in pack_section_override:
+            section = pack_section_override[pack_id]
+        else:
+            section = category_to_section.get(str(pack.get("category", "world")), "World & Environment")
+        packs_by_section.setdefault(section, []).append(pack)
+
+    active_slug = project.get("project_slug")
+    if active_slug and st.session_state.get("enrich_project_slug") != active_slug:
+        st.session_state["enrich_project_slug"] = active_slug
+        defaults = list(
+            st.session_state.get("wizard_enabled_packs", concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("enabled_packs", []))
+        )
+        for section in section_order:
+            section_key = f"enrich_pack_{section.replace(' ', '_').lower()}"
+            options = [pack.get("pack_id", "") for pack in packs_by_section.get(section, []) if pack.get("pack_id")]
+            st.session_state[section_key] = [pack_id for pack_id in options if pack_id in defaults]
+
+    reset_cols = st.columns([1.2, 2.0])
+    if reset_cols[0].button("Reset to defaults", key="enrich_reset_packs"):
+        defaults = list(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("enabled_packs", []))
+        st.session_state["wizard_enabled_packs"] = defaults
+        st.session_state["wizard_biomes"] = list(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("biome_filters", []))
+        st.session_state["wizard_context_limit"] = int(concept_packs.DEFAULT_TIER_LIMITS.get("context", 200))
+        st.session_state["wizard_optional_limit"] = int(concept_packs.DEFAULT_TIER_LIMITS.get("optional", 100))
+        st.session_state["wizard_pack_seed"] = int(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("random_seed", 42))
+        for section in section_order:
+            section_key = f"enrich_pack_{section.replace(' ', '_').lower()}"
+            options = [pack.get("pack_id", "") for pack in packs_by_section.get(section, []) if pack.get("pack_id")]
+            st.session_state[section_key] = [pack_id for pack_id in options if pack_id in defaults]
+        st.rerun()
+
+    enabled_packs: List[str] = []
+    selected_pack_ids = st.session_state.get(
+        "wizard_enabled_packs",
+        list(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("enabled_packs", [])),
+    )
+
+    for section in section_order:
+        pack_list = packs_by_section.get(section, [])
+        if not pack_list:
+            continue
+        with st.expander(section, expanded=False):
+            options = [pack.get("pack_id", "") for pack in pack_list if pack.get("pack_id")]
+            label_map = {
+                pack.get("pack_id"): f"{pack.get('pack_name')} ({pack.get('pack_id')})" for pack in pack_list
+            }
+            if show_desc:
+                for pack in pack_list:
+                    description = str(pack.get("description", "")).strip()
+                    if description:
+                        st.caption(f"{pack.get('pack_name')}: {description}")
+            defaults = [pack_id for pack_id in options if pack_id in selected_pack_ids]
+            selected = st.multiselect(
+                f"{section} packs",
+                options=options,
+                default=defaults,
+                format_func=lambda pack_id: label_map.get(pack_id, pack_id),
+                key=f"enrich_pack_{section.replace(' ', '_').lower()}",
+            )
+            enabled_packs.extend(selected)
+
+    biome_options = [
+        "temperate_forest",
+        "tropical_forest",
+        "grassland",
+        "steppe",
+        "desert",
+        "tundra",
+        "mountain",
+        "coast",
+        "wetland",
+    ]
+    selected_biomes = st.multiselect(
+        "Biome filters",
+        options=biome_options,
+        default=st.session_state.get("wizard_biomes", concept_packs.DEFAULT_CONCEPT_PACK_CONFIG.get("biome_filters", [])),
+        key="wizard_biomes",
+    )
+
+    context_limit = st.slider(
+        "Context tier size",
+        min_value=50,
+        max_value=400,
+        value=int(st.session_state.get("wizard_context_limit", concept_packs.DEFAULT_TIER_LIMITS.get("context", 200))),
+        step=10,
+        key="wizard_context_limit",
+    )
+    optional_limit = st.slider(
+        "Optional tier size",
+        min_value=0,
+        max_value=200,
+        value=int(st.session_state.get("wizard_optional_limit", concept_packs.DEFAULT_TIER_LIMITS.get("optional", 100))),
+        step=10,
+        key="wizard_optional_limit",
+    )
+
+    register_defaults = concept_packs.DEFAULT_REGISTER_BIAS
+    reg_cols = st.columns(3)
+    sacred_bias = reg_cols[0].slider("Sacred bias", 0.0, 1.5, float(register_defaults.get("sacred", 0.75)), 0.05)
+    poetic_bias = reg_cols[1].slider("Poetic bias", 0.0, 1.5, float(register_defaults.get("poetic", 0.8)), 0.05)
+    archaic_bias = reg_cols[2].slider("Archaic bias", 0.0, 1.5, float(register_defaults.get("archaic", 0.7)), 0.05)
+    formal_bias = reg_cols[0].slider("Formal bias", 0.0, 1.5, float(register_defaults.get("formal", 0.85)), 0.05)
+    taboo_bias = reg_cols[1].slider("Taboo bias", 0.0, 1.5, float(register_defaults.get("taboo", 0.4)), 0.05)
+
+    pack_seed = st.number_input(
+        "Pack selection seed",
+        min_value=0,
+        max_value=2_147_483_647,
+        value=int(st.session_state.get("wizard_pack_seed", 42)),
+        step=1,
+        key="wizard_pack_seed",
+    )
+
+    concept_pack_config = {
+        "enabled_packs": sorted(set(enabled_packs)),
+        "tier_limits": {
+            "core": concept_packs.DEFAULT_TIER_LIMITS.get("core", 100),
+            "context": context_limit,
+            "optional": optional_limit,
+        },
+        "biome_filters": list(selected_biomes),
+        "register_bias": {
+            "neutral": register_defaults.get("neutral", 1.0),
+            "formal": formal_bias,
+            "poetic": poetic_bias,
+            "archaic": archaic_bias,
+            "sacred": sacred_bias,
+            "taboo": taboo_bias,
+        },
+        "random_seed": int(pack_seed),
+    }
+    st.session_state["wizard_enabled_packs"] = concept_pack_config["enabled_packs"]
+    st.session_state["wizard_concept_pack_config"] = concept_pack_config
+
+    selected_entries = concept_packs.select_pack_entries(concept_pack_config)
+    coverage = concept_packs.pack_coverage(selected_entries)
+    st.markdown("**Coverage meter**")
+    st.caption(f"Selected pack entries: {len(selected_entries)}")
+    if coverage:
+        st.dataframe(
+            [{"Category": category, "Count": count} for category, count in sorted(coverage.items())],
+            hide_index=True,
+            use_container_width=True,
+        )
+    if not concept_pack_config["enabled_packs"]:
+        st.warning("No concept packs enabled. Names and culture words will be very sparse.")
+
+    tag_counts: Dict[str, int] = {}
+    for entry in selected_entries:
+        if not isinstance(entry, dict):
+            continue
+        for tag in entry.get("tags", []):
+            tag_counts[str(tag)] = tag_counts.get(str(tag), 0) + 1
+    missing_tags = []
+    for needed in ["settlement", "landform", "hydrology", "deity", "virtue", "flora", "fauna", "season", "daypart"]:
+        if tag_counts.get(needed, 0) == 0:
+            missing_tags.append(needed)
+    if missing_tags:
+        st.warning("Missing key tags for names: " + ", ".join(sorted(missing_tags)))
+
+    st.markdown("**Culture notes**")
+    bio_notes = project.get("bio_notes", {})
+    if not isinstance(bio_notes, dict):
+        bio_notes = {}
+    culture_overview = st.text_area(
+        "Culture overview",
+        value=str(bio_notes.get("culture_overview", "")),
+        height=120,
+        key="enrich_culture_overview",
+    )
+    language_notes = st.text_area(
+        "Language notes",
+        value=str(bio_notes.get("language_notes", "")),
+        height=120,
+        key="enrich_language_notes",
+    )
+
+    rebuild_descendants = st.checkbox(
+        "Rebuild descendants after applying packs",
+        value=False,
+        key="enrich_rebuild_descendants",
+    )
+    if st.button("Apply Packs & Expand Lexicon", type="primary", use_container_width=True):
+        try:
+            project["concept_pack_config"] = dict(concept_pack_config)
+            project["bio_notes"] = {
+                "culture_overview": str(culture_overview),
+                "language_notes": str(language_notes),
+            }
+            project_io.save_project(project)
+
+            root_language_id = project.get("root_language_id") or "proto"
+            languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+            proto_path = languages_dir / f"{root_language_id}.json"
+            if not proto_path.exists():
+                st.error("Proto language not found. Create a proto in Start first.")
+                return
+            proto_language = project_io.load_language(proto_path)
+            proto_inventory = proto_language.get("inventory", {})
+            model = build_language_model(
+                vowels=proto_inventory.get("vowels", []),
+                consonants=proto_inventory.get("consonants", []),
+                syllable_range=tuple(proto_language.get("syllable_range", [1, 2])),
+                syllable_separator=str(proto_language.get("syllable_separator", "")),
+                style_name=str(proto_language.get("style_name", DEFAULT_STYLE_PRESET)),
+                concept_list_name=str(proto_language.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
+                grammar_profile_name=str(proto_language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
+                concept_pack_config=concept_pack_config,
+                phonotactic_profile_overrides=proto_language.get("phonotactic_profile_overrides", {}),
+            )
+            proto_language["lexicon"] = model.get("lexicon", [])
+            proto_language["concept_pack_config"] = model.get("concept_pack_config", concept_pack_config)
+            proto_language["style_name"] = model.get("style_name", DEFAULT_STYLE_PRESET)
+            proto_language["concept_list_name"] = model.get("concept_list_name", DEFAULT_CONCEPT_LIST)
+            proto_language["grammar_profile_name"] = model.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)
+            proto_language["syllable_range"] = model.get("syllable_range", [1, 2])
+            proto_language["syllable_separator"] = model.get("syllable_separator", "")
+            proto_language["phonotactic_profile_overrides"] = model.get("phonotactic_profile_overrides", {})
+
+            overrides = proto_language.get("meta", {}).get("lexicon_overrides", {})
+            if isinstance(overrides, dict):
+                proto_language = family_generator.apply_lexicon_overrides(proto_language, overrides)
+
+            normalized = project_io.normalize_language_snapshot(proto_language)
+            normalized["meta"] = proto_language.get("meta", {})
+            project_io.save_language(normalized, proto_path)
+
+            if rebuild_descendants:
+                family_generator.rebuild_subtree(project_dir, root_language_id)
+
+            st.session_state["family_languages_cache"] = None
+            st.success("Concept packs applied and proto lexicon updated.")
+        except Exception as exc:  # pragma: no cover - UI safety net
+            st.error(f"Could not apply packs: {exc}")
+
+    st.markdown("**Proto dictionary preview**")
+    root_language_id = project.get("root_language_id") or "proto"
+    languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+    proto_path = languages_dir / f"{root_language_id}.json"
+    if proto_path.exists():
+        proto_language = project_io.load_language(proto_path)
+        lexicon = proto_language.get("lexicon", [])
+        st.caption(f"Proto lexicon entries: {len(lexicon) if isinstance(lexicon, list) else 0}")
+        if isinstance(lexicon, list) and lexicon:
+            rows = [
+                {
+                    "Entry": str(entry.get("id", "")),
+                    "IPA": str(entry.get("ipa", "")),
+                    "Sound-like": ipa_text_to_sound_like(
+                        str(entry.get("ipa", "")),
+                        use_segment_separators=False,
+                        profile_name=st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE),
+                    ),
+                    "Gloss": str(entry.get("gloss", "")),
+                    "Meaning": str(entry.get("meaning", "")),
+                    "POS": str(entry.get("pos", "")),
+                    "Source": str(entry.get("source", "")),
+                }
+                for entry in lexicon[:50]
+                if isinstance(entry, dict)
+            ]
+            st.dataframe(rows, hide_index=True, use_container_width=True)
+        else:
+            st.info("Proto lexicon is empty. Apply packs or generate proto first.")
+    else:
+        st.info("Proto lexicon not found yet.")
+
+
+def render_family_tab() -> None:
+    st.markdown("### Family")
+    st.caption("Explore the tree, create daughters, and inspect languages.")
+
+    project = st.session_state.get("family_project")
+    project_dir_value = st.session_state.get("family_project_dir")
+    project_dir = Path(project_dir_value) if project_dir_value else None
+
+    if not isinstance(project, dict) or not project_dir:
+        st.info("Load or create a project first.")
+        return
+
+    notice = st.session_state.pop("family_notice", None)
+    if notice:
+        st.success(notice)
+
+    romanization_profile = st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE)
+    if romanization_profile not in ROMANIZATION_PROFILES:
+        romanization_profile = DEFAULT_ROMANIZATION_PROFILE
+
+    display_col = st.columns([2.2, 1.0])[1]
+    with display_col:
+        st.markdown("**Display**")
+        st.selectbox(
+            "Romanization profile",
+            options=list(ROMANIZATION_PROFILES.keys()),
+            index=list(ROMANIZATION_PROFILES.keys()).index(romanization_profile)
+            if romanization_profile in ROMANIZATION_PROFILES
+            else 0,
+            key="romanization_profile",
+            help="Display-only: how IPA renders to sound-like text.",
+        )
+
+    with st.expander("Auto-generate family tree (advanced)", expanded=False):
+        st.markdown("**Family parameters**")
+        st.number_input(
+            "Extant language count",
+            min_value=2,
+            max_value=500,
+            value=int(project.get("family_config", {}).get("extant_language_count", 50)),
+            step=1,
+            key="family_auto_extant_count",
+        )
+        st.number_input(
+            "Minimum branch years",
+            min_value=50,
+            max_value=2000,
+            value=int(project.get("family_config", {}).get("min_branch_years", 100)),
+            step=10,
+            key="family_auto_min_branch_years",
+        )
+        st.number_input(
+            "Events per 1000 years",
+            min_value=1.0,
+            max_value=15.0,
+            value=float(project.get("family_config", {}).get("events_per_1000_years", 6.0)),
+            step=0.5,
+            key="family_auto_events",
+        )
+        st.number_input(
+            "Time span (years)",
+            min_value=100,
+            max_value=10000,
+            value=int(project.get("time_span_years", 2000)),
+            step=50,
+            key="family_auto_time_span",
+        )
+        st.number_input(
+            "Project seed",
+            min_value=0,
+            max_value=2_147_483_647,
+            value=int(project.get("seed", 42)),
+            step=1,
+            key="family_auto_seed",
         )
 
         template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
         st.multiselect(
             "Sound change templates",
             options=template_options,
-            default=template_options,
-            key="wizard_sound_templates",
+            default=project.get("family_config", {}).get("sound_change_templates_enabled", template_options),
+            key="family_auto_templates",
         )
         st.selectbox(
             "Tree type",
             options=["binary"],
             index=0,
-            key="wizard_tree_type",
+            key="family_auto_tree_type",
         )
-
-        st.divider()
-        st.markdown("**Name generation settings**")
-        name_config = dict(name_generator.DEFAULT_NAME_CONFIG)
-        counts = name_config.get("counts_by_type", {})
-        personal_defaults = counts.get("personal", {}) if isinstance(counts, dict) else {}
-        toponym_defaults = counts.get("toponym", {}) if isinstance(counts, dict) else {}
-
-        personal_cols = st.columns(3)
-        personal_given = personal_cols[0].number_input("Given names", min_value=0, max_value=200, value=int(personal_defaults.get("given", 50)), step=5)
-        personal_family = personal_cols[1].number_input("Family names", min_value=0, max_value=200, value=int(personal_defaults.get("family", 20)), step=5)
-        personal_title = personal_cols[2].number_input("Titles", min_value=0, max_value=100, value=int(personal_defaults.get("title", 10)), step=5)
-
-        topo_cols = st.columns(3)
-        topo_settlement = topo_cols[0].number_input("Settlements", min_value=0, max_value=200, value=int(toponym_defaults.get("settlement", 30)), step=5)
-        topo_hydronym = topo_cols[1].number_input("Hydronyms", min_value=0, max_value=200, value=int(toponym_defaults.get("hydronym", 15)), step=5)
-        topo_terrain = topo_cols[2].number_input("Terrain names", min_value=0, max_value=200, value=int(toponym_defaults.get("terrain", 15)), step=5)
-
-        bias_cols = st.columns(3)
-        bias_self = bias_cols[0].slider("Self bias", 0.0, 1.0, float(name_config["archaic_bias"].get("self", 0.7)), 0.05)
-        bias_parent = bias_cols[1].slider("Parent bias", 0.0, 1.0, float(name_config["archaic_bias"].get("parent", 0.2)), 0.05)
-        bias_proto = bias_cols[2].slider("Proto bias", 0.0, 1.0, float(name_config["archaic_bias"].get("proto", 0.1)), 0.05)
-
-        name_config["counts_by_type"] = {
-            "personal": {"given": personal_given, "family": personal_family, "title": personal_title},
-            "toponym": {"settlement": topo_settlement, "hydronym": topo_hydronym, "terrain": topo_terrain},
-        }
-        name_config["archaic_bias"] = {"self": bias_self, "parent": bias_parent, "proto": bias_proto}
-        st.session_state["wizard_name_config"] = name_config
-
-    with tab_generate:
-        st.markdown("**Project setup**")
-        project_root = st.text_input(
-            "Project root folder",
-            value=st.session_state.get("family_project_root", "outputs/projects"),
-            key="wizard_project_root",
+        st.caption("Auto-generation may overwrite existing language IDs (lang_###).")
+        generate_names = st.checkbox(
+            "Generate names after auto-build",
+            value=True,
+            key="family_auto_generate_names",
         )
-        project_name = st.text_input(
-            "Project name",
-            value=st.session_state.get("wizard_project_name", "MyLanguageFamily"),
-            key="wizard_project_name",
-        )
-        proto_name = st.text_input("Proto language name", value=f"Proto {project_name}", key="wizard_proto_name")
-
-        loaded_project = st.session_state.get("family_project")
-        loaded_project_dir = st.session_state.get("family_project_dir")
-        use_loaded_project = False
-        overwrite_proto = False
-        if isinstance(loaded_project, dict) and loaded_project_dir:
-            use_loaded_project = st.checkbox(
-                "Use loaded project (overwrite proto)",
-                value=True,
-                key="wizard_use_loaded_project",
-            )
-            overwrite_proto = st.checkbox(
-                "Overwrite existing proto",
-                value=True,
-                key="wizard_overwrite_proto",
-            )
-            if use_loaded_project:
-                st.caption(f"Using loaded project: {loaded_project.get('project_name', '(unknown)')}")
-
-        inventory_ready = isinstance(st.session_state.get("wizard_inventory"), dict)
-        pack_config = st.session_state.get("wizard_concept_pack_config", concept_packs.DEFAULT_CONCEPT_PACK_CONFIG)
-
-        if st.button("Generate Family", type="primary", use_container_width=True, disabled=not inventory_ready):
-            if not inventory_ready:
-                st.error("Generate the proto inventory first.")
+        if st.button("Generate Full Family Tree", type="primary", use_container_width=True):
+            root_language_id = project.get("root_language_id") or "proto"
+            languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+            proto_path = languages_dir / f"{root_language_id}.json"
+            if not proto_path.exists():
+                st.error("Proto language not found. Create it in Start first.")
             else:
-                try:
-                    if use_loaded_project and isinstance(loaded_project, dict) and loaded_project_dir:
-                        project_dir = Path(loaded_project_dir)
-                        project = project_io.load_project(project_dir)
-                    else:
-                        project = project_io.create_project(
-                            root_dir=Path(project_root),
-                            project_name=project_name,
-                            seed=int(st.session_state.get("wizard_project_seed", 42)),
-                            time_span_years=int(st.session_state.get("wizard_time_span_years", 2000)),
-                        )
-                        project_dir = Path(project_root) / project["project_slug"]
-                    project["concept_pack_config"] = dict(pack_config)
-                    project["name_config"] = dict(st.session_state.get("wizard_name_config", name_generator.DEFAULT_NAME_CONFIG))
-                    project["culture_profile"] = project.get("culture_profile", {})
-                    project_io.save_project(project)
-
-                    wizard_inventory = st.session_state.get("wizard_inventory", {})
-                    model = build_language_model(
-                        vowels=wizard_inventory.get("vowels", []),
-                        consonants=wizard_inventory.get("consonants", []),
-                        syllable_range=tuple(st.session_state.get("wizard_syllable_range", (1, 2))),
-                        syllable_separator=str(st.session_state.get("wizard_syllable_separator", "")),
-                        style_name=str(st.session_state.get("wizard_style_name", DEFAULT_STYLE_PRESET)),
-                        concept_list_name=str(st.session_state.get("wizard_concept_list", DEFAULT_CONCEPT_LIST)),
-                        grammar_profile_name=str(st.session_state.get("wizard_grammar_profile", DEFAULT_GRAMMAR_PROFILE)),
-                        concept_pack_config=pack_config,
-                    )
-                    proto_snapshot = build_language_snapshot(
-                        language_name=proto_name,
-                        inventory=wizard_inventory,
-                        language_model=model,
-                        language_id="proto",
-                    )
-
-                    languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
-                    proto_path = languages_dir / "proto.json"
-                    if proto_path.exists() and not overwrite_proto and use_loaded_project:
-                        st.error("Proto already exists. Enable overwrite to replace it.")
-                        return
-                    project_io.save_language(proto_snapshot, proto_path)
-                    project["root_language_id"] = "proto"
-                    project["language_index"] = [{"language_id": "proto", "filename": "proto.json"}]
-                    project_io.save_project(project)
-
-                    family_config = {
-                        "extant_language_count": int(st.session_state.get("wizard_extant_count", 50)),
-                        "min_branch_years": int(st.session_state.get("wizard_min_branch_years", 100)),
-                        "events_per_1000_years": float(st.session_state.get("wizard_events_per_1000", 6.0)),
-                        "sound_change_templates_enabled": list(st.session_state.get("wizard_sound_templates", [])),
-                        "tree_type": str(st.session_state.get("wizard_tree_type", "binary")),
-                        "time_span_years": int(st.session_state.get("wizard_time_span_years", 2000)),
-                        "extant_year": int(st.session_state.get("wizard_time_span_years", 2000)),
-                        "seed": int(st.session_state.get("wizard_project_seed", 42)),
-                    }
-
-                    family_generator.generate_family(
+                family_config = {
+                    "extant_language_count": int(st.session_state.get("family_auto_extant_count", 50)),
+                    "min_branch_years": int(st.session_state.get("family_auto_min_branch_years", 100)),
+                    "events_per_1000_years": float(st.session_state.get("family_auto_events", 6.0)),
+                    "sound_change_templates_enabled": list(st.session_state.get("family_auto_templates", [])),
+                    "tree_type": str(st.session_state.get("family_auto_tree_type", "binary")),
+                    "time_span_years": int(st.session_state.get("family_auto_time_span", 2000)),
+                    "extant_year": int(st.session_state.get("family_auto_time_span", 2000)),
+                    "seed": int(st.session_state.get("family_auto_seed", 42)),
+                }
+                family_generator.generate_family(
+                    project_dir=project_dir,
+                    proto_language_path=proto_path,
+                    family_config=family_config,
+                )
+                project = project_io.load_project(project_dir)
+                set_project_state(project, project_dir)
+                if generate_names:
+                    languages = load_languages_from_project(project, project_dir)
+                    templates = name_generator.load_templates()
+                    name_generator.rebuild_names_subtree(
                         project_dir=project_dir,
-                        proto_language_path=languages_dir / "proto.json",
-                        family_config=family_config,
+                        root_language_id=project.get("root_language_id", "proto"),
+                        languages=languages,
+                        name_config=project.get("name_config", name_generator.DEFAULT_NAME_CONFIG),
+                        templates=templates,
                     )
-                    project = project_io.load_project(project_dir)
-                    set_project_state(project, project_dir)
-                    st.success("Language family generated.")
-                except FileExistsError as exc:
-                    st.error(f"{exc} Load the project first or enable 'Use loaded project'.")
-                except Exception as exc:  # pragma: no cover - UI safety net
-                    st.error(f"Could not generate family: {exc}")
-
-
-
-def render_language_family_ui() -> None:
-    st.subheader("Language Family Generator")
-    render_family_wizard()
-    st.divider()
-    romanization_profile = st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE)
-    if romanization_profile not in ROMANIZATION_PROFILES:
-        romanization_profile = DEFAULT_ROMANIZATION_PROFILE
-
-    notice = st.session_state.pop("family_notice", None)
-    if notice:
-        st.success(notice)
-
-    romanization_profile = st.selectbox(
-        "Romanization profile",
-        options=list(ROMANIZATION_PROFILES.keys()),
-        index=list(ROMANIZATION_PROFILES.keys()).index(romanization_profile)
-        if romanization_profile in ROMANIZATION_PROFILES
-        else 0,
-        key="romanization_profile",
-        help="Display-only: how IPA renders to sound-like text.",
-    )
+                st.success("Family tree generated.")
+                st.rerun()
 
     help_topics = {
         "project_root": {
@@ -2716,87 +3131,6 @@ def render_language_family_ui() -> None:
         if st.button("?", key=key):
             st.session_state["help_topic"] = topic_key
 
-    setup_col_1 = st.container()
-
-    with setup_col_1:
-        st.markdown("### Project")
-        st.info("Use the Family Wizard above to create a proto language and initial tree.")
-        project_root = st.text_input(
-            "Project root folder",
-            value=st.session_state.get("family_project_root", "outputs/projects"),
-            key="family_project_root",
-        )
-        help_button("project_root")
-        project_root_path = Path(project_root)
-        project_dirs = discover_project_dirs(project_root_path)
-        project_labels = [path.name for path in project_dirs]
-
-        create_col, load_col = st.columns(2)
-        with create_col:
-            new_project_name = st.text_input("Project name", value="MyLanguageFamily", key="family_new_project_name")
-            new_project_seed = st.number_input(
-                "Seed",
-                min_value=0,
-                max_value=2_147_483_647,
-                value=42,
-                step=1,
-                key="family_new_project_seed",
-            )
-            new_project_timespan = st.number_input(
-                "Time span (years)",
-                min_value=100,
-                max_value=10000,
-                value=2000,
-                step=50,
-                key="family_new_project_timespan",
-            )
-            if st.button("Create Project", use_container_width=True):
-                try:
-                    project = project_io.create_project(
-                        root_dir=project_root_path,
-                        project_name=new_project_name,
-                        seed=int(new_project_seed),
-                        time_span_years=int(new_project_timespan),
-                    )
-                    set_project_state(project, project_root_path / project["project_slug"])
-                    st.success("Project created and loaded.")
-                except FileExistsError as exc:
-                    st.error(str(exc))
-
-        with load_col:
-            selected_project = st.selectbox(
-                "Projects",
-                options=project_labels if project_labels else ["(none)"],
-                index=0,
-                disabled=not project_labels,
-            )
-            if st.button("Load Project", use_container_width=True, disabled=not project_labels):
-                project_dir = project_root_path / selected_project
-                try:
-                    project = project_io.load_project(project_dir)
-                    set_project_state(project, project_dir)
-                    st.success(f"Loaded project: {selected_project}")
-                except Exception as exc:  # pragma: no cover - UI safety net
-                    st.error(f"Could not load project: {exc}")
-
-        project = st.session_state.get("family_project")
-        project_dir_value = st.session_state.get("family_project_dir")
-        project_dir = Path(project_dir_value) if project_dir_value else None
-        if isinstance(project, dict):
-            st.caption(f"Active: {project.get('project_name', '(unknown)')}")
-            if st.button("Save Project", use_container_width=True):
-                try:
-                    project_io.save_project(project)
-                    st.success("Project saved.")
-                except Exception as exc:  # pragma: no cover - UI safety net
-                    st.error(f"Could not save project: {exc}")
-
-    project = st.session_state.get("family_project")
-    project_dir_value = st.session_state.get("family_project_dir")
-    project_dir = Path(project_dir_value) if project_dir_value else None
-
-    st.divider()
-
     def _load_languages(force: bool = False) -> Dict[str, Dict[str, Any]]:
         if not isinstance(project, dict) or not project_dir:
             return {}
@@ -2822,530 +3156,710 @@ def render_language_family_ui() -> None:
                 return candidate
             counter += 1
 
+    def _ancestor_models() -> Dict[str, Dict[str, Any]]:
+        ancestors: Dict[str, Dict[str, Any]] = {}
+        languages_local = _load_languages()
+        selected_local = st.session_state.get("family_selected_id")
+        if selected_local and selected_local in languages_local:
+            parent_id = languages_local[selected_local].get("meta", {}).get("parent_id")
+            if parent_id and parent_id in languages_local:
+                ancestors["parent"] = languages_local[parent_id]
+        root_id = project.get("root_language_id")
+        if root_id and root_id in languages_local:
+            ancestors["proto"] = languages_local[root_id]
+        return ancestors
+
     left_col, main_col, help_col = st.columns([1.3, 2.2, 1.1], gap="large")
 
     with left_col:
         st.markdown("### Tree")
         help_button("tree")
-        if not isinstance(project, dict) or not project_dir:
-            st.info("Load or create a project first.")
+        languages = _load_languages()
+        if not languages:
+            st.info("No languages found in this project yet.")
         else:
-            if st.button("Reload languages", key="family_reload_languages"):
-                _load_languages(force=True)
-            languages = _load_languages()
-            if not languages:
-                st.info("No languages found in this project yet.")
-            else:
-                child_map = family_generator.build_child_map(languages)
-                root_id = project.get("root_language_id")
-                selected_id = st.session_state.get("family_selected_id") or root_id
-                if selected_id not in languages:
-                    selected_id = root_id if root_id in languages else list(languages.keys())[0]
+            child_map = family_generator.build_child_map(languages)
+            root_id = project.get("root_language_id")
+            selected_id = st.session_state.get("family_selected_id") or root_id
+            if selected_id not in languages:
+                selected_id = root_id if root_id in languages else list(languages.keys())[0]
 
-                path_ids = family_generator.path_to_root(languages, selected_id)
-                path_set = set(path_ids)
+            path_ids = family_generator.path_to_root(languages, selected_id)
+            path_set = set(path_ids)
 
-                if AGRAPH_AVAILABLE:
-                    nodes = []
-                    edges = []
-                    for language_id, language in languages.items():
-                        meta = language.get("meta", {})
-                        label = f"{meta.get('name', language_id)}\n{meta.get('year', '?')}"
-                        size = 26 if language_id == root_id else 18
-                        color = "#1f7a5a" if language_id == root_id else "#5b8bd1"
-                        if language_id == selected_id:
-                            color = "#d65b5b"
-                        elif language_id in path_set:
-                            color = "#f0a202"
-                        nodes.append(Node(id=language_id, label=label, size=size, color=color))
-                    for parent_id, children in child_map.items():
-                        for child_id in children:
-                            edge_color = "#f0a202" if parent_id in path_set and child_id in path_set else "#a7b6bd"
-                            edges.append(Edge(source=parent_id, target=child_id, color=edge_color))
-                    config = Config(
-                        width="100%",
-                        height=520,
-                        directed=True,
-                        physics=True,
-                        hierarchical=False,
-                        nodeHighlightBehavior=True,
-                    )
-                    selected = agraph(nodes=nodes, edges=edges, config=config)
-                    if selected:
-                        if isinstance(selected, str):
-                            selected_id = selected
-                        elif isinstance(selected, dict) and "id" in selected:
-                            selected_id = str(selected["id"])
-                else:
-                    st.info("Install streamlit-agraph for interactive tree. Showing static graph instead.")
-                    dot_lines = ["digraph G {", "rankdir=LR;"]
-                    for language_id, language in languages.items():
-                        meta = language.get("meta", {})
-                        label = f"{meta.get('name', language_id)} ({meta.get('year', '?')})".replace('"', "'")
-                        dot_lines.append(f'"{language_id}" [label="{label}"];')
-                    for parent_id, children in child_map.items():
-                        for child_id in children:
-                            dot_lines.append(f'"{parent_id}" -> "{child_id}";')
-                    dot_lines.append("}")
-                    st.graphviz_chart("\n".join(dot_lines))
-
-                available_ids = list(languages.keys())
-                available_ids.sort(key=lambda lang_id: str(languages[lang_id].get("meta", {}).get("year", "")))
-                labels = {_label_for(lang_id, languages): lang_id for lang_id in available_ids}
-                selected_label = st.selectbox(
-                    "Selected language",
-                    options=list(labels.keys()),
-                    index=list(labels.values()).index(selected_id) if selected_id in labels.values() else 0,
+            if AGRAPH_AVAILABLE:
+                nodes = []
+                edges = []
+                for language_id, language in languages.items():
+                    meta = language.get("meta", {})
+                    label = f"{meta.get('name', language_id)}\n{meta.get('year', '?')}"
+                    size = 26 if language_id == root_id else 18
+                    color = "#1f7a5a" if language_id == root_id else "#5b8bd1"
+                    if language_id == selected_id:
+                        color = "#d65b5b"
+                    elif language_id in path_set:
+                        color = "#f0a202"
+                    nodes.append(Node(id=language_id, label=label, size=size, color=color))
+                for parent_id, children in child_map.items():
+                    for child_id in children:
+                        edge_color = "#f0a202" if parent_id in path_set and child_id in path_set else "#a7b6bd"
+                        edges.append(Edge(source=parent_id, target=child_id, color=edge_color))
+                config = Config(
+                    width="100%",
+                    height=520,
+                    directed=True,
+                    physics=True,
+                    hierarchical=False,
+                    nodeHighlightBehavior=True,
                 )
-                selected_id = labels[selected_label]
-                st.session_state["family_selected_id"] = selected_id
+                selected = agraph(nodes=nodes, edges=edges, config=config)
+                if selected:
+                    if isinstance(selected, str):
+                        selected_id = selected
+                    elif isinstance(selected, dict) and "id" in selected:
+                        selected_id = str(selected["id"])
+            else:
+                st.info("Install streamlit-agraph for interactive tree. Showing static graph instead.")
+                dot_lines = ["digraph G {", "rankdir=LR;"]
+                for language_id, language in languages.items():
+                    meta = language.get("meta", {})
+                    label = f"{meta.get('name', language_id)} ({meta.get('year', '?')})".replace('"', "'")
+                    dot_lines.append(f'"{language_id}" [label="{label}"];')
+                for parent_id, children in child_map.items():
+                    for child_id in children:
+                        dot_lines.append(f'"{parent_id}" -> "{child_id}";')
+                dot_lines.append("}")
+                st.graphviz_chart("\n".join(dot_lines))
 
-                selected_meta = languages.get(selected_id, {}).get("meta", {})
-                parent_id = selected_meta.get("parent_id")
-                path_ids = list(reversed(family_generator.path_to_root(languages, selected_id)))
-                if path_ids:
-                    st.caption("Path: " + " → ".join(path_ids))
+            available_ids = list(languages.keys())
+            available_ids.sort(key=lambda lang_id: str(languages[lang_id].get("meta", {}).get("year", "")))
+            labels = {_label_for(lang_id, languages): lang_id for lang_id in available_ids}
+            selected_label = st.selectbox(
+                "Selected language",
+                options=list(labels.keys()),
+                index=list(labels.values()).index(selected_id) if selected_id in labels.values() else 0,
+            )
+            selected_id = labels[selected_label]
+            st.session_state["family_selected_id"] = selected_id
 
-                nav_cols = st.columns(2)
-                with nav_cols[0]:
-                    if parent_id and st.button("Go to parent", key="family_go_parent"):
-                        st.session_state["family_selected_id"] = parent_id
-                        st.rerun()
-                with nav_cols[1]:
-                    root_id = project.get("root_language_id")
-                    if root_id and st.button("Go to root", key="family_go_root"):
-                        st.session_state["family_selected_id"] = root_id
-                        st.rerun()
+            selected_meta = languages.get(selected_id, {}).get("meta", {})
+            parent_id = selected_meta.get("parent_id")
+            path_ids = list(reversed(family_generator.path_to_root(languages, selected_id)))
+            if path_ids:
+                st.caption("Path: " + " → ".join(path_ids))
+
+            nav_cols = st.columns(2)
+            with nav_cols[0]:
+                if parent_id and st.button("Go to parent", key="family_go_parent"):
+                    st.session_state["family_selected_id"] = parent_id
+                    st.rerun()
+            with nav_cols[1]:
+                root_id = project.get("root_language_id")
+                if root_id and st.button("Go to root", key="family_go_root"):
+                    st.session_state["family_selected_id"] = root_id
+                    st.rerun()
 
     with main_col:
-        if not isinstance(project, dict) or not project_dir:
-            st.info("Load or create a project first.")
+        languages = _load_languages()
+        if not languages:
+            st.info("Save a proto language first in the setup panel above.")
         else:
-            languages = _load_languages()
-            if not languages:
-                st.info("Save a proto language first in the setup panel above.")
-            else:
-                selected_id = st.session_state.get("family_selected_id") or project.get("root_language_id")
-                if selected_id not in languages:
-                    selected_id = list(languages.keys())[0]
-                selected_meta = languages.get(selected_id, {}).get("meta", {})
-                selected_label = f"{selected_meta.get('name', selected_id)} ({selected_id})"
-                summary_cols = st.columns(3)
-                summary_cols[0].metric("Languages", str(len(languages)))
-                summary_cols[1].metric("Selected", selected_label)
-                summary_cols[2].metric("Root", str(project.get("root_language_id") or "—"))
-                view = st.radio(
-                    "Workspace",
-                    options=["Create Daughter", "Compare", "Language Details"],
-                    horizontal=True,
+            selected_id = st.session_state.get("family_selected_id") or project.get("root_language_id")
+            if selected_id not in languages:
+                selected_id = list(languages.keys())[0]
+            selected_meta = languages.get(selected_id, {}).get("meta", {})
+            selected_label = f"{selected_meta.get('name', selected_id)} ({selected_id})"
+            summary_cols = st.columns(3)
+            summary_cols[0].metric("Languages", str(len(languages)))
+            summary_cols[1].metric("Selected", selected_label)
+            summary_cols[2].metric("Root", str(project.get("root_language_id") or "—"))
+            view = st.radio(
+                "Workspace",
+                options=["Create Daughter", "Compare", "Language Details"],
+                horizontal=True,
+            )
+
+            if view == "Create Daughter":
+                existing_ids = sorted(list(languages.keys()))
+                selected_parent_default = st.session_state.get("family_selected_id") or project.get("root_language_id")
+                if selected_parent_default not in existing_ids:
+                    selected_parent_default = existing_ids[0]
+
+                selected_parent = selected_parent_default
+                child_name = f"{selected_parent}_child"
+                child_id_input = ""
+                override_settings: Dict[str, Any] = {}
+                cleaned_rules: List[Dict[str, Any]] = []
+
+                step_parent, step_identity, step_changes, step_preview = st.tabs(
+                    ["1. Parent", "2. Identity", "3. Changes", "4. Preview"]
                 )
 
-                if view == "Create Daughter":
-                    existing_ids = sorted(list(languages.keys()))
-                    selected_parent_default = st.session_state.get("family_selected_id") or project.get("root_language_id")
-                    if selected_parent_default not in existing_ids:
-                        selected_parent_default = existing_ids[0]
-
-                    selected_parent = selected_parent_default
-                    child_name = f"{selected_parent}_child"
-                    child_id_input = ""
-                    override_settings: Dict[str, Any] = {}
-                    cleaned_rules: List[Dict[str, Any]] = []
-
-                    step_parent, step_identity, step_changes, step_preview = st.tabs(
-                        ["1. Parent", "2. Identity", "3. Changes", "4. Preview"]
+                with step_parent:
+                    parent_col, parent_help_col = st.columns([4, 1])
+                    with parent_col:
+                        selected_parent = st.selectbox(
+                            "Select parent language",
+                            options=existing_ids,
+                            index=existing_ids.index(selected_parent_default)
+                            if selected_parent_default in existing_ids
+                            else 0,
+                        )
+                    with parent_help_col:
+                        help_button("parent_select")
+                    parent_language = languages[selected_parent]
+                    parent_meta = parent_language.get("meta", {})
+                    st.caption(
+                        f"Parent: {parent_meta.get('name', selected_parent)} "
+                        f"({selected_parent}, year {parent_meta.get('year', '?')})"
                     )
 
-                    with step_parent:
-                        parent_col, parent_help_col = st.columns([4, 1])
-                        with parent_col:
-                            selected_parent = st.selectbox(
-                                "Select parent language",
-                                options=existing_ids,
-                                index=existing_ids.index(selected_parent_default)
-                                if selected_parent_default in existing_ids
+                with step_identity:
+                    parent_language = languages[selected_parent]
+                    st.markdown("**Name + ID**")
+                    child_name = st.text_input("Child language name", value=f"{selected_parent}_child")
+                    suggested_id = _suggest_unique_id(child_name, existing_ids)
+                    child_id_input = st.text_input("Child language ID", value=suggested_id)
+                    help_button("child_id")
+                    if child_id_input in existing_ids:
+                        st.error("This ID is already used. Choose a different one.")
+                    year_default = int(parent_language.get("meta", {}).get("year", 0)) + 100
+                    child_year = st.number_input("Year (relative to proto timeline)", value=year_default, step=10)
+                    notes = st.text_area("Notes (optional)", value="")
+
+                    override_settings = {"year": int(child_year), "notes": notes}
+                    with st.expander("Override inherited settings", expanded=False):
+                        help_button("override_settings")
+                        parent_style = str(parent_language.get("style_name", DEFAULT_STYLE_PRESET))
+                        parent_concept = str(parent_language.get("concept_list_name", DEFAULT_CONCEPT_LIST))
+                        parent_grammar = str(parent_language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE))
+                        parent_syllable_range = parent_language.get("syllable_range", [1, 1])
+                        if not isinstance(parent_syllable_range, (list, tuple)) or len(parent_syllable_range) != 2:
+                            parent_syllable_range = [1, 1]
+                        parent_separator = str(parent_language.get("syllable_separator", ""))
+
+                        if st.checkbox("Override style preset", value=False, key="family_override_style"):
+                            override_settings["style_name"] = st.selectbox(
+                                "Style preset",
+                                options=list(STYLE_PRESETS.keys()),
+                                index=list(STYLE_PRESETS.keys()).index(parent_style)
+                                if parent_style in STYLE_PRESETS
                                 else 0,
                             )
-                        with parent_help_col:
-                            help_button("parent_select")
-                        parent_language = languages[selected_parent]
-                        parent_meta = parent_language.get("meta", {})
-                        st.caption(
-                            f"Parent: {parent_meta.get('name', selected_parent)} "
-                            f"({selected_parent}, year {parent_meta.get('year', '?')})"
-                        )
 
-                    with step_identity:
-                        parent_language = languages[selected_parent]
-                        st.markdown("**Name + ID**")
-                        child_name = st.text_input("Child language name", value=f"{selected_parent}_child")
-                        suggested_id = _suggest_unique_id(child_name, existing_ids)
-                        child_id_input = st.text_input("Child language ID", value=suggested_id)
-                        help_button("child_id")
-                        if child_id_input in existing_ids:
-                            st.error("This ID is already used. Choose a different one.")
-                        year_default = int(parent_language.get("meta", {}).get("year", 0)) + 100
-                        child_year = st.number_input("Year (relative to proto timeline)", value=year_default, step=10)
-                        notes = st.text_area("Notes (optional)", value="")
+                        if st.checkbox("Override concept list", value=False, key="family_override_concept"):
+                            override_settings["concept_list_name"] = st.selectbox(
+                                "Concept list",
+                                options=list(CONCEPT_LIST_PRESETS.keys()),
+                                index=list(CONCEPT_LIST_PRESETS.keys()).index(parent_concept)
+                                if parent_concept in CONCEPT_LIST_PRESETS
+                                else 0,
+                            )
 
-                        override_settings = {"year": int(child_year), "notes": notes}
-                        with st.expander("Override inherited settings", expanded=False):
-                            help_button("override_settings")
-                            parent_style = str(parent_language.get("style_name", DEFAULT_STYLE_PRESET))
-                            parent_concept = str(parent_language.get("concept_list_name", DEFAULT_CONCEPT_LIST))
-                            parent_grammar = str(parent_language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE))
-                            parent_syllable_range = parent_language.get("syllable_range", [1, 1])
-                            if not isinstance(parent_syllable_range, (list, tuple)) or len(parent_syllable_range) != 2:
-                                parent_syllable_range = [1, 1]
-                            parent_separator = str(parent_language.get("syllable_separator", ""))
+                        if st.checkbox("Override grammar profile", value=False, key="family_override_grammar"):
+                            override_settings["grammar_profile_name"] = st.selectbox(
+                                "Grammar profile",
+                                options=list(GRAMMAR_PROFILES.keys()),
+                                index=list(GRAMMAR_PROFILES.keys()).index(parent_grammar)
+                                if parent_grammar in GRAMMAR_PROFILES
+                                else 0,
+                            )
 
-                            if st.checkbox("Override style preset", value=False, key="family_override_style"):
-                                override_settings["style_name"] = st.selectbox(
-                                    "Style preset",
-                                    options=list(STYLE_PRESETS.keys()),
-                                    index=list(STYLE_PRESETS.keys()).index(parent_style)
-                                    if parent_style in STYLE_PRESETS
-                                    else 0,
+                        if st.checkbox("Override syllable range", value=False, key="family_override_syllables"):
+                            override_settings["syllable_range"] = list(
+                                st.slider(
+                                    "Syllables per word",
+                                    min_value=1,
+                                    max_value=5,
+                                    value=(int(parent_syllable_range[0]), int(parent_syllable_range[1])),
                                 )
+                            )
 
-                            if st.checkbox("Override concept list", value=False, key="family_override_concept"):
-                                override_settings["concept_list_name"] = st.selectbox(
-                                    "Concept list",
-                                    options=list(CONCEPT_LIST_PRESETS.keys()),
-                                    index=list(CONCEPT_LIST_PRESETS.keys()).index(parent_concept)
-                                    if parent_concept in CONCEPT_LIST_PRESETS
-                                    else 0,
-                                )
+                        if st.checkbox("Override syllable separator", value=False, key="family_override_sep"):
+                            override_settings["syllable_separator"] = st.selectbox(
+                                "Separator",
+                                options=["", "."],
+                                index=0 if parent_separator == "" else 1,
+                            )
 
-                            if st.checkbox("Override grammar profile", value=False, key="family_override_grammar"):
-                                override_settings["grammar_profile_name"] = st.selectbox(
-                                    "Grammar profile",
-                                    options=list(GRAMMAR_PROFILES.keys()),
-                                    index=list(GRAMMAR_PROFILES.keys()).index(parent_grammar)
-                                    if parent_grammar in GRAMMAR_PROFILES
-                                    else 0,
-                                )
+                        if st.checkbox(
+                            "Override phonotactic profile (JSON)", value=False, key="family_override_phonotactics"
+                        ):
+                            raw_override = st.text_area("Phonotactic overrides JSON", value="{}", height=120)
+                            override_dict, override_error = parse_override_json(raw_override)
+                            if override_error:
+                                st.error(override_error)
+                            else:
+                                override_settings["phonotactic_profile_overrides"] = override_dict
 
-                            if st.checkbox("Override syllable range", value=False, key="family_override_syllables"):
-                                override_settings["syllable_range"] = list(
-                                    st.slider(
-                                        "Syllables per word",
-                                        min_value=1,
-                                        max_value=5,
-                                        value=(int(parent_syllable_range[0]), int(parent_syllable_range[1])),
-                                    )
-                                )
+                with step_changes:
+                    parent_language = languages[selected_parent]
+                    parent_inventory = parent_language.get("inventory", {})
+                    st.markdown("**Sound changes**")
+                    help_button("sound_changes")
+                    template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
+                    selected_templates = st.multiselect("Templates", options=template_options, default=[])
+                    rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
 
-                            if st.checkbox("Override syllable separator", value=False, key="family_override_sep"):
-                                override_settings["syllable_separator"] = st.selectbox(
-                                    "Separator",
-                                    options=["", "."],
-                                    index=0 if parent_separator == "" else 1,
-                                )
+                    if rule_editor_key not in st.session_state:
+                        st.session_state[rule_editor_key] = []
 
-                            if st.checkbox(
-                                "Override phonotactic profile (JSON)", value=False, key="family_override_phonotactics"
-                            ):
-                                raw_override = st.text_area("Phonotactic overrides JSON", value="{}", height=120)
-                                override_dict, override_error = parse_override_json(raw_override)
-                                if override_error:
-                                    st.error(override_error)
-                                else:
-                                    override_settings["phonotactic_profile_overrides"] = override_dict
-
-                    with step_changes:
-                        parent_language = languages[selected_parent]
-                        parent_inventory = parent_language.get("inventory", {})
-                        st.markdown("**Sound changes**")
-                        help_button("sound_changes")
-                        template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
-                        selected_templates = st.multiselect("Templates", options=template_options, default=[])
-                        rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
-
-                        if rule_editor_key not in st.session_state:
+                    if st.button("Generate rules from templates"):
+                        if selected_templates:
+                            seed_base = int(project.get("seed", 0))
+                            seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}")) % (2**32)
+                            rng = random.Random(seed_value)
+                            changeset_preview = family_generator.generate_changeset(
+                                parent_inventory=parent_inventory,
+                                enabled_templates=selected_templates,
+                                event_count=max(1, len(selected_templates)),
+                                rng=rng,
+                                changeset_id=f"chg_{selected_parent}_{child_id_input}",
+                                name=f"{selected_parent}→{child_id_input}",
+                            )
+                            st.session_state[rule_editor_key] = [
+                                {
+                                    "from": rule.get("from", ""),
+                                    "to": rule.get("to", ""),
+                                    "enabled": rule.get("enabled", True),
+                                    "notes": rule.get("notes", ""),
+                                }
+                                for rule in changeset_preview.get("rules", [])
+                                if isinstance(rule, dict)
+                            ]
+                        else:
                             st.session_state[rule_editor_key] = []
 
-                        if st.button("Generate rules from templates"):
-                            if selected_templates:
-                                seed_base = int(project.get("seed", 0))
-                                seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}")) % (2**32)
-                                rng = random.Random(seed_value)
-                                changeset_preview = family_generator.generate_changeset(
-                                    parent_inventory=parent_inventory,
-                                    enabled_templates=selected_templates,
-                                    event_count=max(1, len(selected_templates)),
-                                    rng=rng,
-                                    changeset_id=f"chg_{selected_parent}_{child_id_input}",
-                                    name=f"{selected_parent}→{child_id_input}",
-                                )
-                                st.session_state[rule_editor_key] = [
-                                    {
-                                        "from": rule.get("from", ""),
-                                        "to": rule.get("to", ""),
-                                        "enabled": rule.get("enabled", True),
-                                        "notes": rule.get("notes", ""),
-                                    }
-                                    for rule in changeset_preview.get("rules", [])
-                                    if isinstance(rule, dict)
-                                ]
-                            else:
-                                st.session_state[rule_editor_key] = []
-
-                        edited_rules = st.data_editor(
-                            st.session_state[rule_editor_key],
-                            hide_index=True,
-                            use_container_width=True,
-                            num_rows="dynamic",
-                            key=f"{rule_editor_key}_editor",
-                        )
-                        if hasattr(edited_rules, "to_dict"):
-                            edited_rules = edited_rules.to_dict(orient="records")
-
-                        cleaned_rules = []
-                        seen_from: set[str] = set()
-                        invalid_rules: List[str] = []
-                        for rule in edited_rules:
-                            if not isinstance(rule, dict):
-                                continue
-                            frm = str(rule.get("from", "")).strip()
-                            to = str(rule.get("to", "")).strip()
-                            enabled = bool(rule.get("enabled", True))
-                            if not frm:
-                                invalid_rules.append("Missing 'from' value.")
-                                continue
-                            if frm in seen_from:
-                                invalid_rules.append(f"Duplicate rule for '{frm}'.")
-                                continue
-                            seen_from.add(frm)
-                            cleaned_rules.append(
-                                {
-                                    "from": frm,
-                                    "to": to,
-                                    "enabled": enabled,
-                                    "notes": str(rule.get("notes", "")),
-                                }
-                            )
-                        if invalid_rules:
-                            st.warning("Rule validation warnings: " + "; ".join(sorted(set(invalid_rules))))
-                        if not cleaned_rules:
-                            st.info("No valid rules yet; you can still create a daughter with an empty changeset.")
-
-                    with step_preview:
-                        parent_language = languages[selected_parent]
-                        parent_inventory = parent_language.get("inventory", {})
-                        st.markdown("**Preview**")
-                        st.caption(f"Parent {selected_parent} → Child {child_id_input or '(auto)'}")
-
-                        changeset = {
-                            "schema_version": 1,
-                            "changeset_id": f"chg_{selected_parent}_{child_id_input}",
-                            "name": f"{selected_parent}→{child_id_input}",
-                            "description": f"{len(cleaned_rules)} sound-change rule(s)",
-                            "rules": cleaned_rules,
-                        }
-                        preview_language = family_generator.preview_child_language(
-                            project_dir=project_dir,
-                            parent_language_id=selected_parent,
-                            child_name=child_name,
-                            child_id=child_id_input,
-                            changeset=changeset,
-                            override_settings=override_settings,
-                        )
-                        diff = sound_change_engine.diff_inventory(parent_inventory, preview_language.get("inventory", {}))
-                        help_button("inventory_diff", "create")
-                        diff_cols = st.columns(2)
-                        with diff_cols[0]:
-                            st.metric("Added vowels", str(len(diff["added_vowels"])))
-                            st.metric("Removed vowels", str(len(diff["removed_vowels"])))
-                        with diff_cols[1]:
-                            st.metric("Added consonants", str(len(diff["added_consonants"])))
-                            st.metric("Removed consonants", str(len(diff["removed_consonants"])))
-
-                        if diff["added_vowels"] or diff["removed_vowels"] or diff["added_consonants"] or diff["removed_consonants"]:
-                            st.dataframe(
-                                [
-                                    {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
-                                    {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
-                                    {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
-                                    {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
-                                ],
-                                hide_index=True,
-                                use_container_width=True,
-                            )
-                        summary = language_diff.summarize_rule_effects(parent_inventory, changeset)
-                        st.caption(f"Rules enabled: {summary['rule_count']}")
-
-                        lexicon_preview = language_diff.sample_lexicon_diff(parent_language, preview_language, n=12)
-                        if lexicon_preview:
-                            help_button("lexicon_diff", "create")
-                            st.dataframe(lexicon_preview, hide_index=True, use_container_width=True)
-
-                        if st.button("Create Daughter", type="primary", use_container_width=True):
-                            if child_id_input in existing_ids:
-                                st.error("Please pick a unique child ID.")
-                            else:
-                                created = family_generator.create_child_language(
-                                    project_dir=project_dir,
-                                    parent_language_id=selected_parent,
-                                    child_name=child_name,
-                                    child_id=child_id_input,
-                                    changeset=changeset,
-                                    override_settings=override_settings,
-                                )
-                                project = project_io.load_project(project_dir)
-                                st.session_state["family_project"] = project
-                                st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-                                st.session_state["family_selected_id"] = created.get("meta", {}).get("language_id")
-                                st.session_state["family_notice"] = (
-                                    f"Created daughter language: {created.get('meta', {}).get('name')}"
-                                )
-                                st.rerun()
-
-                elif view == "Compare":
-                    ids = sorted(list(languages.keys()))
-                    default_child = st.session_state.get("family_selected_id") or ids[0]
-                    child_id = st.selectbox(
-                        "Child language",
-                        options=ids,
-                        index=ids.index(default_child) if default_child in ids else 0,
-                    )
-                    child_language = languages[child_id]
-                    parent_id = child_language.get("meta", {}).get("parent_id") or ids[0]
-                    parent_id = st.selectbox(
-                        "Parent language",
-                        options=ids,
-                        index=ids.index(parent_id) if parent_id in ids else 0,
-                    )
-                    parent_language = languages[parent_id]
-
-                    diff = sound_change_engine.diff_inventory(
-                        parent_language.get("inventory", {}),
-                        child_language.get("inventory", {}),
-                    )
-                    st.markdown("**Inventory diff**")
-                    help_button("inventory_diff", "compare")
-                    st.dataframe(
-                        [
-                            {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
-                            {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
-                            {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
-                            {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
-                        ],
+                    edited_rules = st.data_editor(
+                        st.session_state[rule_editor_key],
                         hide_index=True,
                         use_container_width=True,
+                        num_rows="dynamic",
+                        key=f"{rule_editor_key}_editor",
                     )
+                    if hasattr(edited_rules, "to_dict"):
+                        edited_rules = edited_rules.to_dict(orient="records")
 
-                    st.markdown("**Lexicon sample diff**")
-                    help_button("lexicon_diff", "compare")
-                    rows = language_diff.sample_lexicon_diff(parent_language, child_language, n=20)
-                    st.dataframe(rows, hide_index=True, use_container_width=True)
-
-                else:
-                    selected_language = languages[selected_id]
-                    meta = selected_language.get("meta", {})
-                    st.markdown(f"**{meta.get('name', selected_id)}**")
-                    meta_cols = st.columns(4)
-                    meta_cols[0].metric("Year", str(meta.get("year", "?")))
-                    meta_cols[1].metric("Parent", str(meta.get("parent_id", "—")))
-                    meta_cols[2].metric("Changeset", str(meta.get("changeset_id", "—")))
-                    meta_cols[3].metric("Lexicon", str(len(selected_language.get("lexicon", []))))
-
-                    rebuild_cols = st.columns([1.3, 1.0])
-                    with rebuild_cols[0]:
-                        rebuild_names = st.checkbox(
-                            "Regenerate names on subtree rebuild",
-                            value=True,
-                            key=f"family_rebuild_names_{selected_id}",
+                    cleaned_rules = []
+                    seen_from: set[str] = set()
+                    invalid_rules: List[str] = []
+                    for rule in edited_rules:
+                        if not isinstance(rule, dict):
+                            continue
+                        frm = str(rule.get("from", "")).strip()
+                        to = str(rule.get("to", "")).strip()
+                        enabled = bool(rule.get("enabled", True))
+                        if not frm:
+                            invalid_rules.append("Missing 'from' value.")
+                            continue
+                        if frm in seen_from:
+                            invalid_rules.append(f"Duplicate rule for '{frm}'.")
+                            continue
+                        seen_from.add(frm)
+                        cleaned_rules.append(
+                            {
+                                "from": frm,
+                                "to": to,
+                                "enabled": enabled,
+                                "notes": str(rule.get("notes", "")),
+                            }
                         )
-                    with rebuild_cols[1]:
-                        if st.button("Rebuild subtree", key=f"family_rebuild_subtree_{selected_id}"):
-                            family_generator.rebuild_subtree(project_dir, selected_id)
-                            project = project_io.load_project(project_dir)
-                            st.session_state["family_project"] = project
-                            st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-                            if rebuild_names:
-                                languages = st.session_state.get("family_languages_cache", {})
-                                name_config = project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)
-                                templates = name_generator.load_templates()
-                                name_generator.rebuild_names_subtree(
-                                    project_dir=project_dir,
-                                    root_language_id=selected_id,
-                                    languages=languages,
-                                    name_config=name_config,
-                                    templates=templates,
-                                )
-                            st.success("Subtree rebuilt.")
-                            st.rerun()
+                    if invalid_rules:
+                        st.warning("Rule validation warnings: " + "; ".join(sorted(set(invalid_rules))))
+                    if not cleaned_rules:
+                        st.info("No valid rules yet; you can still create a daughter with an empty changeset.")
 
-                    inventory = selected_language.get("inventory", {})
-                    display_col_1, display_col_2 = st.columns(2)
-                    with display_col_1:
-                        display_segment_table(
-                            "Vowels",
-                            inventory.get("vowels", []) if isinstance(inventory, dict) else [],
-                            profile_name=romanization_profile,
-                        )
-                    with display_col_2:
-                        display_segment_table(
-                            "Consonants",
-                            inventory.get("consonants", []) if isinstance(inventory, dict) else [],
-                            profile_name=romanization_profile,
-                        )
+                with step_preview:
+                    parent_language = languages[selected_parent]
+                    parent_inventory = parent_language.get("inventory", {})
+                    st.markdown("**Preview**")
+                    st.caption(f"Parent {selected_parent} → Child {child_id_input or '(auto)'}")
 
-                    st.markdown("**Sample sentences**")
-                    model = project_io.hydrate_language_model(selected_language)
-                    sample_sentence_count = st.number_input(
-                        "Sentence samples",
-                        min_value=1,
-                        max_value=20,
-                        value=5,
-                        step=1,
-                        key=f"family_sentence_count_{selected_id}",
+                    changeset = {
+                        "schema_version": 1,
+                        "changeset_id": f"chg_{selected_parent}_{child_id_input}",
+                        "name": f"{selected_parent}→{child_id_input}",
+                        "description": f"{len(cleaned_rules)} sound-change rule(s)",
+                        "rules": cleaned_rules,
+                    }
+                    preview_language = family_generator.preview_child_language(
+                        project_dir=project_dir,
+                        parent_language_id=selected_parent,
+                        child_name=child_name,
+                        child_id=child_id_input or _suggest_unique_id(child_name, existing_ids),
+                        changeset=changeset,
+                        override_settings=override_settings,
                     )
-                    words_range = st.slider(
-                        "Words per sentence",
-                        min_value=2,
-                        max_value=12,
-                        value=(4, 8),
-                        key=f"family_words_range_{selected_id}",
-                    )
-                    if st.button("Generate sentences", key=f"family_generate_sentences_{selected_id}"):
-                        sentences = build_sample_sentences(
-                            vowels=model.get("inventory", {}).get("vowels", []),
-                            consonants=model.get("inventory", {}).get("consonants", []),
-                            sample_count=int(sample_sentence_count),
-                            syllable_range=tuple(model.get("syllable_range", [1, 2])),
-                            words_range=tuple(words_range),
-                            syllable_separator=str(model.get("syllable_separator", "")),
-                            style_name=str(model.get("style_name", DEFAULT_STYLE_PRESET)),
-                            concept_list_name=str(model.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
-                            grammar_profile_name=str(model.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
-                            language_model=model,
-                            phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
-                        )
-                        st.session_state[f"family_sentences_{selected_id}"] = sentences
-                    sentences = st.session_state.get(f"family_sentences_{selected_id}", [])
-                    if sentences:
+                    diff = sound_change_engine.diff_inventory(parent_inventory, preview_language.get("inventory", {}))
+                    help_button("inventory_diff", "create")
+                    diff_cols = st.columns(2)
+                    with diff_cols[0]:
+                        st.metric("Added vowels", str(len(diff["added_vowels"])))
+                        st.metric("Removed vowels", str(len(diff["removed_vowels"])))
+                    with diff_cols[1]:
+                        st.metric("Added consonants", str(len(diff["added_consonants"])))
+                        st.metric("Removed consonants", str(len(diff["removed_consonants"])))
+
+                    if diff["added_vowels"] or diff["removed_vowels"] or diff["added_consonants"] or diff["removed_consonants"]:
                         st.dataframe(
                             [
-                                {
-                                    "IPA": s.get("ipa", ""),
-                                    "Gloss": s.get("gloss", ""),
-                                    "Template": s.get("template", ""),
-                                }
-                                for s in sentences
+                                {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
+                                {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
+                                {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
+                                {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
                             ],
                             hide_index=True,
                             use_container_width=True,
                         )
-                    else:
-                        st.info("No sentences generated yet.")
+                    summary = language_diff.summarize_rule_effects(parent_inventory, changeset)
+                    st.caption(f"Rules enabled: {summary['rule_count']}")
 
-                    st.markdown("**Lexicon curation**")
-                    lexicon = model.get("lexicon", [])
-                    word_rows = [
+                    lexicon_preview = language_diff.sample_lexicon_diff(parent_language, preview_language, n=12)
+                    if lexicon_preview:
+                        help_button("lexicon_diff", "create")
+                        st.dataframe(lexicon_preview, hide_index=True, use_container_width=True)
+
+                    if st.button("Create Daughter", type="primary", use_container_width=True):
+                        if child_id_input in existing_ids:
+                            st.error("Please pick a unique child ID.")
+                        else:
+                            created = family_generator.create_child_language(
+                                project_dir=project_dir,
+                                parent_language_id=selected_parent,
+                                child_name=child_name,
+                                child_id=child_id_input,
+                                changeset=changeset,
+                                override_settings=override_settings,
+                            )
+                            project = project_io.load_project(project_dir)
+                            st.session_state["family_project"] = project
+                            st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                            st.session_state["family_selected_id"] = created.get("meta", {}).get("language_id")
+                            st.session_state["family_notice"] = (
+                                f"Created daughter language: {created.get('meta', {}).get('name')}"
+                            )
+                            st.rerun()
+
+            elif view == "Compare":
+                ids = sorted(list(languages.keys()))
+                default_child = st.session_state.get("family_selected_id") or ids[0]
+                child_id = st.selectbox(
+                    "Child language",
+                    options=ids,
+                    index=ids.index(default_child) if default_child in ids else 0,
+                )
+                child_language = languages[child_id]
+                parent_id = child_language.get("meta", {}).get("parent_id") or ids[0]
+                parent_id = st.selectbox(
+                    "Parent language",
+                    options=ids,
+                    index=ids.index(parent_id) if parent_id in ids else 0,
+                )
+                parent_language = languages[parent_id]
+
+                diff = sound_change_engine.diff_inventory(
+                    parent_language.get("inventory", {}),
+                    child_language.get("inventory", {}),
+                )
+                st.markdown("**Inventory diff**")
+                help_button("inventory_diff", "compare")
+                st.dataframe(
+                    [
+                        {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
+                        {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
+                        {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
+                        {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
+                    ],
+                    hide_index=True,
+                    use_container_width=True,
+                )
+
+                st.markdown("**Lexicon sample diff**")
+                help_button("lexicon_diff", "compare")
+                rows = language_diff.sample_lexicon_diff(parent_language, child_language, n=20)
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+
+            else:
+                selected_language = languages[selected_id]
+                meta = selected_language.get("meta", {})
+                st.markdown(f"**{meta.get('name', selected_id)}**")
+                meta_cols = st.columns(4)
+                meta_cols[0].metric("Year", str(meta.get("year", "?")))
+                meta_cols[1].metric("Parent", str(meta.get("parent_id", "—")))
+                meta_cols[2].metric("Changeset", str(meta.get("changeset_id", "—")))
+                meta_cols[3].metric("Lexicon", str(len(selected_language.get("lexicon", []))))
+
+                rebuild_cols = st.columns([1.3, 1.0])
+                with rebuild_cols[0]:
+                    rebuild_names = st.checkbox(
+                        "Regenerate names on subtree rebuild",
+                        value=True,
+                        key=f"family_rebuild_names_{selected_id}",
+                    )
+                with rebuild_cols[1]:
+                    if st.button("Rebuild subtree", key=f"family_rebuild_subtree_{selected_id}"):
+                        family_generator.rebuild_subtree(project_dir, selected_id)
+                        project = project_io.load_project(project_dir)
+                        st.session_state["family_project"] = project
+                        st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                        if rebuild_names:
+                            languages = st.session_state.get("family_languages_cache", {})
+                            name_config = project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)
+                            templates = name_generator.load_templates()
+                            name_generator.rebuild_names_subtree(
+                                project_dir=project_dir,
+                                root_language_id=selected_id,
+                                languages=languages,
+                                name_config=name_config,
+                                templates=templates,
+                            )
+                        st.success("Subtree rebuilt.")
+                        st.rerun()
+
+                inventory = selected_language.get("inventory", {})
+                display_col_1, display_col_2 = st.columns(2)
+                with display_col_1:
+                    display_segment_table(
+                        "Vowels",
+                        inventory.get("vowels", []) if isinstance(inventory, dict) else [],
+                        profile_name=romanization_profile,
+                    )
+                with display_col_2:
+                    display_segment_table(
+                        "Consonants",
+                        inventory.get("consonants", []) if isinstance(inventory, dict) else [],
+                        profile_name=romanization_profile,
+                    )
+
+                st.markdown("**Sample sentences**")
+                model = project_io.hydrate_language_model(selected_language)
+                sample_sentence_count = st.number_input(
+                    "Sentence samples",
+                    min_value=1,
+                    max_value=20,
+                    value=5,
+                    step=1,
+                    key=f"family_sentence_count_{selected_id}",
+                )
+                words_range = st.slider(
+                    "Words per sentence",
+                    min_value=2,
+                    max_value=12,
+                    value=(4, 8),
+                    key=f"family_words_range_{selected_id}",
+                )
+                if st.button("Generate sentences", key=f"family_generate_sentences_{selected_id}"):
+                    sentences = build_sample_sentences(
+                        vowels=model.get("inventory", {}).get("vowels", []),
+                        consonants=model.get("inventory", {}).get("consonants", []),
+                        sample_count=int(sample_sentence_count),
+                        syllable_range=tuple(model.get("syllable_range", [1, 2])),
+                        words_range=tuple(words_range),
+                        syllable_separator=str(model.get("syllable_separator", "")),
+                        style_name=str(model.get("style_name", DEFAULT_STYLE_PRESET)),
+                        concept_list_name=str(model.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
+                        grammar_profile_name=str(model.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
+                        language_model=model,
+                        phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
+                    )
+                    st.session_state[f"family_sentences_{selected_id}"] = sentences
+                sentences = st.session_state.get(f"family_sentences_{selected_id}", [])
+                if sentences:
+                    st.dataframe(
+                        [
+                            {
+                                "IPA": s.get("ipa", ""),
+                                "Gloss": s.get("gloss", ""),
+                                "Template": s.get("template", ""),
+                            }
+                            for s in sentences
+                        ],
+                        hide_index=True,
+                        use_container_width=True,
+                    )
+                else:
+                    st.info("No sentences generated yet.")
+
+                st.markdown("**Lexicon curation**")
+                lexicon = model.get("lexicon", [])
+                word_rows = [
+                    {
+                        "Entry": str(entry.get("id", "")),
+                        "IPA": str(entry.get("ipa", "")),
+                        "Sound-like": ipa_text_to_sound_like(
+                            str(entry.get("ipa", "")),
+                            use_segment_separators=False,
+                            profile_name=romanization_profile,
+                        ),
+                        "Gloss": str(entry.get("gloss", "")),
+                        "Meaning tag": str(entry.get("meaning", "")),
+                        "Part of speech": str(entry.get("pos", "")),
+                        "Source": str(entry.get("source", "")),
+                        "Re-roll": False,
+                    }
+                    for entry in lexicon
+                    if isinstance(entry, dict)
+                ]
+                edited_rows = st.data_editor(
+                    word_rows,
+                    hide_index=True,
+                    use_container_width=True,
+                    key=f"family_lexicon_{selected_id}",
+                    column_config={
+                        "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
+                        "Entry": st.column_config.TextColumn("Entry", disabled=True),
+                        "IPA": st.column_config.TextColumn("IPA", disabled=True),
+                        "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
+                        "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
+                        "Meaning tag": st.column_config.TextColumn("Meaning tag", disabled=True),
+                        "Part of speech": st.column_config.TextColumn("Part of speech", disabled=True),
+                        "Source": st.column_config.TextColumn("Source", disabled=True),
+                    },
+                )
+                if hasattr(edited_rows, "to_dict"):
+                    edited_rows = edited_rows.to_dict(orient="records")
+                selected_rerolls = [
+                    str(row.get("Entry", "")).strip()
+                    for row in edited_rows
+                    if isinstance(row, dict) and row.get("Re-roll") is True
+                ]
+                if st.button(
+                    f"Re-roll {len(selected_rerolls)} selected",
+                    key=f"family_reroll_{selected_id}",
+                    disabled=not selected_rerolls,
+                ):
+                    overrides = meta.get("lexicon_overrides", {})
+                    if not isinstance(overrides, dict):
+                        overrides = {}
+                    for entry_id in selected_rerolls:
+                        reroll_lexicon_entry(
+                            model,
+                            entry_id=entry_id,
+                            phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
+                        )
+                        overrides[entry_id] = find_entry_ipa(model, entry_id)
+                    meta["lexicon_overrides"] = overrides
+                    selected_language["meta"] = meta
+                    selected_language["lexicon"] = model.get("lexicon", [])
+                    normalized = project_io.normalize_language_snapshot(selected_language)
+                    normalized["meta"] = meta
+                    languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+                    project_io.save_language(normalized, languages_dir / f"{selected_id}.json")
+                    st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                    st.success("Re-rolled entries saved.")
+                    st.rerun()
+
+                st.markdown("**Names**")
+                name_config = project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)
+                templates = name_generator.load_templates()
+                names_payload = name_generator.load_names(project_dir, selected_id)
+                existing_names = []
+                if isinstance(names_payload, dict):
+                    existing_names = (
+                        names_payload.get("names", []) if isinstance(names_payload.get("names", []), list) else []
+                    )
+
+                with st.expander("Name settings", expanded=False):
+                    counts = name_config.get("counts_by_type", {}) if isinstance(name_config, dict) else {}
+                    personal_defaults = counts.get("personal", {}) if isinstance(counts, dict) else {}
+                    toponym_defaults = counts.get("toponym", {}) if isinstance(counts, dict) else {}
+
+                    personal_cols = st.columns(3)
+                    personal_given = personal_cols[0].number_input(
+                        "Given names",
+                        min_value=0,
+                        max_value=200,
+                        value=int(personal_defaults.get("given", 50)),
+                        step=5,
+                        key=f"name_given_{selected_id}",
+                    )
+                    personal_family = personal_cols[1].number_input(
+                        "Family names",
+                        min_value=0,
+                        max_value=200,
+                        value=int(personal_defaults.get("family", 20)),
+                        step=5,
+                        key=f"name_family_{selected_id}",
+                    )
+                    personal_title = personal_cols[2].number_input(
+                        "Titles",
+                        min_value=0,
+                        max_value=100,
+                        value=int(personal_defaults.get("title", 10)),
+                        step=5,
+                        key=f"name_title_{selected_id}",
+                    )
+
+                    topo_cols = st.columns(3)
+                    topo_settlement = topo_cols[0].number_input(
+                        "Settlements",
+                        min_value=0,
+                        max_value=200,
+                        value=int(toponym_defaults.get("settlement", 30)),
+                        step=5,
+                        key=f"name_settlement_{selected_id}",
+                    )
+                    topo_hydronym = topo_cols[1].number_input(
+                        "Hydronyms",
+                        min_value=0,
+                        max_value=200,
+                        value=int(toponym_defaults.get("hydronym", 15)),
+                        step=5,
+                        key=f"name_hydronym_{selected_id}",
+                    )
+                    topo_terrain = topo_cols[2].number_input(
+                        "Terrain names",
+                        min_value=0,
+                        max_value=200,
+                        value=int(toponym_defaults.get("terrain", 15)),
+                        step=5,
+                        key=f"name_terrain_{selected_id}",
+                    )
+
+                    bias_cols = st.columns(3)
+                    archaic_bias = name_config.get("archaic_bias", {}) if isinstance(name_config, dict) else {}
+                    bias_self = bias_cols[0].slider(
+                        "Self bias",
+                        0.0,
+                        1.0,
+                        float(archaic_bias.get("self", 0.7)),
+                        0.05,
+                        key=f"name_bias_self_{selected_id}",
+                    )
+                    bias_parent = bias_cols[1].slider(
+                        "Parent bias",
+                        0.0,
+                        1.0,
+                        float(archaic_bias.get("parent", 0.2)),
+                        0.05,
+                        key=f"name_bias_parent_{selected_id}",
+                    )
+                    bias_proto = bias_cols[2].slider(
+                        "Proto bias",
+                        0.0,
+                        1.0,
+                        float(archaic_bias.get("proto", 0.1)),
+                        0.05,
+                        key=f"name_bias_proto_{selected_id}",
+                    )
+
+                    name_config["counts_by_type"] = {
+                        "personal": {"given": personal_given, "family": personal_family, "title": personal_title},
+                        "toponym": {"settlement": topo_settlement, "hydronym": topo_hydronym, "terrain": topo_terrain},
+                    }
+                    name_config["archaic_bias"] = {"self": bias_self, "parent": bias_parent, "proto": bias_proto}
+
+                    if st.button("Save name defaults", key=f"name_save_defaults_{selected_id}"):
+                        project["name_config"] = dict(name_config)
+                        project_io.save_project(project)
+                        st.success("Name defaults saved to project.")
+
+                if existing_names:
+                    st.caption(f"Existing names: {len(existing_names)}")
+                    name_rows = [
                         {
-                            "Entry": str(entry.get("id", "")),
+                            "Locked": bool(entry.get("locked", False)),
+                            "Name ID": str(entry.get("name_id", "")),
                             "IPA": str(entry.get("ipa", "")),
                             "Sound-like": ipa_text_to_sound_like(
                                 str(entry.get("ipa", "")),
@@ -3353,191 +3867,55 @@ def render_language_family_ui() -> None:
                                 profile_name=romanization_profile,
                             ),
                             "Gloss": str(entry.get("gloss", "")),
-                            "Meaning tag": str(entry.get("meaning", "")),
-                            "Part of speech": str(entry.get("pos", "")),
-                            "Source": str(entry.get("source", "")),
-                            "Re-roll": False,
+                            "Type": str(entry.get("type", "")),
+                            "Subtype": str(entry.get("subtype", "")),
+                            "Template": str(entry.get("template", "")),
                         }
-                        for entry in lexicon
+                        for entry in existing_names
                         if isinstance(entry, dict)
                     ]
-                    edited_rows = st.data_editor(
-                        word_rows,
+                    name_actions = st.columns(3)
+                    edited_names = st.data_editor(
+                        name_rows,
                         hide_index=True,
                         use_container_width=True,
-                        key=f"family_lexicon_{selected_id}",
+                        key=f"name_table_{selected_id}",
                         column_config={
-                            "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
-                            "Entry": st.column_config.TextColumn("Entry", disabled=True),
+                            "Locked": st.column_config.CheckboxColumn("Locked", default=False),
+                            "Name ID": st.column_config.TextColumn("Name ID", disabled=True),
                             "IPA": st.column_config.TextColumn("IPA", disabled=True),
                             "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
                             "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
-                            "Meaning tag": st.column_config.TextColumn("Meaning tag", disabled=True),
-                            "Part of speech": st.column_config.TextColumn("Part of speech", disabled=True),
-                            "Source": st.column_config.TextColumn("Source", disabled=True),
+                            "Type": st.column_config.TextColumn("Type", disabled=True),
+                            "Subtype": st.column_config.TextColumn("Subtype", disabled=True),
+                            "Template": st.column_config.TextColumn("Template", disabled=True),
                         },
                     )
-                    if hasattr(edited_rows, "to_dict"):
-                        edited_rows = edited_rows.to_dict(orient="records")
-                    selected_rerolls = [
-                        str(row.get("Entry", "")).strip()
-                        for row in edited_rows
-                        if isinstance(row, dict) and row.get("Re-roll") is True
-                    ]
-                    if st.button(
-                        f"Re-roll {len(selected_rerolls)} selected",
-                        key=f"family_reroll_{selected_id}",
-                        disabled=not selected_rerolls,
-                    ):
-                        overrides = meta.get("lexicon_overrides", {})
-                        if not isinstance(overrides, dict):
-                            overrides = {}
-                        for entry_id in selected_rerolls:
-                            reroll_lexicon_entry(
-                                model,
-                                entry_id=entry_id,
-                                phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
-                            )
-                            overrides[entry_id] = find_entry_ipa(model, entry_id)
-                        meta["lexicon_overrides"] = overrides
-                        selected_language["meta"] = meta
-                        selected_language["lexicon"] = model.get("lexicon", [])
-                        normalized = project_io.normalize_language_snapshot(selected_language)
-                        normalized["meta"] = meta
-                        languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
-                        project_io.save_language(normalized, languages_dir / f"{selected_id}.json")
-                        st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-                        st.success("Re-rolled entries saved.")
+                    if hasattr(edited_names, "to_dict"):
+                        edited_names = edited_names.to_dict(orient="records")
+
+                    if name_actions[1].button("Save locks", key=f"name_save_locks_{selected_id}"):
+                        locked_map = {
+                            str(row.get("Name ID", "")): bool(row.get("Locked", False))
+                            for row in edited_names
+                            if isinstance(row, dict)
+                        }
+                        for entry in existing_names:
+                            if not isinstance(entry, dict):
+                                continue
+                            entry_id = str(entry.get("name_id", ""))
+                            if entry_id in locked_map:
+                                entry["locked"] = locked_map[entry_id]
+                        payload = name_generator.names_payload(
+                            language_id=selected_id,
+                            names=existing_names,
+                            config_hash=name_generator.config_hash(project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)),
+                        )
+                        name_generator.save_names(project_dir, payload)
+                        st.success("Name locks saved.")
                         st.rerun()
 
-                    st.markdown("**Names**")
-                    name_config = project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)
-                    templates = name_generator.load_templates()
-                    names_payload = name_generator.load_names(project_dir, selected_id)
-                    existing_names = []
-                    if isinstance(names_payload, dict):
-                        existing_names = names_payload.get("names", []) if isinstance(names_payload.get("names", []), list) else []
-
-                    with st.expander("Name settings", expanded=False):
-                        counts = name_config.get("counts_by_type", {}) if isinstance(name_config, dict) else {}
-                        personal_defaults = counts.get("personal", {}) if isinstance(counts, dict) else {}
-                        toponym_defaults = counts.get("toponym", {}) if isinstance(counts, dict) else {}
-
-                        personal_cols = st.columns(3)
-                        personal_given = personal_cols[0].number_input(
-                            "Given names",
-                            min_value=0,
-                            max_value=200,
-                            value=int(personal_defaults.get("given", 50)),
-                            step=5,
-                            key=f"name_given_{selected_id}",
-                        )
-                        personal_family = personal_cols[1].number_input(
-                            "Family names",
-                            min_value=0,
-                            max_value=200,
-                            value=int(personal_defaults.get("family", 20)),
-                            step=5,
-                            key=f"name_family_{selected_id}",
-                        )
-                        personal_title = personal_cols[2].number_input(
-                            "Titles",
-                            min_value=0,
-                            max_value=100,
-                            value=int(personal_defaults.get("title", 10)),
-                            step=5,
-                            key=f"name_title_{selected_id}",
-                        )
-
-                        topo_cols = st.columns(3)
-                        topo_settlement = topo_cols[0].number_input(
-                            "Settlements",
-                            min_value=0,
-                            max_value=200,
-                            value=int(toponym_defaults.get("settlement", 30)),
-                            step=5,
-                            key=f"name_settlement_{selected_id}",
-                        )
-                        topo_hydronym = topo_cols[1].number_input(
-                            "Hydronyms",
-                            min_value=0,
-                            max_value=200,
-                            value=int(toponym_defaults.get("hydronym", 15)),
-                            step=5,
-                            key=f"name_hydronym_{selected_id}",
-                        )
-                        topo_terrain = topo_cols[2].number_input(
-                            "Terrain names",
-                            min_value=0,
-                            max_value=200,
-                            value=int(toponym_defaults.get("terrain", 15)),
-                            step=5,
-                            key=f"name_terrain_{selected_id}",
-                        )
-
-                        bias_cols = st.columns(3)
-                        archaic_bias = name_config.get("archaic_bias", {}) if isinstance(name_config, dict) else {}
-                        bias_self = bias_cols[0].slider(
-                            "Self bias",
-                            0.0,
-                            1.0,
-                            float(archaic_bias.get("self", 0.7)),
-                            0.05,
-                            key=f"name_bias_self_{selected_id}",
-                        )
-                        bias_parent = bias_cols[1].slider(
-                            "Parent bias",
-                            0.0,
-                            1.0,
-                            float(archaic_bias.get("parent", 0.2)),
-                            0.05,
-                            key=f"name_bias_parent_{selected_id}",
-                        )
-                        bias_proto = bias_cols[2].slider(
-                            "Proto bias",
-                            0.0,
-                            1.0,
-                            float(archaic_bias.get("proto", 0.1)),
-                            0.05,
-                            key=f"name_bias_proto_{selected_id}",
-                        )
-
-                        if st.button("Save name settings", key=f"name_save_config_{selected_id}"):
-                            updated_config = dict(name_config)
-                            updated_config["counts_by_type"] = {
-                                "personal": {
-                                    "given": personal_given,
-                                    "family": personal_family,
-                                    "title": personal_title,
-                                },
-                                "toponym": {
-                                    "settlement": topo_settlement,
-                                    "hydronym": topo_hydronym,
-                                    "terrain": topo_terrain,
-                                },
-                            }
-                            updated_config["archaic_bias"] = {
-                                "self": bias_self,
-                                "parent": bias_parent,
-                                "proto": bias_proto,
-                            }
-                            project["name_config"] = updated_config
-                            project_io.save_project(project)
-                            st.session_state["family_project"] = project
-                            st.success("Name settings saved.")
-
-                    def _ancestor_models() -> Dict[str, Dict[str, Any]]:
-                        ancestors: Dict[str, Dict[str, Any]] = {}
-                        parent_id = meta.get("parent_id")
-                        if parent_id and parent_id in languages:
-                            ancestors["parent"] = languages[parent_id]
-                        root_id = project.get("root_language_id")
-                        if root_id and root_id in languages and root_id != selected_id:
-                            ancestors["proto"] = languages[root_id]
-                        return ancestors
-
-                    name_actions = st.columns(3)
-                    if name_actions[0].button("Generate names", key=f"name_generate_{selected_id}"):
+                    if name_actions[2].button("Regenerate unlocked", key=f"name_regen_{selected_id}"):
                         rng = random.Random(int(project.get("seed", 42)))
                         generated = name_generator.generate_names(
                             language_model=selected_language,
@@ -3546,94 +3924,18 @@ def render_language_family_ui() -> None:
                             ancestors=_ancestor_models(),
                             rng=rng,
                         )
+                        merged = name_generator.merge_locked(existing_names, generated)
                         payload = name_generator.names_payload(
                             language_id=selected_id,
-                            names=generated,
+                            names=merged,
                             config_hash=name_generator.config_hash(project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)),
                         )
                         name_generator.save_names(project_dir, payload)
-                        st.success("Names generated.")
+                        st.success("Unlocked names regenerated.")
                         st.rerun()
+                else:
+                    st.info("No names generated yet.")
 
-                    if existing_names:
-                        name_rows = [
-                            {
-                                "Name ID": str(entry.get("name_id", "")),
-                                "IPA": str(entry.get("form_ipa", "")),
-                                "Sound-like": ipa_text_to_sound_like(
-                                    str(entry.get("form_ipa", "")),
-                                    use_segment_separators=False,
-                                    profile_name=romanization_profile,
-                                ),
-                                "Gloss": str(entry.get("gloss", "")),
-                                "Type": str(entry.get("name_type", "")),
-                                "Subtype": str(entry.get("subtype", "")),
-                                "Template": str(entry.get("template_id", "")),
-                                "Locked": bool(entry.get("locked", False)),
-                            }
-                            for entry in existing_names
-                            if isinstance(entry, dict)
-                        ]
-                        edited_names = st.data_editor(
-                            name_rows,
-                            hide_index=True,
-                            use_container_width=True,
-                            key=f"family_names_{selected_id}",
-                            column_config={
-                                "Locked": st.column_config.CheckboxColumn("Locked", default=False),
-                                "Name ID": st.column_config.TextColumn("Name ID", disabled=True),
-                                "IPA": st.column_config.TextColumn("IPA", disabled=True),
-                                "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
-                                "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
-                                "Type": st.column_config.TextColumn("Type", disabled=True),
-                                "Subtype": st.column_config.TextColumn("Subtype", disabled=True),
-                                "Template": st.column_config.TextColumn("Template", disabled=True),
-                            },
-                        )
-                        if hasattr(edited_names, "to_dict"):
-                            edited_names = edited_names.to_dict(orient="records")
-
-                        if name_actions[1].button("Save locks", key=f"name_save_locks_{selected_id}"):
-                            locked_map = {
-                                str(row.get("Name ID", "")): bool(row.get("Locked", False))
-                                for row in edited_names
-                                if isinstance(row, dict)
-                            }
-                            for entry in existing_names:
-                                if not isinstance(entry, dict):
-                                    continue
-                                entry_id = str(entry.get("name_id", ""))
-                                if entry_id in locked_map:
-                                    entry["locked"] = locked_map[entry_id]
-                            payload = name_generator.names_payload(
-                                language_id=selected_id,
-                                names=existing_names,
-                                config_hash=name_generator.config_hash(project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)),
-                            )
-                            name_generator.save_names(project_dir, payload)
-                            st.success("Name locks saved.")
-                            st.rerun()
-
-                        if name_actions[2].button("Regenerate unlocked", key=f"name_regen_{selected_id}"):
-                            rng = random.Random(int(project.get("seed", 42)))
-                            generated = name_generator.generate_names(
-                                language_model=selected_language,
-                                name_config=project.get("name_config", name_generator.DEFAULT_NAME_CONFIG),
-                                templates=templates,
-                                ancestors=_ancestor_models(),
-                                rng=rng,
-                            )
-                            merged = name_generator.merge_locked(existing_names, generated)
-                            payload = name_generator.names_payload(
-                                language_id=selected_id,
-                                names=merged,
-                                config_hash=name_generator.config_hash(project.get("name_config", name_generator.DEFAULT_NAME_CONFIG)),
-                            )
-                            name_generator.save_names(project_dir, payload)
-                            st.success("Unlocked names regenerated.")
-                            st.rerun()
-                    else:
-                        st.info("No names generated yet.")
     with help_col:
         st.markdown("### Help")
         topic_key = st.session_state.get("help_topic")
@@ -3643,6 +3945,204 @@ def render_language_family_ui() -> None:
             st.write(topic["body"])
         else:
             st.write("Click a ? icon to learn about a control.")
+
+
+def render_manage_tab() -> None:
+    st.markdown("### Manage")
+    st.caption("Project administration, loading, and advanced settings.")
+
+    project_root = st.text_input(
+        "Project root folder",
+        value=st.session_state.get("family_project_root", "outputs/projects"),
+        key="family_project_root",
+    )
+    project_root_path = Path(project_root)
+    project_dirs = discover_project_dirs(project_root_path)
+    project_labels = [path.name for path in project_dirs]
+
+    create_col, load_col = st.columns(2)
+    with create_col:
+        new_project_name = st.text_input("Project name", value="MyLanguageFamily", key="family_new_project_name")
+        new_project_slug = st.text_input(
+            "Project slug",
+            value=project_io.sanitize_slug(new_project_name),
+            key="family_new_project_slug",
+        )
+        new_project_seed = st.number_input(
+            "Seed",
+            min_value=0,
+            max_value=2_147_483_647,
+            value=42,
+            step=1,
+            key="family_new_project_seed",
+        )
+        new_project_timespan = st.number_input(
+            "Time span (years)",
+            min_value=100,
+            max_value=10000,
+            value=2000,
+            step=50,
+            key="family_new_project_timespan",
+        )
+        if st.button("Create Empty Project", use_container_width=True):
+            try:
+                project = project_io.create_project(
+                    root_dir=project_root_path,
+                    project_name=new_project_name,
+                    seed=int(new_project_seed),
+                    time_span_years=int(new_project_timespan),
+                    project_slug=new_project_slug,
+                )
+                set_project_state(project, project_root_path / project["project_slug"])
+                st.success("Project created and loaded.")
+            except FileExistsError as exc:
+                st.error(str(exc))
+
+    with load_col:
+        selected_project = st.selectbox(
+            "Projects",
+            options=project_labels if project_labels else ["(none)"],
+            index=0,
+            disabled=not project_labels,
+        )
+        if st.button("Load Existing Project", use_container_width=True, disabled=not project_labels):
+            project_dir = project_root_path / selected_project
+            try:
+                project = project_io.load_project(project_dir)
+                set_project_state(project, project_dir)
+                st.success(f"Loaded project: {selected_project}")
+            except Exception as exc:  # pragma: no cover - UI safety net
+                st.error(f"Could not load project: {exc}")
+
+    project = st.session_state.get("family_project")
+    project_dir_value = st.session_state.get("family_project_dir")
+    project_dir = Path(project_dir_value) if project_dir_value else None
+    if isinstance(project, dict):
+        st.caption(f"Active: {project.get('project_name', '(unknown)')}")
+        if st.button("Save Project", use_container_width=True):
+            try:
+                project_io.save_project(project)
+                st.success("Project saved.")
+            except Exception as exc:  # pragma: no cover - UI safety net
+                st.error(f"Could not save project: {exc}")
+        if st.button("Clear Active Project", use_container_width=True):
+            st.session_state.pop("family_project", None)
+            st.session_state.pop("family_project_dir", None)
+            st.session_state["family_languages_cache"] = None
+            st.success("Cleared active project.")
+
+
+def render_export_tab() -> None:
+    st.markdown("### Export")
+    st.caption("Export projects, lexicons, and names, or import an existing project zip.")
+
+    project = st.session_state.get("family_project")
+    project_dir_value = st.session_state.get("family_project_dir")
+    project_dir = Path(project_dir_value) if project_dir_value else None
+    if not isinstance(project, dict) or not project_dir:
+        st.info("Load a project to export or import data.")
+        return
+
+    st.markdown("**Project export**")
+    project_file = project_dir / "project.json"
+    if project_file.exists():
+        st.download_button(
+            label="Download project.json",
+            data=project_file.read_text(encoding="utf-8"),
+            file_name="project.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        base_dir = project_dir.parent
+        for path in project_dir.rglob("*"):
+            if path.is_file():
+                zipf.write(path, path.relative_to(base_dir))
+    zip_buffer.seek(0)
+    st.download_button(
+        label="Download project ZIP",
+        data=zip_buffer.getvalue(),
+        file_name=f"{project.get('project_slug', 'project')}.zip",
+        mime="application/zip",
+        use_container_width=True,
+    )
+
+    st.markdown("**Language export**")
+    languages = load_languages_from_project(project, project_dir)
+    if languages:
+        language_ids = sorted(list(languages.keys()))
+        selected_default = st.session_state.get("family_selected_id")
+        if selected_default not in language_ids:
+            selected_default = language_ids[0]
+        selected_language_id = st.selectbox(
+            "Language",
+            options=language_ids,
+            index=language_ids.index(selected_default) if language_ids else 0,
+        )
+        language = languages.get(selected_language_id, {})
+        lexicon_payload = json.dumps(language.get("lexicon", []), ensure_ascii=False, indent=2)
+        st.download_button(
+            label="Download lexicon JSON",
+            data=lexicon_payload,
+            file_name=f"{selected_language_id}_lexicon.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        names_payload = name_generator.load_names(project_dir, selected_language_id)
+        if names_payload:
+            st.download_button(
+                label="Download names JSON",
+                data=json.dumps(names_payload, ensure_ascii=False, indent=2),
+                file_name=f"{selected_language_id}_names.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+        else:
+            st.info("No names file found for this language yet.")
+    else:
+        st.info("No languages found to export.")
+
+    st.markdown("**Import project (ZIP)**")
+    import_root = st.text_input(
+        "Import destination root",
+        value=st.session_state.get("family_project_root", "outputs/projects"),
+        key="family_import_root",
+    )
+    uploaded = st.file_uploader("Project ZIP", type=["zip"], key="family_import_zip")
+    if st.button("Import Project", use_container_width=True, disabled=uploaded is None):
+        if uploaded is None:
+            st.error("Upload a project ZIP first.")
+        else:
+            try:
+                import_root_path = Path(import_root)
+                import_root_path.mkdir(parents=True, exist_ok=True)
+                with zipfile.ZipFile(uploaded) as zipf:
+                    zipf.extractall(import_root_path)
+                st.success("Project imported. Load it from the Manage tab.")
+            except Exception as exc:  # pragma: no cover - UI safety net
+                st.error(f"Could not import project: {exc}")
+
+
+
+def render_language_family_ui() -> None:
+    st.subheader("Language Family Generator")
+    if "family_project_root" not in st.session_state:
+        st.session_state["family_project_root"] = "outputs/projects"
+    tab_start, tab_enrich, tab_family, tab_manage, tab_export = st.tabs(
+        ["Start", "Enrich", "Family", "Manage", "Export"]
+    )
+    with tab_start:
+        render_start_tab()
+    with tab_enrich:
+        render_enrich_tab()
+    with tab_family:
+        render_family_tab()
+    with tab_manage:
+        render_manage_tab()
+    with tab_export:
+        render_export_tab()
 
 
 def main() -> None:

@@ -72,3 +72,7 @@ streamlit run app.py
 - get validation feedback for concept/grammar/style profile definitions while iterating,
 - save outputs to an output folder,
 - save the latest result as a reusable preset in `presets/`.
+
+## UI/UX Bible
+
+The family-first experience is guided by the UI bible in `docs/ui_bible.md`. It documents the intended flow (Start -> Enrich -> Family), the separation of admin tasks into Manage/Export, and the rules for adding future cultural-meaning expansions.

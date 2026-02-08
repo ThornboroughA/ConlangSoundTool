@@ -89,9 +89,15 @@ def normalize_language_snapshot(language: Dict[str, Any]) -> Dict[str, Any]:
     return snapshot
 
 
-def create_project(root_dir: Path, project_name: str, seed: int, time_span_years: int) -> Dict[str, Any]:
+def create_project(
+    root_dir: Path,
+    project_name: str,
+    seed: int,
+    time_span_years: int,
+    project_slug: Optional[str] = None,
+) -> Dict[str, Any]:
     root_dir = Path(root_dir)
-    project_slug = sanitize_slug(project_name)
+    project_slug = sanitize_slug(project_slug or project_name)
     project_dir = root_dir / project_slug
     project_file = project_dir / "project.json"
     if project_file.exists():
@@ -120,6 +126,7 @@ def create_project(root_dir: Path, project_name: str, seed: int, time_span_years
         "concept_pack_config": dict(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG),
         "name_config": dict(name_generator.DEFAULT_NAME_CONFIG),
         "culture_profile": {},
+        "bio_notes": {},
         "name_schema_version": 1,
         "language_index": [],
         "_project_dir": str(project_dir),
@@ -138,6 +145,7 @@ def load_project(project_dir: Path) -> Dict[str, Any]:
     project.setdefault("concept_pack_config", dict(concept_packs.DEFAULT_CONCEPT_PACK_CONFIG))
     project.setdefault("name_config", dict(name_generator.DEFAULT_NAME_CONFIG))
     project.setdefault("culture_profile", {})
+    project.setdefault("bio_notes", {})
     project.setdefault("name_schema_version", 1)
     project["_project_dir"] = str(project_dir)
     return project

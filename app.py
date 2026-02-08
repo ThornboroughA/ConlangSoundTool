@@ -381,6 +381,28 @@ PHOIBLE_DEFAULT_URL = "https://raw.githubusercontent.com/phoible/dev/refs/heads/
 PHOIBLE_CORE_WEIGHT_DEFAULT = 1.0
 PHOIBLE_MARGINAL_WEIGHT_DEFAULT = 0.35
 PHOIBLE_MAX_RESULTS = 200
+FAMILY_TIMESPAN_DEFAULT = 2000
+SOUND_CHANGE_TEMPLATE_LABELS: Dict[str, str] = {
+    "stop_voicing": "Stop voicing (p→b, t→d, k→g)",
+    "stop_devoicing": "Stop devoicing (b→p, d→t, g→k)",
+    "s_voicing": "S voicing (s→z)",
+    "h_loss": "H loss (h→∅)",
+    "approximant_shift": "Approximant shift (w↔v)",
+    "r_shift": "R shift (r↔ɾ)",
+    "vowel_raise_pair": "Vowel raise (e→i, o→u, etc.)",
+    "vowel_lower_pair": "Vowel lower (i→e, u→o, etc.)",
+}
+SOUND_CHANGE_TEMPLATE_DESCRIPTIONS: Dict[str, str] = {
+    "stop_voicing": "Turns voiceless stops into voiced ones (like p→b).",
+    "stop_devoicing": "Turns voiced stops into voiceless ones (like b→p).",
+    "s_voicing": "Voices s to z in applicable contexts.",
+    "h_loss": "Deletes h from words, a common historical change.",
+    "approximant_shift": "Swaps w and v, modeling labial approximant/ fricative shifts.",
+    "r_shift": "Alternates r with a tap ɾ, a frequent rhotic drift.",
+    "vowel_raise_pair": "Raises a vowel (like e→i or o→u).",
+    "vowel_lower_pair": "Lowers a vowel (like i→e or u→o).",
+}
+SOUND_CHANGE_VOWEL_TEMPLATES = {"vowel_raise_pair", "vowel_lower_pair"}
 
 ROMANIZATION_FALLBACK_VOWELS = set("aeiouyæœɨöü")
 ROMANIZATION_FALLBACK_VOWELS |= set("āēīōūȳǣôŏăŭ")
@@ -885,7 +907,12 @@ def render_phoible_importer() -> None:
             "Pull inventories directly from PHOIBLE. PHOIBLE does not provide per-language frequency weights, "
             "so representation values are derived from the marginal flag (configurable below)."
         )
-        enable_phoible = st.checkbox("Enable PHOIBLE search", value=False, key="phoible_enable")
+        enable_phoible = st.checkbox(
+            "Enable PHOIBLE search",
+            value=False,
+            key="phoible_enable",
+            help="Toggle to load the PHOIBLE database for preset imports.",
+        )
         if not enable_phoible:
             return
 
@@ -893,6 +920,7 @@ def render_phoible_importer() -> None:
             "PHOIBLE CSV URL",
             value=st.session_state.get("phoible_url", PHOIBLE_DEFAULT_URL),
             key="phoible_url",
+            help="Advanced: override the default PHOIBLE CSV source.",
         )
 
         try:
@@ -905,6 +933,7 @@ def render_phoible_importer() -> None:
             "Search (language, dialect, ISO, Glottocode, or inventory ID)",
             value=st.session_state.get("phoible_query", ""),
             key="phoible_query",
+            help="Filter inventories by name, ID, ISO, or Glottocode.",
         )
         matches = filter_phoible_inventories(inventories, query)
         if not query:
@@ -930,6 +959,7 @@ def render_phoible_importer() -> None:
             "Matching inventories",
             options=list(labels.keys()),
             key="phoible_selected_label",
+            help="Pick the inventory to import.",
         )
         selected_entry = labels[selected_label]
         inventory_id = selected_entry["inventory_id"]
@@ -940,8 +970,18 @@ def render_phoible_importer() -> None:
             f"{selected_entry['tone_count']} tones)."
         )
 
-        include_marginal = st.checkbox("Include marginal segments", value=True, key="phoible_include_marginal")
-        include_tones = st.checkbox("Include tone segments (stored as consonants)", value=False, key="phoible_include_tones")
+        include_marginal = st.checkbox(
+            "Include marginal segments",
+            value=True,
+            key="phoible_include_marginal",
+            help="Keep segments marked as marginal in PHOIBLE.",
+        )
+        include_tones = st.checkbox(
+            "Include tone segments (stored as consonants)",
+            value=False,
+            key="phoible_include_tones",
+            help="Include tone markers in the consonant list.",
+        )
         core_weight = st.slider(
             "Core segment representation weight",
             min_value=0.2,
@@ -949,6 +989,7 @@ def render_phoible_importer() -> None:
             value=PHOIBLE_CORE_WEIGHT_DEFAULT,
             step=0.05,
             key="phoible_core_weight",
+            help="Relative weight for non-marginal segments.",
         )
         marginal_weight = st.slider(
             "Marginal segment representation weight",
@@ -957,6 +998,7 @@ def render_phoible_importer() -> None:
             value=PHOIBLE_MARGINAL_WEIGHT_DEFAULT,
             step=0.05,
             key="phoible_marginal_weight",
+            help="Relative weight for marginal segments.",
         )
 
         default_display_name = selected_entry["language_name"]
@@ -976,15 +1018,27 @@ def render_phoible_importer() -> None:
             "Preset display name",
             value=st.session_state.get("phoible_preset_name", default_display_name),
             key="phoible_preset_name",
+            help="Human-readable name stored inside the preset JSON.",
         )
         preset_filename = st.text_input(
             "Preset filename (without .json)",
             value=st.session_state.get("phoible_preset_filename", suggested_filename),
             key="phoible_preset_filename",
+            help="Filename used when saving into presets/.",
         )
-        overwrite_existing = st.checkbox("Overwrite existing preset file", value=False, key="phoible_overwrite")
+        overwrite_existing = st.checkbox(
+            "Overwrite existing preset file",
+            value=False,
+            key="phoible_overwrite",
+            help="Allow replacing a preset with the same filename.",
+        )
 
-        if st.button("Create preset from PHOIBLE", type="primary", use_container_width=True):
+        if st.button(
+            "Create preset from PHOIBLE",
+            type="primary",
+            use_container_width=True,
+            help="Save this inventory into presets/ for mixing later.",
+        ):
             safe_name = sanitize_name(preset_filename)
             if not safe_name:
                 st.error("Provide a valid preset filename.")
@@ -1286,6 +1340,39 @@ def build_lexicon_csv(rows: Sequence[Dict[str, str]]) -> str:
     return output.getvalue()
 
 
+def suggest_language_name(language_model: Optional[Dict[str, Any]], profile_name: str) -> str:
+    if not isinstance(language_model, dict):
+        return ""
+    lexicon = language_model.get("lexicon", [])
+    if not isinstance(lexicon, list) or not lexicon:
+        return ""
+    candidates: List[Dict[str, Any]] = []
+    for entry in lexicon:
+        if not isinstance(entry, dict):
+            continue
+        entry_id = str(entry.get("id", "")).strip()
+        pos = str(entry.get("pos", "")).strip()
+        source = str(entry.get("source", "")).strip()
+        if entry_id.startswith("PART:") or pos == "PART" or source.startswith("grammar:"):
+            continue
+        if not str(entry.get("ipa", "")).strip():
+            continue
+        candidates.append(entry)
+    if not candidates:
+        return ""
+    noun_candidates = [entry for entry in candidates if str(entry.get("pos", "")).strip() == "N"]
+    pool = noun_candidates if noun_candidates else candidates
+    chosen = random.choice(pool)
+    ipa_value = str(chosen.get("ipa", "")).strip()
+    if not ipa_value:
+        return ""
+    name = ipa_text_to_sound_like(ipa_value, use_segment_separators=False, profile_name=profile_name)
+    name = re.sub(r"[\\s\\.-]+", "", name)
+    if not name:
+        return ""
+    return name[0].upper() + name[1:]
+
+
 def inject_custom_css() -> None:
     """Apply visual polish while keeping Streamlit-native layout behavior."""
     st.markdown(
@@ -1478,10 +1565,10 @@ def render_hero() -> None:
         """
         <section class="hero-shell">
             <div class="hero-eyebrow">Conlang Sound Toolkit</div>
-            <h1 class="hero-title">Build phonology-first lexicons with meaning-aware roots.</h1>
+            <h1 class="hero-title">Design phonology-driven languages and evolving families.</h1>
             <p class="hero-copy">
-                Blend real-language inventories, tune the sound rules, and generate a reusable lexicon
-                that ties forms to meanings. Start simple, then grow into richer morphology and grammar.
+                Mix inventories, build lexicons with custom words, and evolve daughter languages with sound changes.
+                Save snapshots, curate entries, and keep every language ready for reuse.
             </p>
         </section>
         """,
@@ -1489,16 +1576,15 @@ def render_hero() -> None:
     )
 
 
-def render_mix_metrics(selected_presets: List[str], selected_rules: List[str], random_weight: float, total_weight: float) -> None:
+def render_mix_metrics(selected_presets: List[str], random_weight: float, total_weight: float) -> None:
     """Show at-a-glance settings metrics for current controls."""
-    metric_cols = st.columns(4)
+    metric_cols = st.columns(3)
     metric_cols[0].metric("Sources", f"{len(selected_presets)}")
-    metric_cols[1].metric("Rules", f"{len(selected_rules)}")
-    metric_cols[2].metric("Random Share", f"{mix_share(random_weight, total_weight):.1f}%")
-    metric_cols[3].metric("Total Weight", f"{total_weight:.2f}")
+    metric_cols[1].metric("Random Share", f"{mix_share(random_weight, total_weight):.1f}%")
+    metric_cols[2].metric("Total Weight", f"{total_weight:.2f}")
 
 
-def render_inventory_metrics(inventory: Dict[str, List[str]], applied_rule_count: int) -> None:
+def render_inventory_metrics(inventory: Dict[str, List[str]], lexicon_count: Optional[int] = None) -> None:
     """Show concise stats for the latest generated inventory."""
     vowels_count = len(inventory.get("vowels", []))
     consonants_count = len(inventory.get("consonants", []))
@@ -1507,7 +1593,10 @@ def render_inventory_metrics(inventory: Dict[str, List[str]], applied_rule_count
     metric_cols[0].metric("Vowels", f"{vowels_count}")
     metric_cols[1].metric("Consonants", f"{consonants_count}")
     metric_cols[2].metric("Total Segments", f"{total_count}")
-    metric_cols[3].metric("Rules Applied", f"{applied_rule_count}")
+    if lexicon_count is None:
+        metric_cols[3].metric("Lexicon Entries", "—")
+    else:
+        metric_cols[3].metric("Lexicon Entries", f"{lexicon_count}")
 
 
 def render_single_language_ui() -> None:
@@ -1516,7 +1605,6 @@ def render_single_language_ui() -> None:
         romanization_profile = DEFAULT_ROMANIZATION_PROFILE
 
     preset_names = list_json_names(generator.PRESETS_DIR)
-    rule_names = list_json_names(generator.RULES_DIR)
 
     if not preset_names:
         st.error("No preset files found. Add JSON files to presets/ and reload.")
@@ -1528,7 +1616,6 @@ def render_single_language_ui() -> None:
 
     latest_inventory = st.session_state.get("last_inventory")
     latest_language_name = st.session_state.get("last_language_name", "GeneratedLanguage")
-    latest_rule_sets = st.session_state.get("last_rule_sets", [])
     latest_generated_at = st.session_state.get("last_generated_at")
     output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
     generated_time_label = f" at {latest_generated_at}" if latest_generated_at else ""
@@ -1540,10 +1627,7 @@ def render_single_language_ui() -> None:
             vowels = latest_inventory.get("vowels", []) if isinstance(latest_inventory, dict) else []
             consonants = latest_inventory.get("consonants", []) if isinstance(latest_inventory, dict) else []
             st.caption(f"Active language: {latest_language_name}")
-            st.caption(
-                f"{len(vowels)} vowels, {len(consonants)} consonants, "
-                f"{len(latest_rule_sets)} rule set(s) applied."
-            )
+            st.caption(f"{len(vowels)} vowels, {len(consonants)} consonants.")
             st.caption(f"Latest files written to: {output_dir_label}{generated_time_label}")
         else:
             st.info("No language generated yet. Use the Build tab to start.")
@@ -1560,8 +1644,8 @@ def render_single_language_ui() -> None:
             help="Display-only: how IPA renders to sound-like text.",
         )
 
-    tab_build, tab_review, tab_samples, tab_export = st.tabs(
-        ["1. Build", "2. Review", "3. Samples", "4. Export"]
+    tab_build, tab_review, tab_samples, tab_lexicon, tab_export = st.tabs(
+        ["1. Build", "2. Review", "3. Samples", "4. Lexicon", "5. Export"]
     )
 
     with tab_build:
@@ -1589,6 +1673,7 @@ def render_single_language_ui() -> None:
                         value=default_weight,
                         step=0.05,
                         key=f"weight_{preset_name}",
+                        help="Relative influence of this preset in the mix.",
                     )
                     weights.append(weight)
 
@@ -1598,6 +1683,7 @@ def render_single_language_ui() -> None:
                 max_value=1.0,
                 value=0.15,
                 step=0.05,
+                help="Extra randomness sampled from the master preset.",
             )
 
             master_default = preset_names.index("random_master") if "random_master" in preset_names else 0
@@ -1605,19 +1691,28 @@ def render_single_language_ui() -> None:
                 "Master preset for random picks",
                 options=preset_names,
                 index=master_default,
+                help="Source inventory used when random weight is above zero.",
             )
 
-            selected_rules = st.multiselect(
-                "Sound-change rules (optional)",
-                options=rule_names,
-                help="Rules are applied in order, from top to bottom.",
-            )
+            st.caption("Sound-change rules are handled in the Language Family workflow.")
 
         with run_col:
             st.markdown("**Output settings**")
-            language_name = st.text_input("Generated language name", value="ProtoLanguage")
-            output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
-            use_seed = st.checkbox("Use fixed random seed", value=False)
+            language_name = st.text_input(
+                "Generated language name",
+                value="ProtoLanguage",
+                help="Used for export filenames and display.",
+            )
+            output_dir_value = st.text_input(
+                "Output folder",
+                value="outputs/ui_run",
+                help="Where JSON + CSV exports are written.",
+            )
+            use_seed = st.checkbox(
+                "Use fixed random seed",
+                value=False,
+                help="Keep results reproducible between runs.",
+            )
             seed_value = st.number_input(
                 "Seed value",
                 min_value=0,
@@ -1625,8 +1720,14 @@ def render_single_language_ui() -> None:
                 value=42,
                 step=1,
                 disabled=not use_seed,
+                help="Only used when fixed seed is enabled.",
             )
-            generate = st.button("Generate Inventory", type="primary", use_container_width=True)
+            generate = st.button(
+                "Generate Inventory",
+                type="primary",
+                use_container_width=True,
+                help="Mix presets and create a new inventory snapshot.",
+            )
 
             st.caption(
                 "Tip: keep a fixed seed while exploring, then save successful inventories as presets."
@@ -1635,7 +1736,6 @@ def render_single_language_ui() -> None:
         total_weight = sum(weights) + (random_weight if random_weight > 0 else 0.0)
         render_mix_metrics(
             selected_presets=selected_presets,
-            selected_rules=selected_rules,
             random_weight=random_weight,
             total_weight=total_weight,
         )
@@ -1669,9 +1769,6 @@ def render_single_language_ui() -> None:
                         master_preset_name=master_preset,
                     )
 
-                    if selected_rules:
-                        mixed_inventory = generator.apply_rules(mixed_inventory, selected_rules)
-
                     output_dir = resolve_output_dir(output_dir_value)
                     generator.save_inventory_as_json(mixed_inventory, str(output_dir), language_name)
                     generator.save_inventory_as_cldf(mixed_inventory, str(output_dir), language_name)
@@ -1679,7 +1776,7 @@ def render_single_language_ui() -> None:
                     st.session_state["last_inventory"] = mixed_inventory
                     st.session_state["last_language_name"] = language_name
                     st.session_state["last_output_dir"] = str(output_dir)
-                    st.session_state["last_rule_sets"] = selected_rules[:]
+                    st.session_state["last_rule_sets"] = []
                     st.session_state["last_generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     st.session_state.pop("sample_words", None)
                     st.session_state.pop("sample_sentences", None)
@@ -1691,7 +1788,6 @@ def render_single_language_ui() -> None:
 
     latest_inventory = st.session_state.get("last_inventory")
     latest_language_name = st.session_state.get("last_language_name", "GeneratedLanguage")
-    latest_rule_sets = st.session_state.get("last_rule_sets", [])
     latest_generated_at = st.session_state.get("last_generated_at")
 
     with tab_review:
@@ -1700,7 +1796,13 @@ def render_single_language_ui() -> None:
         if not latest_inventory:
             st.info("Generate a language first to review its inventory.")
         else:
-            render_inventory_metrics(latest_inventory, applied_rule_count=len(latest_rule_sets))
+            model = st.session_state.get("sample_language_model")
+            lexicon_count: Optional[int] = None
+            if isinstance(model, dict):
+                lexicon = model.get("lexicon", [])
+                if isinstance(lexicon, list):
+                    lexicon_count = len(lexicon)
+            render_inventory_metrics(latest_inventory, lexicon_count=lexicon_count)
             output_dir_label = st.session_state.get("last_output_dir", "(unknown)")
             generated_time_label = f" at {latest_generated_at}" if latest_generated_at else ""
             st.caption(f"Latest files were written to: {output_dir_label}{generated_time_label}")
@@ -1709,6 +1811,45 @@ def render_single_language_ui() -> None:
                 f"Profile: {romanization_profile}."
             )
             st.caption("Example column is intentionally blank for now (ready for your later notes).")
+            def _auto_name_single() -> None:
+                suggested = suggest_language_name(model, romanization_profile)
+                if suggested:
+                    st.session_state["single_language_name"] = suggested
+                    st.session_state["last_language_name"] = suggested
+                    st.session_state["single_language_name_notice"] = f"Generated name: {suggested}"
+                else:
+                    st.session_state["single_language_name_notice"] = (
+                        "Generate a lexicon first (Samples tab) to auto-name this language."
+                    )
+
+            name_cols = st.columns([3, 1, 1])
+            with name_cols[0]:
+                rename_value = st.text_input(
+                    "Language name",
+                    value=latest_language_name,
+                    key="single_language_name",
+                    help="Rename this language for exports and displays.",
+                )
+            with name_cols[1]:
+                if st.button(
+                    "Save name",
+                    key="single_language_name_save",
+                    help="Update the display name for this session.",
+                ):
+                    if rename_value.strip():
+                        st.session_state["last_language_name"] = rename_value.strip()
+                        st.success("Language name updated.")
+                        st.rerun()
+            with name_cols[2]:
+                st.button(
+                    "Auto-name",
+                    key="single_language_name_auto",
+                    help="Generate a language name from the lexicon.",
+                    on_click=_auto_name_single,
+                )
+            notice = st.session_state.pop("single_language_name_notice", None)
+            if notice:
+                st.info(notice)
             col_a, col_b = st.columns(2)
             with col_a:
                 display_segment_table(
@@ -1737,11 +1878,12 @@ def render_single_language_ui() -> None:
                 key="language_notes",
                 height=140,
                 placeholder="Add any notes you want to remember about this language.",
+                help="Private notes saved into snapshots.",
             )
 
     with tab_samples:
         st.markdown('<div class="section-kicker">Step 3</div>', unsafe_allow_html=True)
-        st.subheader("Generate Samples and Curate")
+        st.subheader("Generate Samples")
         if not latest_inventory:
             st.info("Generate a language first to build lexicon samples.")
         else:
@@ -1940,6 +2082,7 @@ def render_single_language_ui() -> None:
                 st.error(advanced_override_error)
             else:
                 phonotactic_overrides = deep_merge_dict(phonotactic_overrides, advanced_override_dict)
+            st.session_state["phonotactic_overrides"] = phonotactic_overrides
 
             validation_report = validate_generation_config()
             validation_errors = validation_report.get("errors", [])
@@ -1966,6 +2109,7 @@ def render_single_language_ui() -> None:
                     max_value=5,
                     value=(1, 3),
                     key="sample_syllable_range",
+                    help="Range of syllables per root in the generated lexicon.",
                 )
                 st.caption(f"Generate Word Samples now returns all {concept_entry_count} concept entries.")
             with sample_controls_right:
@@ -1976,6 +2120,7 @@ def render_single_language_ui() -> None:
                     value=6,
                     step=1,
                     key="sample_sentence_count",
+                    help="How many sentences to generate per click.",
                 )
                 sample_words_range = st.slider(
                     "Words per generated sentence",
@@ -1983,17 +2128,20 @@ def render_single_language_ui() -> None:
                     max_value=14,
                     value=(4, 8),
                     key="sample_sentence_words_range",
+                    help="Range of word counts per sentence.",
                 )
 
             show_syllable_breaks = st.checkbox(
                 "Show syllable separators (.)",
                 value=False,
                 key="sample_show_syllable_breaks",
+                help="Insert dots between syllables in IPA output.",
             )
             show_segment_separators = st.checkbox(
                 "Show segment separators (-) in sound-like text",
                 value=False,
                 key="sample_show_segment_separators",
+                help="Insert hyphens between segments in the sound-like column.",
             )
             syllable_separator = "." if show_syllable_breaks else ""
 
@@ -2003,18 +2151,21 @@ def render_single_language_ui() -> None:
                     "Generate Word Samples",
                     key="generate_word_samples",
                     disabled=sample_generation_disabled,
+                    help="Build or rebuild the lexicon and show word entries.",
                 )
             with samples_button_col_2:
                 generate_sentence_samples = st.button(
                     "Generate Sentence Samples",
                     key="generate_sentence_samples",
                     disabled=sample_generation_disabled,
+                    help="Generate new sentence samples from the current lexicon.",
                 )
             with samples_button_col_3:
                 generate_both_samples = st.button(
                     "Generate Both",
                     key="generate_both_samples",
                     disabled=sample_generation_disabled,
+                    help="Generate word + sentence samples together.",
                 )
 
             latest_vowels = latest_inventory.get("vowels", [])
@@ -2126,13 +2277,19 @@ def render_single_language_ui() -> None:
                             help="Select one or more words to re-generate.",
                             default=False,
                         ),
-                        "Entry": st.column_config.TextColumn("Entry", disabled=True),
-                        "IPA": st.column_config.TextColumn("IPA", disabled=True),
-                        "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
-                        "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
-                        "Meaning tag": st.column_config.TextColumn("Meaning tag", disabled=True),
-                        "Part of speech": st.column_config.TextColumn("Part of speech", disabled=True),
-                        "Source": st.column_config.TextColumn("Source", disabled=True),
+                        "Entry": st.column_config.TextColumn("Entry", disabled=True, help="Stable entry ID."),
+                        "IPA": st.column_config.TextColumn("IPA", disabled=True, help="Canonical IPA form."),
+                        "Sound-like": st.column_config.TextColumn(
+                            "Sound-like", disabled=True, help="Approximate romanization."
+                        ),
+                        "Gloss": st.column_config.TextColumn("Gloss", disabled=True, help="Gloss text."),
+                        "Meaning tag": st.column_config.TextColumn(
+                            "Meaning tag", disabled=True, help="Semantic label."
+                        ),
+                        "Part of speech": st.column_config.TextColumn(
+                            "Part of speech", disabled=True, help="Grammatical category."
+                        ),
+                        "Source": st.column_config.TextColumn("Source", disabled=True, help="Entry origin."),
                     },
                 )
 
@@ -2149,6 +2306,7 @@ def render_single_language_ui() -> None:
                 reroll_button = st.button(
                     f"Re-roll {len(selected_rerolls)} selected word(s)",
                     disabled=sample_generation_disabled or not selected_rerolls,
+                    help="Regenerate IPA forms for the selected word entries.",
                 )
                 if reroll_button:
                     model = st.session_state.get("sample_language_model")
@@ -2203,7 +2361,86 @@ def render_single_language_ui() -> None:
                 st.info("No sentence samples yet. Click 'Generate Sentence Samples' or 'Generate Both'.")
 
             st.divider()
-            st.markdown("**Custom word builder**")
+            st.caption("Lexicon curation lives in the Lexicon tab for a focused workflow.")
+
+    with tab_lexicon:
+        st.markdown('<div class="section-kicker">Step 4</div>', unsafe_allow_html=True)
+        st.subheader("Lexicon Builder and Overview")
+        if not latest_inventory:
+            st.info("Generate a language first to build its lexicon.")
+        else:
+            st.caption(
+                "Create custom words and curate the full lexicon. "
+                "Custom entries persist across sample runs."
+            )
+            selected_style = st.session_state.get("sample_style_preset", DEFAULT_STYLE_PRESET)
+            selected_concept_list = st.session_state.get("sample_concept_list", DEFAULT_CONCEPT_LIST)
+            selected_grammar_profile = st.session_state.get("sample_grammar_profile", DEFAULT_GRAMMAR_PROFILE)
+            sample_syllable_range = st.session_state.get("sample_syllable_range", (1, 3))
+            if isinstance(sample_syllable_range, list):
+                sample_syllable_range = tuple(sample_syllable_range)
+            show_syllable_breaks = bool(st.session_state.get("sample_show_syllable_breaks", False))
+            show_segment_separators = bool(st.session_state.get("sample_show_segment_separators", False))
+            syllable_separator = "." if show_syllable_breaks else ""
+            phonotactic_overrides = st.session_state.get("phonotactic_overrides", {})
+
+            advanced_override_text = st.session_state.get("phon_ui_advanced_override_json", "")
+            _, advanced_override_error = parse_override_json(advanced_override_text)
+            validation_report = validate_generation_config()
+            validation_errors = validation_report.get("errors", [])
+            sample_generation_disabled = bool(validation_errors or advanced_override_error)
+            if validation_errors:
+                st.error("Fix generation profile errors before creating lexicon entries.")
+            if advanced_override_error:
+                st.error(advanced_override_error)
+
+            latest_vowels = latest_inventory.get("vowels", [])
+            latest_consonants = latest_inventory.get("consonants", [])
+            cached_model = st.session_state.get("sample_language_model")
+            model_is_current = model_matches(
+                cached_model,
+                vowels=latest_vowels,
+                consonants=latest_consonants,
+                syllable_range=sample_syllable_range,
+                syllable_separator=syllable_separator,
+                style_name=selected_style,
+                concept_list_name=selected_concept_list,
+                grammar_profile_name=selected_grammar_profile,
+                phonotactic_profile_overrides=phonotactic_overrides,
+            )
+            if cached_model:
+                model_stats = language_model_summary(cached_model)
+                st.caption(
+                    f"Current lexicon model: {model_stats['root_entries']} roots + "
+                    f"{model_stats['particle_entries']} particles "
+                    f"({model_stats['total_entries']} total entries)."
+                )
+            if cached_model and not model_is_current:
+                st.info("Sample settings changed. Rebuild the lexicon model if you want fresh roots.")
+
+            if st.button(
+                "Rebuild lexicon model",
+                key="lexicon_rebuild_model",
+                disabled=sample_generation_disabled,
+                help="Re-roll roots/particles using current sample settings (custom entries are preserved).",
+            ):
+                cached_model = ensure_language_model(
+                    cached_model=cached_model,
+                    vowels=latest_vowels,
+                    consonants=latest_consonants,
+                    syllable_range=sample_syllable_range,
+                    syllable_separator=syllable_separator,
+                    style_name=selected_style,
+                    concept_list_name=selected_concept_list,
+                    grammar_profile_name=selected_grammar_profile,
+                    phonotactic_profile_overrides=phonotactic_overrides,
+                    force_rebuild=True,
+                )
+                st.session_state["sample_language_model"] = cached_model
+                st.session_state.pop("sample_words", None)
+                st.session_state.pop("sample_sentences", None)
+                st.success("Lexicon model rebuilt.")
+                st.rerun()
 
             lexicon_model = cached_model
             if not isinstance(lexicon_model, dict):
@@ -2220,10 +2457,6 @@ def render_single_language_ui() -> None:
                     force_rebuild=True,
                 )
                 st.session_state["sample_language_model"] = lexicon_model
-                cached_model = lexicon_model
-
-            if cached_model and not model_is_current:
-                st.caption("Using the last generated lexicon model. Generate samples to rebuild if settings changed.")
 
             pos_order = ["N", "V", "ADJ", "ADV", "PRON", "NUM", "DEM", "ADP", "NEG", "CONJ", "INT", "PART"]
             pos_options = [pos for pos in pos_order if pos in POS_LABELS]
@@ -2233,17 +2466,34 @@ def render_single_language_ui() -> None:
                 label = POS_LABELS.get(value, value)
                 return f"{label} ({value})" if value and label != value else label
 
+            st.divider()
+            st.markdown("**Custom word builder**")
             builder_col_1, builder_col_2 = st.columns(2)
             with builder_col_1:
-                meaning_tag = st.text_input("Meaning tag", key="custom_word_meaning")
+                meaning_tag = st.text_input(
+                    "Meaning tag",
+                    key="custom_word_meaning",
+                    help="Short semantic label used for search and glossing.",
+                )
                 selected_pos = st.selectbox(
                     "Part of speech",
                     options=pos_options,
                     format_func=format_pos_label,
                     key="custom_word_pos",
+                    help="Grammatical category for the new word.",
                 )
-                auto_gloss = st.checkbox("Auto gloss", value=True, key="custom_word_auto_gloss")
-                gloss_input = st.text_input("Gloss", key="custom_word_gloss", disabled=auto_gloss)
+                auto_gloss = st.checkbox(
+                    "Auto gloss",
+                    value=True,
+                    key="custom_word_auto_gloss",
+                    help="Automatically generate a gloss from the meaning tag.",
+                )
+                gloss_input = st.text_input(
+                    "Gloss",
+                    key="custom_word_gloss",
+                    disabled=auto_gloss,
+                    help="Short gloss used in sentence samples (manual override).",
+                )
                 gloss_value = ""
                 if auto_gloss and meaning_tag.strip():
                     gloss_value = concept_gloss(meaning_tag.strip(), selected_pos)
@@ -2257,6 +2507,7 @@ def render_single_language_ui() -> None:
                     options=["Random", "Use existing root"],
                     horizontal=True,
                     key="custom_word_mode",
+                    help="Random builds from phonotactics; rooted derives from an existing entry.",
                 )
                 custom_meta: Dict[str, Any] = {}
                 root_ids: List[str] = []
@@ -2268,6 +2519,7 @@ def render_single_language_ui() -> None:
                         max_value=5,
                         value=sample_syllable_range,
                         key="custom_word_random_range",
+                        help="Total syllable range for the new word.",
                     )
                     custom_meta = {"mode": "random", "syllable_range": [int(custom_range[0]), int(custom_range[1])]}
                 else:
@@ -2289,6 +2541,7 @@ def render_single_language_ui() -> None:
                         format_func=lambda value: root_label_map.get(value, value),
                         key="custom_word_root_id",
                         disabled=not root_ids,
+                        help="Pick an existing root to attach affixes to.",
                     )
                     if not root_ids:
                         st.warning("No eligible roots found to derive from.")
@@ -2298,6 +2551,7 @@ def render_single_language_ui() -> None:
                         "Affix mode",
                         options=["Auto", "Prefix", "Suffix", "Both"],
                         key="custom_word_affix_mode",
+                        help="Where the generated affix should attach.",
                     )
                     affix_range = st.slider(
                         "Affix syllables",
@@ -2305,6 +2559,7 @@ def render_single_language_ui() -> None:
                         max_value=4,
                         value=(1, 1),
                         key="custom_word_affix_range",
+                        help="Syllable range for the affix portion.",
                     )
                     custom_meta = {
                         "mode": "rooted",
@@ -2322,6 +2577,7 @@ def render_single_language_ui() -> None:
                 "Generate candidate",
                 key="custom_word_generate",
                 disabled=not can_generate,
+                help="Generate a new candidate form using the current settings.",
             )
             if generate_candidate:
                 ipa = generate_custom_word_form(
@@ -2352,7 +2608,12 @@ def render_single_language_ui() -> None:
                     )
 
             add_disabled = not (isinstance(preview_state, dict) and preview_state.get("ipa")) or not meaning_tag.strip()
-            if st.button("Add to lexicon", key="custom_word_add", disabled=add_disabled):
+            if st.button(
+                "Add to lexicon",
+                key="custom_word_add",
+                disabled=add_disabled,
+                help="Persist the previewed word into the lexicon.",
+            ):
                 entry = build_custom_entry(
                     language_model=lexicon_model,
                     meaning=meaning_tag.strip(),
@@ -2381,7 +2642,11 @@ def render_single_language_ui() -> None:
             if not isinstance(lexicon_entries, list):
                 lexicon_entries = []
 
-            search_term = st.text_input("Search lexicon", key="lexicon_overview_search")
+            search_term = st.text_input(
+                "Search lexicon",
+                key="lexicon_overview_search",
+                help="Filter by ID, meaning, gloss, or IPA.",
+            )
 
             def entry_source_label(entry: Dict[str, Any]) -> str:
                 if is_custom_entry(entry):
@@ -2403,6 +2668,7 @@ def render_single_language_ui() -> None:
                 options=source_options if source_options else source_order,
                 default=source_options,
                 key="lexicon_overview_sources",
+                help="Filter by entry origin.",
             )
 
             pos_codes = sorted(
@@ -2418,6 +2684,7 @@ def render_single_language_ui() -> None:
                 default=pos_codes,
                 format_func=format_pos_label,
                 key="lexicon_overview_pos",
+                help="Filter by grammatical category.",
             )
 
             def matches_search(entry: Dict[str, Any], needle: str) -> bool:
@@ -2472,18 +2739,29 @@ def render_single_language_ui() -> None:
                 overview_rows,
                 hide_index=True,
                 use_container_width=True,
+                height=520,
                 key="lexicon_overview_table",
                 column_config={
-                    "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
-                    "Delete": st.column_config.CheckboxColumn("Delete", default=False),
-                    "Entry": st.column_config.TextColumn("Entry", disabled=True),
-                    "IPA": st.column_config.TextColumn("IPA", disabled=True),
-                    "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
-                    "Gloss": st.column_config.TextColumn("Gloss"),
-                    "Meaning tag": st.column_config.TextColumn("Meaning tag"),
-                    "POS": st.column_config.SelectboxColumn("POS", options=pos_options),
-                    "Source": st.column_config.TextColumn("Source", disabled=True),
-                    "Custom": st.column_config.TextColumn("Custom", disabled=True),
+                    "Re-roll": st.column_config.CheckboxColumn(
+                        "Re-roll",
+                        default=False,
+                        help="Regenerate this entry's IPA form.",
+                    ),
+                    "Delete": st.column_config.CheckboxColumn(
+                        "Delete",
+                        default=False,
+                        help="Remove this entry from the lexicon.",
+                    ),
+                    "Entry": st.column_config.TextColumn("Entry", disabled=True, help="Stable entry ID."),
+                    "IPA": st.column_config.TextColumn("IPA", disabled=True, help="Canonical IPA form."),
+                    "Sound-like": st.column_config.TextColumn(
+                        "Sound-like", disabled=True, help="Approximate romanization display."
+                    ),
+                    "Gloss": st.column_config.TextColumn("Gloss", help="Edit the gloss field."),
+                    "Meaning tag": st.column_config.TextColumn("Meaning tag", help="Edit the meaning tag."),
+                    "POS": st.column_config.SelectboxColumn("POS", options=pos_options, help="Edit part of speech."),
+                    "Source": st.column_config.TextColumn("Source", disabled=True, help="Entry origin."),
+                    "Custom": st.column_config.TextColumn("Custom", disabled=True, help="Custom entry flag."),
                 },
             )
 
@@ -2523,6 +2801,7 @@ def render_single_language_ui() -> None:
                 "Apply edits / deletions",
                 key="lexicon_overview_apply",
                 disabled=sample_generation_disabled or not pending_changes,
+                help="Commit edits and deletions to the lexicon.",
             )
             if apply_changes:
                 delete_ids: List[str] = []
@@ -2560,7 +2839,9 @@ def render_single_language_ui() -> None:
                     ]
                 lexicon_model = rebuild_indices(lexicon_model)
                 st.session_state["sample_language_model"] = lexicon_model
-                if sample_words:
+                if st.session_state.get("sample_words"):
+                    concept_entries_raw = CONCEPT_LIST_PRESETS[selected_concept_list].get("entries", [])
+                    concept_entry_count = len(concept_entries_raw) if isinstance(concept_entries_raw, (list, tuple)) else 0
                     st.session_state["sample_words"] = build_sample_words(
                         latest_vowels,
                         latest_consonants,
@@ -2607,11 +2888,13 @@ def render_single_language_ui() -> None:
                 file_name=f"{sanitize_name(latest_language_name)}_lexicon.csv",
                 mime="text/csv",
                 use_container_width=True,
+                help="Download the filtered lexicon as CSV.",
             )
             reroll_overview_button = st.button(
                 f"Re-roll {len(overview_rerolls)} selected entries",
                 key="lexicon_overview_reroll",
                 disabled=not overview_rerolls or sample_generation_disabled,
+                help="Regenerate IPA forms for the selected entries.",
             )
             if reroll_overview_button:
                 for entry_id in overview_rerolls:
@@ -2622,7 +2905,9 @@ def render_single_language_ui() -> None:
                     )
                 lexicon_model = rebuild_indices(lexicon_model)
                 st.session_state["sample_language_model"] = lexicon_model
-                if sample_words:
+                if st.session_state.get("sample_words"):
+                    concept_entries_raw = CONCEPT_LIST_PRESETS[selected_concept_list].get("entries", [])
+                    concept_entry_count = len(concept_entries_raw) if isinstance(concept_entries_raw, (list, tuple)) else 0
                     st.session_state["sample_words"] = build_sample_words(
                         latest_vowels,
                         latest_consonants,
@@ -2640,7 +2925,7 @@ def render_single_language_ui() -> None:
                 st.rerun()
 
     with tab_export:
-        st.markdown('<div class="section-kicker">Step 4</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-kicker">Step 5</div>', unsafe_allow_html=True)
         st.subheader("Export and Reuse")
         if not latest_inventory:
             st.info("Generate a language first to export snapshots and presets.")
@@ -2656,6 +2941,7 @@ def render_single_language_ui() -> None:
                     file_name=f"{sanitize_name(latest_language_name)}.json",
                     mime="application/json",
                     use_container_width=True,
+                    help="Save the current inventory as a preset.",
                 )
             guide_csv = build_pronunciation_csv(
                 latest_inventory.get("vowels", []),
@@ -2669,6 +2955,7 @@ def render_single_language_ui() -> None:
                     file_name=f"{sanitize_name(latest_language_name)}_pronunciation_guide.csv",
                     mime="text/csv",
                     use_container_width=True,
+                    help="Export a segment + sound-like reference table.",
                 )
 
             snapshot_payload = build_language_snapshot(
@@ -2684,11 +2971,13 @@ def render_single_language_ui() -> None:
                 file_name=f"{sanitize_name(latest_language_name)}_snapshot.json",
                 mime="application/json",
                 use_container_width=True,
+                help="Export a full snapshot including lexicon and notes.",
             )
             uploaded_snapshot = st.file_uploader(
                 "Load language snapshot JSON",
                 type="json",
                 key="language_snapshot_upload",
+                help="Load a previously exported snapshot.",
             )
             if uploaded_snapshot:
                 try:
@@ -2731,9 +3020,18 @@ def render_single_language_ui() -> None:
                 "Preset filename (without .json)",
                 value=sanitize_name(latest_language_name),
                 key="preset_filename",
+                help="Saved into presets/ for reuse.",
             )
-            overwrite_existing = st.checkbox("Overwrite existing preset file", value=False)
-            save_preset = st.button("Save to presets/", use_container_width=True)
+            overwrite_existing = st.checkbox(
+                "Overwrite existing preset file",
+                value=False,
+                help="Allow replacing a preset with the same filename.",
+            )
+            save_preset = st.button(
+                "Save to presets/",
+                use_container_width=True,
+                help="Write the preset JSON into presets/.",
+            )
 
             if save_preset:
                 safe_name = sanitize_name(preset_filename)
@@ -2747,7 +3045,11 @@ def render_single_language_ui() -> None:
                     st.success(f"Saved preset: {preset_path}")
 
             st.markdown("**Next step**")
-            if st.button("Open Language Family Builder", use_container_width=True):
+            if st.button(
+                "Open Language Family Builder",
+                use_container_width=True,
+                help="Switch to multi-language family workflows.",
+            ):
                 st.session_state["app_mode"] = "Language Family"
                 st.rerun()
 
@@ -2798,7 +3100,8 @@ def render_language_family_ui() -> None:
         },
         "sound_changes": {
             "title": "Sound changes",
-            "body": "Rules are applied in order to transform the parent inventory and lexicon into the daughter.",
+            "body": "Rules are applied in order to transform the parent inventory and lexicon into the daughter. "
+            "Use templates to auto-fill common historical shifts; see the template explanations below.",
         },
         "override_settings": {
             "title": "Overrides",
@@ -2820,1216 +3123,1465 @@ def render_language_family_ui() -> None:
 
     def help_button(topic_key: str, suffix: str = "") -> None:
         key = f"help_{topic_key}_{suffix}" if suffix else f"help_{topic_key}"
-        if st.button("?", key=key):
+        if st.button("?", key=key, help="Show an explanation for this section."):
             st.session_state["help_topic"] = topic_key
 
-    setup_col_1, setup_col_2 = st.columns([1.4, 1.0], gap="large")
+    def pick_random_sound_templates(options: List[str]) -> List[str]:
+        if not options:
+            return []
+        rng = random.Random()
+        max_count = min(6, len(options))
+        min_count = min(3, len(options))
+        target_count = rng.randint(min_count, max_count) if max_count >= min_count else len(options)
+        vowel_options = [template for template in options if template in SOUND_CHANGE_VOWEL_TEMPLATES]
+        consonant_options = [template for template in options if template not in SOUND_CHANGE_VOWEL_TEMPLATES]
+        chosen: List[str] = []
+        if vowel_options:
+            chosen.append(rng.choice(vowel_options))
+        if consonant_options:
+            chosen.append(rng.choice(consonant_options))
+        chosen_set = set(chosen)
+        opposing_pairs = [
+            ("stop_voicing", "stop_devoicing"),
+            ("vowel_raise_pair", "vowel_lower_pair"),
+        ]
+        remaining = [template for template in options if template not in chosen_set]
+        for left, right in opposing_pairs:
+            if left in chosen_set and right in remaining:
+                remaining.remove(right)
+            if right in chosen_set and left in remaining:
+                remaining.remove(left)
+        remaining_count = max(0, target_count - len(chosen))
+        if remaining_count > 0:
+            chosen.extend(rng.sample(remaining, k=min(remaining_count, len(remaining))))
+        return [template for template in options if template in set(chosen)]
 
-    with setup_col_1:
-        st.markdown("### Project")
-        project_root = st.text_input(
-            "Project root folder",
-            value=st.session_state.get("family_project_root", "outputs/projects"),
-            key="family_project_root",
-        )
-        help_button("project_root")
-        project_root_path = Path(project_root)
-        project_dirs = discover_project_dirs(project_root_path)
-        project_labels = [path.name for path in project_dirs]
+    setup_tab, workspace_tab = st.tabs(["Project Setup", "Family Workspace"])
 
-        create_col, load_col = st.columns(2)
-        with create_col:
-            new_project_name = st.text_input("Project name", value="MyLanguageFamily", key="family_new_project_name")
-            new_project_seed = st.number_input(
-                "Seed",
-                min_value=0,
-                max_value=2_147_483_647,
-                value=42,
-                step=1,
-                key="family_new_project_seed",
-            )
-            new_project_timespan = st.number_input(
-                "Time span (years)",
-                min_value=100,
-                max_value=10000,
-                value=2000,
-                step=50,
-                key="family_new_project_timespan",
-            )
-            if st.button("Create Project", use_container_width=True):
-                try:
-                    project = project_io.create_project(
-                        root_dir=project_root_path,
-                        project_name=new_project_name,
-                        seed=int(new_project_seed),
-                        time_span_years=int(new_project_timespan),
-                    )
-                    _set_project_state(project, project_root_path / project["project_slug"])
-                    st.success("Project created and loaded.")
-                except FileExistsError as exc:
-                    st.error(str(exc))
+    with setup_tab:
+        setup_col_1, setup_col_2 = st.columns([1.4, 1.0], gap="large")
 
-        with load_col:
-            selected_project = st.selectbox(
-                "Projects",
-                options=project_labels if project_labels else ["(none)"],
-                index=0,
-                disabled=not project_labels,
+        with setup_col_1:
+            st.markdown("### Project")
+            project_root = st.text_input(
+                "Project root folder",
+                value=st.session_state.get("family_project_root", "outputs/projects"),
+                key="family_project_root",
+                help="Folder where family projects are stored.",
             )
-            if st.button("Load Project", use_container_width=True, disabled=not project_labels):
-                project_dir = project_root_path / selected_project
-                try:
-                    project = project_io.load_project(project_dir)
-                    _set_project_state(project, project_dir)
-                    st.success(f"Loaded project: {selected_project}")
-                except Exception as exc:  # pragma: no cover - UI safety net
-                    st.error(f"Could not load project: {exc}")
+            help_button("project_root")
+            project_root_path = Path(project_root)
+            project_dirs = discover_project_dirs(project_root_path)
+            project_labels = [path.name for path in project_dirs]
+
+            create_col, load_col = st.columns(2)
+            with create_col:
+                new_project_name = st.text_input(
+                    "Project name",
+                    value="MyLanguageFamily",
+                    key="family_new_project_name",
+                    help="Human-readable project name.",
+                )
+                new_project_seed = st.number_input(
+                    "Seed",
+                    min_value=0,
+                    max_value=2_147_483_647,
+                    value=42,
+                    step=1,
+                    key="family_new_project_seed",
+                    help="Random seed for family generation.",
+                )
+                st.caption("Timeline span is fixed for now; you can edit years per language as needed.")
+                if st.button(
+                    "Create Project",
+                    use_container_width=True,
+                    help="Create a new family project folder.",
+                ):
+                    try:
+                        project = project_io.create_project(
+                            root_dir=project_root_path,
+                            project_name=new_project_name,
+                            seed=int(new_project_seed),
+                            time_span_years=FAMILY_TIMESPAN_DEFAULT,
+                        )
+                        _set_project_state(project, project_root_path / project["project_slug"])
+                        st.success("Project created and loaded.")
+                    except FileExistsError as exc:
+                        st.error(str(exc))
+
+            with load_col:
+                selected_project = st.selectbox(
+                    "Projects",
+                    options=project_labels if project_labels else ["(none)"],
+                    index=0,
+                    disabled=not project_labels,
+                    help="Pick a saved project to load.",
+                )
+                if st.button(
+                    "Load Project",
+                    use_container_width=True,
+                    disabled=not project_labels,
+                    help="Load the selected project into the workspace.",
+                ):
+                    project_dir = project_root_path / selected_project
+                    try:
+                        project = project_io.load_project(project_dir)
+                        _set_project_state(project, project_dir)
+                        st.success(f"Loaded project: {selected_project}")
+                    except Exception as exc:  # pragma: no cover - UI safety net
+                        st.error(f"Could not load project: {exc}")
+
+            project = st.session_state.get("family_project")
+            project_dir_value = st.session_state.get("family_project_dir")
+            project_dir = Path(project_dir_value) if project_dir_value else None
+            if isinstance(project, dict):
+                st.caption(f"Active: {project.get('project_name', '(unknown)')}")
+                if st.button(
+                    "Save Project",
+                    use_container_width=True,
+                    help="Persist any changes to project.json.",
+                ):
+                    try:
+                        project_io.save_project(project)
+                        st.success("Project saved.")
+                    except Exception as exc:  # pragma: no cover - UI safety net
+                        st.error(f"Could not save project: {exc}")
 
         project = st.session_state.get("family_project")
         project_dir_value = st.session_state.get("family_project_dir")
         project_dir = Path(project_dir_value) if project_dir_value else None
-        if isinstance(project, dict):
-            st.caption(f"Active: {project.get('project_name', '(unknown)')}")
-            if st.button("Save Project", use_container_width=True):
-                try:
-                    project_io.save_project(project)
-                    st.success("Project saved.")
-                except Exception as exc:  # pragma: no cover - UI safety net
-                    st.error(f"Could not save project: {exc}")
 
-    project = st.session_state.get("family_project")
-    project_dir_value = st.session_state.get("family_project_dir")
-    project_dir = Path(project_dir_value) if project_dir_value else None
-
-    with setup_col_2:
-        st.markdown("### Proto")
-        proto_source = st.radio(
-            "Proto source",
-            options=["Use current single-language state", "Upload snapshot JSON"],
-            horizontal=True,
-            key="family_proto_source",
-        )
-        help_button("proto_source")
-        proto_snapshot: Optional[Dict[str, Any]] = None
-
-        if proto_source == "Use current single-language state":
-            latest_inventory = st.session_state.get("last_inventory")
-            if isinstance(latest_inventory, dict):
-                model = st.session_state.get("sample_language_model")
-                proto_snapshot = build_language_snapshot(
-                    language_name=st.session_state.get("last_language_name", "ProtoLanguage"),
-                    inventory=latest_inventory,
-                    language_model=model if isinstance(model, dict) else None,
-                    language_id="proto",
-                    notes=st.session_state.get("language_notes", ""),
-                )
-                st.caption(f"Proto ready: {snapshot_summary(proto_snapshot)}")
-            else:
-                st.info("Generate a single language inventory first.")
-        else:
-            uploaded_proto = st.file_uploader(
-                "Upload snapshot JSON",
-                type="json",
-                key="family_proto_upload",
+        with setup_col_2:
+            st.markdown("### Proto")
+            proto_source = st.radio(
+                "Proto source",
+                options=["Use current single-language state", "Upload snapshot JSON"],
+                horizontal=True,
+                key="family_proto_source",
+                help="Choose where the proto language snapshot comes from.",
             )
-            if uploaded_proto:
-                try:
-                    proto_snapshot = json.load(uploaded_proto)
-                    if not isinstance(proto_snapshot, dict):
-                        raise ValueError("Snapshot must be a JSON object.")
-                    if "inventory" not in proto_snapshot:
-                        raise ValueError("Snapshot missing inventory field.")
-                    st.caption(f"Proto loaded: {snapshot_summary(proto_snapshot)}")
-                except Exception as exc:
-                    st.error(f"Could not load snapshot: {exc}")
+            help_button("proto_source")
+            proto_snapshot: Optional[Dict[str, Any]] = None
 
-        if proto_snapshot and isinstance(project, dict) and project_dir:
-            overwrite_proto = st.checkbox("Overwrite existing proto", value=False)
-            if st.button("Save Proto", use_container_width=True):
-                meta = proto_snapshot.get("meta", {})
-                if not isinstance(meta, dict):
-                    meta = {}
-                language_id = sanitize_name(str(meta.get("language_id") or "proto")) or "proto"
-                language_name = str(meta.get("name") or proto_snapshot.get("name") or language_id)
-                meta.update(
-                    {
-                        "language_id": language_id,
-                        "name": language_name,
-                        "year": 0,
-                        "parent_id": None,
-                        "changeset_id": None,
-                        "created_at": meta.get("created_at") or datetime.now().isoformat(),
-                        "notes": meta.get("notes", ""),
-                        "lexicon_overrides": meta.get("lexicon_overrides", {}),
-                    }
-                )
-
-                languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
-                target_path = languages_dir / f"{language_id}.json"
-                if target_path.exists() and not overwrite_proto:
-                    st.error("Proto file already exists. Enable overwrite to replace it.")
-                else:
-                    normalized = project_io.normalize_language_snapshot(proto_snapshot)
-                    normalized["meta"] = meta
-                    project_io.save_language(normalized, target_path)
-                    project["root_language_id"] = language_id
-                    language_index = project.get("language_index", [])
-                    if not isinstance(language_index, list):
-                        language_index = []
-                    if not any(
-                        isinstance(item, dict) and item.get("language_id") == language_id for item in language_index
-                    ):
-                        language_index.append({"language_id": language_id, "filename": f"{language_id}.json"})
-                    project["language_index"] = language_index
-                    project_io.save_project(project)
-                    _set_project_state(project, project_dir)
-                    st.session_state["family_notice"] = f"Saved proto language: {language_id}"
-                    st.rerun()
-
-    st.divider()
-
-    def _load_languages(force: bool = False) -> Dict[str, Dict[str, Any]]:
-        if not isinstance(project, dict) or not project_dir:
-            return {}
-        cache = st.session_state.get("family_languages_cache")
-        if force or not isinstance(cache, dict) or not cache:
-            st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-        return st.session_state.get("family_languages_cache", {})
-
-    def _label_for(language_id: str, languages: Dict[str, Dict[str, Any]]) -> str:
-        meta = languages.get(language_id, {}).get("meta", {})
-        name = meta.get("name", language_id)
-        year = meta.get("year", "?")
-        return f"{name} ({language_id}, {year})"
-
-    def _suggest_unique_id(base: str, existing_ids: List[str]) -> str:
-        base_id = sanitize_name(base) or "language"
-        if base_id not in existing_ids:
-            return base_id
-        counter = 1
-        while True:
-            candidate = f"{base_id}_{counter:02d}"
-            if candidate not in existing_ids:
-                return candidate
-            counter += 1
-
-    left_col, main_col, help_col = st.columns([1.3, 2.2, 1.1], gap="large")
-
-    with left_col:
-        st.markdown("### Tree")
-        help_button("tree")
-        if not isinstance(project, dict) or not project_dir:
-            st.info("Load or create a project first.")
-        else:
-            if st.button("Reload languages", key="family_reload_languages"):
-                _load_languages(force=True)
-            languages = _load_languages()
-            if not languages:
-                st.info("No languages found in this project yet.")
-            else:
-                child_map = family_generator.build_child_map(languages)
-                root_id = project.get("root_language_id")
-                selected_id = st.session_state.get("family_selected_id") or root_id
-                if selected_id not in languages:
-                    selected_id = root_id if root_id in languages else list(languages.keys())[0]
-
-                path_ids = family_generator.path_to_root(languages, selected_id)
-                path_set = set(path_ids)
-
-                if AGRAPH_AVAILABLE:
-                    nodes = []
-                    edges = []
-                    for language_id, language in languages.items():
-                        meta = language.get("meta", {})
-                        label = f"{meta.get('name', language_id)}\n{meta.get('year', '?')}"
-                        size = 26 if language_id == root_id else 18
-                        color = "#1f7a5a" if language_id == root_id else "#5b8bd1"
-                        if language_id == selected_id:
-                            color = "#d65b5b"
-                        elif language_id in path_set:
-                            color = "#f0a202"
-                        nodes.append(Node(id=language_id, label=label, size=size, color=color))
-                    for parent_id, children in child_map.items():
-                        for child_id in children:
-                            edge_color = "#f0a202" if parent_id in path_set and child_id in path_set else "#a7b6bd"
-                            edges.append(Edge(source=parent_id, target=child_id, color=edge_color))
-                    config = Config(
-                        width="100%",
-                        height=520,
-                        directed=True,
-                        physics=True,
-                        hierarchical=False,
-                        nodeHighlightBehavior=True,
+            if proto_source == "Use current single-language state":
+                latest_inventory = st.session_state.get("last_inventory")
+                if isinstance(latest_inventory, dict):
+                    model = st.session_state.get("sample_language_model")
+                    proto_snapshot = build_language_snapshot(
+                        language_name=st.session_state.get("last_language_name", "ProtoLanguage"),
+                        inventory=latest_inventory,
+                        language_model=model if isinstance(model, dict) else None,
+                        language_id="proto",
+                        notes=st.session_state.get("language_notes", ""),
                     )
-                    selected = agraph(nodes=nodes, edges=edges, config=config)
-                    if selected:
-                        if isinstance(selected, str):
-                            selected_id = selected
-                        elif isinstance(selected, dict) and "id" in selected:
-                            selected_id = str(selected["id"])
+                    st.caption(f"Proto ready: {snapshot_summary(proto_snapshot)}")
                 else:
-                    st.info("Install streamlit-agraph for interactive tree. Showing static graph instead.")
-                    dot_lines = ["digraph G {", "rankdir=LR;"]
-                    for language_id, language in languages.items():
-                        meta = language.get("meta", {})
-                        label = f"{meta.get('name', language_id)} ({meta.get('year', '?')})".replace('"', "'")
-                        dot_lines.append(f'"{language_id}" [label="{label}"];')
-                    for parent_id, children in child_map.items():
-                        for child_id in children:
-                            dot_lines.append(f'"{parent_id}" -> "{child_id}";')
-                    dot_lines.append("}")
-                    st.graphviz_chart("\n".join(dot_lines))
-
-                available_ids = list(languages.keys())
-                available_ids.sort(key=lambda lang_id: str(languages[lang_id].get("meta", {}).get("year", "")))
-                labels = {_label_for(lang_id, languages): lang_id for lang_id in available_ids}
-                selected_label = st.selectbox(
-                    "Selected language",
-                    options=list(labels.keys()),
-                    index=list(labels.values()).index(selected_id) if selected_id in labels.values() else 0,
-                )
-                selected_id = labels[selected_label]
-                st.session_state["family_selected_id"] = selected_id
-
-                selected_meta = languages.get(selected_id, {}).get("meta", {})
-                parent_id = selected_meta.get("parent_id")
-                path_ids = list(reversed(family_generator.path_to_root(languages, selected_id)))
-                if path_ids:
-                    st.caption("Path: " + " → ".join(path_ids))
-
-                nav_cols = st.columns(2)
-                with nav_cols[0]:
-                    if parent_id and st.button("Go to parent", key="family_go_parent"):
-                        st.session_state["family_selected_id"] = parent_id
-                        st.rerun()
-                with nav_cols[1]:
-                    root_id = project.get("root_language_id")
-                    if root_id and st.button("Go to root", key="family_go_root"):
-                        st.session_state["family_selected_id"] = root_id
-                        st.rerun()
-
-    with main_col:
-        if not isinstance(project, dict) or not project_dir:
-            st.info("Load or create a project first.")
-        else:
-            languages = _load_languages()
-            if not languages:
-                st.info("Save a proto language first in the setup panel above.")
+                    st.info("Generate a single language inventory first.")
             else:
-                selected_id = st.session_state.get("family_selected_id") or project.get("root_language_id")
-                if selected_id not in languages:
-                    selected_id = list(languages.keys())[0]
-                selected_meta = languages.get(selected_id, {}).get("meta", {})
-                selected_label = f"{selected_meta.get('name', selected_id)} ({selected_id})"
-                summary_cols = st.columns(3)
-                summary_cols[0].metric("Languages", str(len(languages)))
-                summary_cols[1].metric("Selected", selected_label)
-                summary_cols[2].metric("Root", str(project.get("root_language_id") or "—"))
-                view = st.radio(
-                    "Workspace",
-                    options=["Create Daughter", "Compare", "Language Details"],
-                    horizontal=True,
+                uploaded_proto = st.file_uploader(
+                    "Upload snapshot JSON",
+                    type="json",
+                    key="family_proto_upload",
+                    help="Upload a snapshot exported from the single-language UI.",
                 )
+                if uploaded_proto:
+                    try:
+                        proto_snapshot = json.load(uploaded_proto)
+                        if not isinstance(proto_snapshot, dict):
+                            raise ValueError("Snapshot must be a JSON object.")
+                        if "inventory" not in proto_snapshot:
+                            raise ValueError("Snapshot missing inventory field.")
+                        st.caption(f"Proto loaded: {snapshot_summary(proto_snapshot)}")
+                    except Exception as exc:
+                        st.error(f"Could not load snapshot: {exc}")
 
-                if view == "Create Daughter":
-                    existing_ids = sorted(list(languages.keys()))
-                    selected_parent_default = st.session_state.get("family_selected_id") or project.get("root_language_id")
-                    if selected_parent_default not in existing_ids:
-                        selected_parent_default = existing_ids[0]
-
-                    selected_parent = selected_parent_default
-                    child_name = f"{selected_parent}_child"
-                    child_id_input = ""
-                    override_settings: Dict[str, Any] = {}
-                    cleaned_rules: List[Dict[str, Any]] = []
-
-                    step_parent, step_identity, step_changes, step_preview = st.tabs(
-                        ["1. Parent", "2. Identity", "3. Changes", "4. Preview"]
-                    )
-
-                    with step_parent:
-                        parent_col, parent_help_col = st.columns([4, 1])
-                        with parent_col:
-                            selected_parent = st.selectbox(
-                                "Select parent language",
-                                options=existing_ids,
-                                index=existing_ids.index(selected_parent_default)
-                                if selected_parent_default in existing_ids
-                                else 0,
-                            )
-                        with parent_help_col:
-                            help_button("parent_select")
-                        parent_language = languages[selected_parent]
-                        parent_meta = parent_language.get("meta", {})
-                        st.caption(
-                            f"Parent: {parent_meta.get('name', selected_parent)} "
-                            f"({selected_parent}, year {parent_meta.get('year', '?')})"
-                        )
-
-                    with step_identity:
-                        parent_language = languages[selected_parent]
-                        st.markdown("**Name + ID**")
-                        child_name = st.text_input("Child language name", value=f"{selected_parent}_child")
-                        suggested_id = _suggest_unique_id(child_name, existing_ids)
-                        child_id_input = st.text_input("Child language ID", value=suggested_id)
-                        help_button("child_id")
-                        if child_id_input in existing_ids:
-                            st.error("This ID is already used. Choose a different one.")
-                        year_default = int(parent_language.get("meta", {}).get("year", 0)) + 100
-                        child_year = st.number_input("Year (relative to proto timeline)", value=year_default, step=10)
-                        notes = st.text_area("Notes (optional)", value="")
-
-                        override_settings = {"year": int(child_year), "notes": notes}
-                        with st.expander("Override inherited settings", expanded=False):
-                            help_button("override_settings")
-                            parent_style = str(parent_language.get("style_name", DEFAULT_STYLE_PRESET))
-                            parent_concept = str(parent_language.get("concept_list_name", DEFAULT_CONCEPT_LIST))
-                            parent_grammar = str(parent_language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE))
-                            parent_syllable_range = parent_language.get("syllable_range", [1, 1])
-                            if not isinstance(parent_syllable_range, (list, tuple)) or len(parent_syllable_range) != 2:
-                                parent_syllable_range = [1, 1]
-                            parent_separator = str(parent_language.get("syllable_separator", ""))
-
-                            if st.checkbox("Override style preset", value=False, key="family_override_style"):
-                                override_settings["style_name"] = st.selectbox(
-                                    "Style preset",
-                                    options=list(STYLE_PRESETS.keys()),
-                                    index=list(STYLE_PRESETS.keys()).index(parent_style)
-                                    if parent_style in STYLE_PRESETS
-                                    else 0,
-                                )
-
-                            if st.checkbox("Override concept list", value=False, key="family_override_concept"):
-                                override_settings["concept_list_name"] = st.selectbox(
-                                    "Concept list",
-                                    options=list(CONCEPT_LIST_PRESETS.keys()),
-                                    index=list(CONCEPT_LIST_PRESETS.keys()).index(parent_concept)
-                                    if parent_concept in CONCEPT_LIST_PRESETS
-                                    else 0,
-                                )
-
-                            if st.checkbox("Override grammar profile", value=False, key="family_override_grammar"):
-                                override_settings["grammar_profile_name"] = st.selectbox(
-                                    "Grammar profile",
-                                    options=list(GRAMMAR_PROFILES.keys()),
-                                    index=list(GRAMMAR_PROFILES.keys()).index(parent_grammar)
-                                    if parent_grammar in GRAMMAR_PROFILES
-                                    else 0,
-                                )
-
-                            if st.checkbox("Override syllable range", value=False, key="family_override_syllables"):
-                                override_settings["syllable_range"] = list(
-                                    st.slider(
-                                        "Syllables per word",
-                                        min_value=1,
-                                        max_value=5,
-                                        value=(int(parent_syllable_range[0]), int(parent_syllable_range[1])),
-                                    )
-                                )
-
-                            if st.checkbox("Override syllable separator", value=False, key="family_override_sep"):
-                                override_settings["syllable_separator"] = st.selectbox(
-                                    "Separator",
-                                    options=["", "."],
-                                    index=0 if parent_separator == "" else 1,
-                                )
-
-                            if st.checkbox(
-                                "Override phonotactic profile (JSON)", value=False, key="family_override_phonotactics"
-                            ):
-                                raw_override = st.text_area("Phonotactic overrides JSON", value="{}", height=120)
-                                override_dict, override_error = parse_override_json(raw_override)
-                                if override_error:
-                                    st.error(override_error)
-                                else:
-                                    override_settings["phonotactic_profile_overrides"] = override_dict
-
-                    with step_changes:
-                        parent_language = languages[selected_parent]
-                        parent_inventory = parent_language.get("inventory", {})
-                        st.markdown("**Sound changes**")
-                        help_button("sound_changes")
-                        template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
-                        selected_templates = st.multiselect("Templates", options=template_options, default=[])
-                        rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
-
-                        if rule_editor_key not in st.session_state:
-                            st.session_state[rule_editor_key] = []
-
-                        if st.button("Generate rules from templates"):
-                            if selected_templates:
-                                seed_base = int(project.get("seed", 0))
-                                seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}")) % (2**32)
-                                rng = random.Random(seed_value)
-                                changeset_preview = family_generator.generate_changeset(
-                                    parent_inventory=parent_inventory,
-                                    enabled_templates=selected_templates,
-                                    event_count=max(1, len(selected_templates)),
-                                    rng=rng,
-                                    changeset_id=f"chg_{selected_parent}_{child_id_input}",
-                                    name=f"{selected_parent}→{child_id_input}",
-                                )
-                                st.session_state[rule_editor_key] = [
-                                    {
-                                        "from": rule.get("from", ""),
-                                        "to": rule.get("to", ""),
-                                        "enabled": rule.get("enabled", True),
-                                        "notes": rule.get("notes", ""),
-                                    }
-                                    for rule in changeset_preview.get("rules", [])
-                                    if isinstance(rule, dict)
-                                ]
-                            else:
-                                st.session_state[rule_editor_key] = []
-
-                        edited_rules = st.data_editor(
-                            st.session_state[rule_editor_key],
-                            hide_index=True,
-                            use_container_width=True,
-                            num_rows="dynamic",
-                            key=f"{rule_editor_key}_editor",
-                        )
-                        if hasattr(edited_rules, "to_dict"):
-                            edited_rules = edited_rules.to_dict(orient="records")
-
-                        cleaned_rules = []
-                        seen_from: set[str] = set()
-                        invalid_rules: List[str] = []
-                        for rule in edited_rules:
-                            if not isinstance(rule, dict):
-                                continue
-                            frm = str(rule.get("from", "")).strip()
-                            to = str(rule.get("to", "")).strip()
-                            enabled = bool(rule.get("enabled", True))
-                            if not frm:
-                                invalid_rules.append("Missing 'from' value.")
-                                continue
-                            if frm in seen_from:
-                                invalid_rules.append(f"Duplicate rule for '{frm}'.")
-                                continue
-                            seen_from.add(frm)
-                            cleaned_rules.append(
-                                {
-                                    "from": frm,
-                                    "to": to,
-                                    "enabled": enabled,
-                                    "notes": str(rule.get("notes", "")),
-                                }
-                            )
-                        if invalid_rules:
-                            st.warning("Rule validation warnings: " + "; ".join(sorted(set(invalid_rules))))
-                        if not cleaned_rules:
-                            st.info("No valid rules yet; you can still create a daughter with an empty changeset.")
-
-                    with step_preview:
-                        parent_language = languages[selected_parent]
-                        parent_inventory = parent_language.get("inventory", {})
-                        st.markdown("**Preview**")
-                        st.caption(f"Parent {selected_parent} → Child {child_id_input or '(auto)'}")
-
-                        changeset = {
-                            "schema_version": 1,
-                            "changeset_id": f"chg_{selected_parent}_{child_id_input}",
-                            "name": f"{selected_parent}→{child_id_input}",
-                            "description": f"{len(cleaned_rules)} sound-change rule(s)",
-                            "rules": cleaned_rules,
+            if proto_snapshot and isinstance(project, dict) and project_dir:
+                overwrite_proto = st.checkbox(
+                    "Overwrite existing proto",
+                    value=False,
+                    help="Replace the proto file if it already exists.",
+                )
+                if st.button(
+                    "Save Proto",
+                    use_container_width=True,
+                    help="Store the proto language into the family project.",
+                ):
+                    meta = proto_snapshot.get("meta", {})
+                    if not isinstance(meta, dict):
+                        meta = {}
+                    language_id = sanitize_name(str(meta.get("language_id") or "proto")) or "proto"
+                    language_name = str(meta.get("name") or proto_snapshot.get("name") or language_id)
+                    meta.update(
+                        {
+                            "language_id": language_id,
+                            "name": language_name,
+                            "year": 0,
+                            "parent_id": None,
+                            "changeset_id": None,
+                            "created_at": meta.get("created_at") or datetime.now().isoformat(),
+                            "notes": meta.get("notes", ""),
+                            "lexicon_overrides": meta.get("lexicon_overrides", {}),
                         }
-                        preview_language = family_generator.preview_child_language(
-                            project_dir=project_dir,
-                            parent_language_id=selected_parent,
-                            child_name=child_name,
-                            child_id=child_id_input,
-                            changeset=changeset,
-                            override_settings=override_settings,
-                        )
-                        diff = sound_change_engine.diff_inventory(parent_inventory, preview_language.get("inventory", {}))
-                        help_button("inventory_diff", "create")
-                        diff_cols = st.columns(2)
-                        with diff_cols[0]:
-                            st.metric("Added vowels", str(len(diff["added_vowels"])))
-                            st.metric("Removed vowels", str(len(diff["removed_vowels"])))
-                        with diff_cols[1]:
-                            st.metric("Added consonants", str(len(diff["added_consonants"])))
-                            st.metric("Removed consonants", str(len(diff["removed_consonants"])))
-
-                        if diff["added_vowels"] or diff["removed_vowels"] or diff["added_consonants"] or diff["removed_consonants"]:
-                            st.dataframe(
-                                [
-                                    {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
-                                    {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
-                                    {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
-                                    {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
-                                ],
-                                hide_index=True,
-                                use_container_width=True,
-                            )
-                        summary = language_diff.summarize_rule_effects(parent_inventory, changeset)
-                        st.caption(f"Rules enabled: {summary['rule_count']}")
-
-                        lexicon_preview = language_diff.sample_lexicon_diff(parent_language, preview_language, n=12)
-                        if lexicon_preview:
-                            help_button("lexicon_diff", "create")
-                            preview_rows = []
-                            for row in lexicon_preview:
-                                parent_ipa = str(row.get("parent_ipa", ""))
-                                child_ipa = str(row.get("child_ipa", ""))
-                                preview_rows.append(
-                                    {
-                                        "id": row.get("id", ""),
-                                        "meaning": row.get("meaning", ""),
-                                        "parent_ipa": parent_ipa,
-                                        "parent_sound_like": ipa_text_to_sound_like(
-                                            parent_ipa,
-                                            use_segment_separators=False,
-                                            profile_name=romanization_profile,
-                                        ),
-                                        "child_ipa": child_ipa,
-                                        "child_sound_like": ipa_text_to_sound_like(
-                                            child_ipa,
-                                            use_segment_separators=False,
-                                            profile_name=romanization_profile,
-                                        ),
-                                    }
-                                )
-                            st.dataframe(preview_rows, hide_index=True, use_container_width=True)
-
-                        if st.button("Create Daughter", type="primary", use_container_width=True):
-                            if child_id_input in existing_ids:
-                                st.error("Please pick a unique child ID.")
-                            else:
-                                created = family_generator.create_child_language(
-                                    project_dir=project_dir,
-                                    parent_language_id=selected_parent,
-                                    child_name=child_name,
-                                    child_id=child_id_input,
-                                    changeset=changeset,
-                                    override_settings=override_settings,
-                                )
-                                project = project_io.load_project(project_dir)
-                                st.session_state["family_project"] = project
-                                st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-                                st.session_state["family_selected_id"] = created.get("meta", {}).get("language_id")
-                                st.session_state["family_notice"] = (
-                                    f"Created daughter language: {created.get('meta', {}).get('name')}"
-                                )
-                                st.rerun()
-
-                elif view == "Compare":
-                    ids = sorted(list(languages.keys()))
-                    default_child = st.session_state.get("family_selected_id") or ids[0]
-                    child_id = st.selectbox(
-                        "Child language",
-                        options=ids,
-                        index=ids.index(default_child) if default_child in ids else 0,
-                    )
-                    child_language = languages[child_id]
-                    parent_id = child_language.get("meta", {}).get("parent_id") or ids[0]
-                    parent_id = st.selectbox(
-                        "Parent language",
-                        options=ids,
-                        index=ids.index(parent_id) if parent_id in ids else 0,
-                    )
-                    parent_language = languages[parent_id]
-
-                    diff = sound_change_engine.diff_inventory(
-                        parent_language.get("inventory", {}),
-                        child_language.get("inventory", {}),
-                    )
-                    st.markdown("**Inventory diff**")
-                    help_button("inventory_diff", "compare")
-                    st.dataframe(
-                        [
-                            {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
-                            {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
-                            {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
-                            {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
-                        ],
-                        hide_index=True,
-                        use_container_width=True,
                     )
 
-                    st.markdown("**Lexicon sample diff**")
-                    help_button("lexicon_diff", "compare")
-                    rows = language_diff.sample_lexicon_diff(parent_language, child_language, n=20)
-                    compare_rows = []
-                    for row in rows:
-                        parent_ipa = str(row.get("parent_ipa", ""))
-                        child_ipa = str(row.get("child_ipa", ""))
-                        compare_rows.append(
-                            {
-                                "id": row.get("id", ""),
-                                "meaning": row.get("meaning", ""),
-                                "parent_ipa": parent_ipa,
-                                "parent_sound_like": ipa_text_to_sound_like(
-                                    parent_ipa,
-                                    use_segment_separators=False,
-                                    profile_name=romanization_profile,
-                                ),
-                                "child_ipa": child_ipa,
-                                "child_sound_like": ipa_text_to_sound_like(
-                                    child_ipa,
-                                    use_segment_separators=False,
-                                    profile_name=romanization_profile,
-                                ),
-                            }
-                        )
-                    st.dataframe(compare_rows, hide_index=True, use_container_width=True)
+                    languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+                    target_path = languages_dir / f"{language_id}.json"
+                    if target_path.exists() and not overwrite_proto:
+                        st.error("Proto file already exists. Enable overwrite to replace it.")
+                    else:
+                        normalized = project_io.normalize_language_snapshot(proto_snapshot)
+                        normalized["meta"] = meta
+                        project_io.save_language(normalized, target_path)
+                        project["root_language_id"] = language_id
+                        language_index = project.get("language_index", [])
+                        if not isinstance(language_index, list):
+                            language_index = []
+                        if not any(
+                            isinstance(item, dict) and item.get("language_id") == language_id for item in language_index
+                        ):
+                            language_index.append({"language_id": language_id, "filename": f"{language_id}.json"})
+                        project["language_index"] = language_index
+                        project_io.save_project(project)
+                        _set_project_state(project, project_dir)
+                        st.session_state["family_notice"] = f"Saved proto language: {language_id}"
+                        st.rerun()
 
+    with workspace_tab:
+        project = st.session_state.get("family_project")
+        project_dir_value = st.session_state.get("family_project_dir")
+        project_dir = Path(project_dir_value) if project_dir_value else None
+
+
+        def _load_languages(force: bool = False) -> Dict[str, Dict[str, Any]]:
+            if not isinstance(project, dict) or not project_dir:
+                return {}
+            cache = st.session_state.get("family_languages_cache")
+            if force or not isinstance(cache, dict) or not cache:
+                st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+            return st.session_state.get("family_languages_cache", {})
+
+        def _label_for(language_id: str, languages: Dict[str, Dict[str, Any]]) -> str:
+            meta = languages.get(language_id, {}).get("meta", {})
+            name = meta.get("name", language_id)
+            year = meta.get("year", "?")
+            return f"{name} ({language_id}, {year})"
+
+        def _suggest_unique_id(base: str, existing_ids: List[str]) -> str:
+            base_id = sanitize_name(base) or "language"
+            if base_id not in existing_ids:
+                return base_id
+            counter = 1
+            while True:
+                candidate = f"{base_id}_{counter:02d}"
+                if candidate not in existing_ids:
+                    return candidate
+                counter += 1
+
+        left_col, main_col, help_col = st.columns([1.3, 2.2, 1.1], gap="large")
+
+        with left_col:
+            st.markdown("### Tree")
+            help_button("tree")
+            if not isinstance(project, dict) or not project_dir:
+                st.info("Load or create a project first.")
+            else:
+                if st.button(
+                    "Reload languages",
+                    key="family_reload_languages",
+                    help="Re-read language files from disk.",
+                ):
+                    _load_languages(force=True)
+                languages = _load_languages()
+                if not languages:
+                    st.info("No languages found in this project yet.")
                 else:
-                    selected_language = languages[selected_id]
-                    meta = selected_language.get("meta", {})
-                    st.markdown(f"**{meta.get('name', selected_id)}**")
-                    meta_cols = st.columns(4)
-                    meta_cols[0].metric("Year", str(meta.get("year", "?")))
-                    meta_cols[1].metric("Parent", str(meta.get("parent_id", "—")))
-                    meta_cols[2].metric("Changeset", str(meta.get("changeset_id", "—")))
-                    meta_cols[3].metric("Lexicon", str(len(selected_language.get("lexicon", []))))
+                    child_map = family_generator.build_child_map(languages)
+                    root_id = project.get("root_language_id")
+                    selected_id = st.session_state.get("family_selected_id") or root_id
+                    if selected_id not in languages:
+                        selected_id = root_id if root_id in languages else list(languages.keys())[0]
 
-                    model = project_io.hydrate_language_model(selected_language)
-                    detail_tabs = st.tabs(["Overview", "Lexicon", "Samples"])
+                    path_ids = family_generator.path_to_root(languages, selected_id)
+                    path_set = set(path_ids)
 
-                    pos_order = ["N", "V", "ADJ", "ADV", "PRON", "NUM", "DEM", "ADP", "NEG", "CONJ", "INT", "PART"]
-                    pos_options = [pos for pos in pos_order if pos in POS_LABELS]
-                    pos_options.extend([pos for pos in POS_LABELS.keys() if pos not in pos_options])
-
-                    def format_pos_label(value: str) -> str:
-                        label = POS_LABELS.get(value, value)
-                        return f"{label} ({value})" if value and label != value else label
-
-                    def save_family_language(updated_language: Dict[str, Any], updated_meta: Dict[str, Any]) -> None:
-                        updated_language["meta"] = updated_meta
-                        normalized = project_io.normalize_language_snapshot(updated_language)
-                        normalized["meta"] = updated_meta
-                        languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
-                        project_io.save_language(normalized, languages_dir / f"{selected_id}.json")
-                        st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-
-                    with detail_tabs[0]:
-                        inventory = selected_language.get("inventory", {})
-                        display_col_1, display_col_2 = st.columns(2)
-                        with display_col_1:
-                            display_segment_table(
-                                "Vowels",
-                                inventory.get("vowels", []) if isinstance(inventory, dict) else [],
-                                profile_name=romanization_profile,
-                            )
-                        with display_col_2:
-                            display_segment_table(
-                                "Consonants",
-                                inventory.get("consonants", []) if isinstance(inventory, dict) else [],
-                                profile_name=romanization_profile,
-                            )
-                        st.markdown("**Language notes**")
-                        notes_key = f"family_notes_{selected_id}"
-                        notes_value = st.text_area(
-                            "Description / reminders",
-                            value=str(meta.get("notes", "")),
-                            key=notes_key,
-                            height=140,
-                            placeholder="Add notes about this language.",
+                    if AGRAPH_AVAILABLE:
+                        nodes = []
+                        edges = []
+                        for language_id, language in languages.items():
+                            meta = language.get("meta", {})
+                            label = f"{meta.get('name', language_id)}\n{meta.get('year', '?')}"
+                            size = 26 if language_id == root_id else 18
+                            color = "#1f7a5a" if language_id == root_id else "#5b8bd1"
+                            if language_id == selected_id:
+                                color = "#d65b5b"
+                            elif language_id in path_set:
+                                color = "#f0a202"
+                            nodes.append(Node(id=language_id, label=label, size=size, color=color))
+                        for parent_id, children in child_map.items():
+                            for child_id in children:
+                                edge_color = "#f0a202" if parent_id in path_set and child_id in path_set else "#a7b6bd"
+                                edges.append(Edge(source=parent_id, target=child_id, color=edge_color))
+                        config = Config(
+                            width="100%",
+                            height=520,
+                            directed=True,
+                            physics=True,
+                            hierarchical=False,
+                            nodeHighlightBehavior=True,
                         )
-                        if st.button("Save notes", key=f"family_notes_save_{selected_id}"):
-                            meta["notes"] = notes_value
-                            save_family_language(selected_language, meta)
-                            st.success("Notes saved.")
+                        selected = agraph(nodes=nodes, edges=edges, config=config)
+                        if selected:
+                            if isinstance(selected, str):
+                                selected_id = selected
+                            elif isinstance(selected, dict) and "id" in selected:
+                                selected_id = str(selected["id"])
+                    else:
+                        st.info("Install streamlit-agraph for interactive tree. Showing static graph instead.")
+                        dot_lines = ["digraph G {", "rankdir=LR;"]
+                        for language_id, language in languages.items():
+                            meta = language.get("meta", {})
+                            label = f"{meta.get('name', language_id)} ({meta.get('year', '?')})".replace('"', "'")
+                            dot_lines.append(f'"{language_id}" [label="{label}"];')
+                        for parent_id, children in child_map.items():
+                            for child_id in children:
+                                dot_lines.append(f'"{parent_id}" -> "{child_id}";')
+                        dot_lines.append("}")
+                        st.graphviz_chart("\n".join(dot_lines))
+
+                    available_ids = list(languages.keys())
+                    available_ids.sort(key=lambda lang_id: str(languages[lang_id].get("meta", {}).get("year", "")))
+                    labels = {_label_for(lang_id, languages): lang_id for lang_id in available_ids}
+                    selected_label = st.selectbox(
+                        "Selected language",
+                        options=list(labels.keys()),
+                        index=list(labels.values()).index(selected_id) if selected_id in labels.values() else 0,
+                        help="Choose the language to inspect or edit.",
+                    )
+                    selected_id = labels[selected_label]
+                    st.session_state["family_selected_id"] = selected_id
+
+                    selected_meta = languages.get(selected_id, {}).get("meta", {})
+                    parent_id = selected_meta.get("parent_id")
+                    path_ids = list(reversed(family_generator.path_to_root(languages, selected_id)))
+                    if path_ids:
+                        st.caption("Path: " + " → ".join(path_ids))
+
+                    nav_cols = st.columns(2)
+                    with nav_cols[0]:
+                        if parent_id and st.button(
+                            "Go to parent",
+                            key="family_go_parent",
+                            help="Jump to the immediate ancestor language.",
+                        ):
+                            st.session_state["family_selected_id"] = parent_id
+                            st.rerun()
+                    with nav_cols[1]:
+                        root_id = project.get("root_language_id")
+                        if root_id and st.button(
+                            "Go to root",
+                            key="family_go_root",
+                            help="Jump to the proto/root language.",
+                        ):
+                            st.session_state["family_selected_id"] = root_id
                             st.rerun()
 
-                        st.divider()
-                        st.markdown("**Quick compare**")
-                        def entry_source_label(entry: Dict[str, Any]) -> str:
-                            if is_custom_entry(entry):
-                                return "Custom"
-                            entry_id = str(entry.get("id", ""))
-                            source = str(entry.get("source", ""))
-                            pos = str(entry.get("pos", ""))
-                            if source.startswith("concept-list:"):
-                                return "Concept roots"
-                            if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
-                                return "Particles"
-                            return "Other"
+        with main_col:
+            if not isinstance(project, dict) or not project_dir:
+                st.info("Load or create a project first.")
+            else:
+                languages = _load_languages()
+                if not languages:
+                    st.info("Save a proto language first in the setup panel above.")
+                else:
+                    selected_id = st.session_state.get("family_selected_id") or project.get("root_language_id")
+                    if selected_id not in languages:
+                        selected_id = list(languages.keys())[0]
+                    selected_meta = languages.get(selected_id, {}).get("meta", {})
+                    selected_label = f"{selected_meta.get('name', selected_id)} ({selected_id})"
+                    summary_cols = st.columns(3)
+                    summary_cols[0].metric("Languages", str(len(languages)))
+                    summary_cols[1].metric("Selected", selected_label)
+                    summary_cols[2].metric("Root", str(project.get("root_language_id") or "—"))
+                    view = st.radio(
+                        "Workspace",
+                        options=["Create Daughter", "Compare", "Language Details"],
+                        horizontal=True,
+                        help="Choose a workflow: create, compare, or curate a language.",
+                    )
 
-                        compare_options = [
-                            {"label": "(none)", "id": ""},
-                        ]
-                        for lang_id in languages.keys():
-                            if lang_id == selected_id:
-                                continue
-                            meta_other = languages.get(lang_id, {}).get("meta", {})
-                            label = f"{meta_other.get('name', lang_id)} ({lang_id})"
-                            compare_options.append({"label": label, "id": lang_id})
+                    if view == "Create Daughter":
+                        existing_ids = sorted(list(languages.keys()))
+                        selected_parent_default = st.session_state.get("family_selected_id") or project.get("root_language_id")
+                        if selected_parent_default not in existing_ids:
+                            selected_parent_default = existing_ids[0]
 
-                        parent_id = meta.get("parent_id")
-                        default_compare_id = parent_id if parent_id in languages else (project.get("root_language_id") or "")
-                        default_index = 0
-                        for idx, option in enumerate(compare_options):
-                            if option["id"] == default_compare_id:
-                                default_index = idx
-                                break
+                        selected_parent = selected_parent_default
+                        child_name = f"{selected_parent}_child"
+                        child_id_input = ""
+                        override_settings: Dict[str, Any] = {}
+                        cleaned_rules: List[Dict[str, Any]] = []
 
-                        compare_label = st.selectbox(
-                            "Compare against",
-                            options=[option["label"] for option in compare_options],
-                            index=default_index,
-                            key=f"family_compare_target_{selected_id}",
+                        step_parent, step_identity, step_changes, step_preview = st.tabs(
+                            ["1. Parent", "2. Identity", "3. Changes", "4. Preview"]
                         )
-                        compare_id = ""
-                        for option in compare_options:
-                            if option["label"] == compare_label:
-                                compare_id = option["id"]
-                                break
 
-                        compare_search = st.text_input(
-                            "Search entries",
-                            key=f"family_compare_search_{selected_id}",
-                            placeholder="Filter by id or meaning",
-                        )
-                        current_lexicon = model.get("lexicon", [])
-                        if not isinstance(current_lexicon, list):
-                            current_lexicon = []
-                        compare_filter_cols = st.columns(3)
-                        with compare_filter_cols[0]:
-                            compare_count = st.slider(
-                                "Rows to show",
-                                min_value=10,
-                                max_value=200,
-                                value=40,
+                        with step_parent:
+                            parent_col, parent_help_col = st.columns([4, 1])
+                            with parent_col:
+                                selected_parent = st.selectbox(
+                                    "Select parent language",
+                                    options=existing_ids,
+                                    index=existing_ids.index(selected_parent_default)
+                                    if selected_parent_default in existing_ids
+                                    else 0,
+                                    help="Parent language that the daughter will derive from.",
+                                )
+                            with parent_help_col:
+                                help_button("parent_select")
+                            parent_language = languages[selected_parent]
+                            parent_meta = parent_language.get("meta", {})
+                            st.caption(
+                                f"Parent: {parent_meta.get('name', selected_parent)} "
+                                f"({selected_parent}, year {parent_meta.get('year', '?')})"
+                            )
+
+                        with step_identity:
+                            parent_language = languages[selected_parent]
+                            st.markdown("**Name + ID**")
+                            child_name = st.text_input(
+                                "Child language name",
+                                value=f"{selected_parent}_child",
+                                help="Display name for the new daughter language.",
+                            )
+                            suggested_id = _suggest_unique_id(child_name, existing_ids)
+                            child_id_input = st.text_input(
+                                "Child language ID",
+                                value=suggested_id,
+                                help="Stable identifier used in filenames and comparisons.",
+                            )
+                            help_button("child_id")
+                            if child_id_input in existing_ids:
+                                st.error("This ID is already used. Choose a different one.")
+                            year_default = int(parent_language.get("meta", {}).get("year", 0)) + 100
+                            child_year = st.number_input(
+                                "Year (relative to proto timeline)",
+                                value=year_default,
                                 step=10,
-                                key=f"family_compare_count_{selected_id}",
+                                help="Approximate year for the daughter relative to the proto timeline.",
                             )
-                        with compare_filter_cols[1]:
-                            compare_sources = sorted(
-                                {entry_source_label(entry) for entry in current_lexicon if isinstance(entry, dict)}
-                            )
-                            selected_sources = st.multiselect(
-                                "Source filter",
-                                options=compare_sources,
-                                default=compare_sources,
-                                key=f"family_compare_sources_{selected_id}",
-                            )
-                        with compare_filter_cols[2]:
-                            compare_pos_codes = sorted(
-                                {
-                                    str(entry.get("pos", "")).strip()
-                                    for entry in current_lexicon
-                                    if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
-                                }
-                            )
-                            selected_compare_pos = st.multiselect(
-                                "Part of speech filter",
-                                options=compare_pos_codes,
-                                default=compare_pos_codes,
-                                format_func=format_pos_label,
-                                key=f"family_compare_pos_{selected_id}",
+                            notes = st.text_area(
+                                "Notes (optional)",
+                                value="",
+                                help="Optional notes stored with the language.",
                             )
 
-                        compare_lexicon = []
-                        if compare_id and compare_id in languages:
-                            compare_language = project_io.hydrate_language_model(languages[compare_id])
-                            compare_lexicon = compare_language.get("lexicon", [])
-                            if not isinstance(compare_lexicon, list):
-                                compare_lexicon = []
-                        compare_map = {
-                            str(entry.get("id", "")).strip(): entry
-                            for entry in compare_lexicon
-                            if isinstance(entry, dict)
-                        }
-                        needle = compare_search.strip().lower()
+                            override_settings = {"year": int(child_year), "notes": notes}
+                            with st.expander("Override inherited settings", expanded=False):
+                                help_button("override_settings")
+                                parent_style = str(parent_language.get("style_name", DEFAULT_STYLE_PRESET))
+                                parent_concept = str(parent_language.get("concept_list_name", DEFAULT_CONCEPT_LIST))
+                                parent_grammar = str(parent_language.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE))
+                                parent_syllable_range = parent_language.get("syllable_range", [1, 1])
+                                if not isinstance(parent_syllable_range, (list, tuple)) or len(parent_syllable_range) != 2:
+                                    parent_syllable_range = [1, 1]
+                                parent_separator = str(parent_language.get("syllable_separator", ""))
+
+                                if st.checkbox(
+                                    "Override style preset",
+                                    value=False,
+                                    key="family_override_style",
+                                    help="Use a different phonotactic style than the parent.",
+                                ):
+                                    override_settings["style_name"] = st.selectbox(
+                                        "Style preset",
+                                        options=list(STYLE_PRESETS.keys()),
+                                        index=list(STYLE_PRESETS.keys()).index(parent_style)
+                                        if parent_style in STYLE_PRESETS
+                                        else 0,
+                                        help="Phonotactic style to use for the daughter.",
+                                    )
+
+                                if st.checkbox(
+                                    "Override concept list",
+                                    value=False,
+                                    key="family_override_concept",
+                                    help="Use a different concept list than the parent.",
+                                ):
+                                    override_settings["concept_list_name"] = st.selectbox(
+                                        "Concept list",
+                                        options=list(CONCEPT_LIST_PRESETS.keys()),
+                                        index=list(CONCEPT_LIST_PRESETS.keys()).index(parent_concept)
+                                        if parent_concept in CONCEPT_LIST_PRESETS
+                                        else 0,
+                                        help="Concept list for root meanings.",
+                                    )
+
+                                if st.checkbox(
+                                    "Override grammar profile",
+                                    value=False,
+                                    key="family_override_grammar",
+                                    help="Use a different grammar profile than the parent.",
+                                ):
+                                    override_settings["grammar_profile_name"] = st.selectbox(
+                                        "Grammar profile",
+                                        options=list(GRAMMAR_PROFILES.keys()),
+                                        index=list(GRAMMAR_PROFILES.keys()).index(parent_grammar)
+                                        if parent_grammar in GRAMMAR_PROFILES
+                                        else 0,
+                                        help="Grammar template for sentence generation.",
+                                    )
+
+                                if st.checkbox(
+                                    "Override syllable range",
+                                    value=False,
+                                    key="family_override_syllables",
+                                    help="Use a different syllable length range.",
+                                ):
+                                    override_settings["syllable_range"] = list(
+                                        st.slider(
+                                            "Syllables per word",
+                                            min_value=1,
+                                            max_value=5,
+                                            value=(int(parent_syllable_range[0]), int(parent_syllable_range[1])),
+                                            help="Min/max syllables for new roots.",
+                                        )
+                                    )
+
+                                if st.checkbox(
+                                    "Override syllable separator",
+                                    value=False,
+                                    key="family_override_sep",
+                                    help="Show syllable separators in IPA output.",
+                                ):
+                                    override_settings["syllable_separator"] = st.selectbox(
+                                        "Separator",
+                                        options=["", "."],
+                                        index=0 if parent_separator == "" else 1,
+                                        help="Choose '.' to insert syllable breaks.",
+                                    )
+
+                                if st.checkbox(
+                                    "Override phonotactic profile (JSON)",
+                                    value=False,
+                                    key="family_override_phonotactics",
+                                    help="Advanced: paste a phonotactic override object.",
+                                ):
+                                    raw_override = st.text_area(
+                                        "Phonotactic overrides JSON",
+                                        value="{}",
+                                        height=120,
+                                        help="JSON overrides for phonotactic controls.",
+                                    )
+                                    override_dict, override_error = parse_override_json(raw_override)
+                                    if override_error:
+                                        st.error(override_error)
+                                    else:
+                                        override_settings["phonotactic_profile_overrides"] = override_dict
+
+                        with step_changes:
+                            parent_language = languages[selected_parent]
+                            parent_inventory = parent_language.get("inventory", {})
+                            st.markdown("**Sound changes**")
+                            help_button("sound_changes")
+                            template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
+                            template_key = f"family_template_select_{selected_parent}_{child_id_input}"
+                            rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
+                            randomize_flag = f"{rule_editor_key}_randomize_flag"
+
+                            if template_key not in st.session_state:
+                                st.session_state[template_key] = []
+                            if rule_editor_key not in st.session_state:
+                                st.session_state[rule_editor_key] = []
+
+                            def _apply_template_rules(templates: List[str], seed_salt: str = "") -> None:
+                                if templates:
+                                    seed_base = int(project.get("seed", 0))
+                                    seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}:{seed_salt}")) % (
+                                        2**32
+                                    )
+                                    rng = random.Random(seed_value)
+                                    changeset_preview = family_generator.generate_changeset(
+                                        parent_inventory=parent_inventory,
+                                        enabled_templates=templates,
+                                        event_count=max(1, len(templates)),
+                                        rng=rng,
+                                        changeset_id=f"chg_{selected_parent}_{child_id_input}",
+                                        name=f"{selected_parent}→{child_id_input}",
+                                    )
+                                    st.session_state[rule_editor_key] = [
+                                        {
+                                            "from": rule.get("from", ""),
+                                            "to": rule.get("to", ""),
+                                            "enabled": rule.get("enabled", True),
+                                            "notes": rule.get("notes", ""),
+                                        }
+                                        for rule in changeset_preview.get("rules", [])
+                                        if isinstance(rule, dict)
+                                    ]
+                                else:
+                                    st.session_state[rule_editor_key] = []
+
+                            if st.session_state.pop(randomize_flag, False):
+                                randomized = pick_random_sound_templates(template_options)
+                                st.session_state[template_key] = randomized
+                                _apply_template_rules(randomized, seed_salt=str(random.random()))
+
+                            selected_templates = st.multiselect(
+                                "Templates",
+                                options=template_options,
+                                default=st.session_state.get(template_key, []),
+                                key=template_key,
+                                format_func=lambda value: SOUND_CHANGE_TEMPLATE_LABELS.get(value, value),
+                                help="Pick change templates; they become the auto-generated rules below.",
+                            )
+
+                            template_action_cols = st.columns([1.2, 1.6, 2.2])
+                            with template_action_cols[0]:
+                                if st.button(
+                                    "Randomize templates",
+                                    key=f"{rule_editor_key}_randomize",
+                                    help="Pick a balanced mix of vowel + consonant changes, then auto-generate rules.",
+                                ):
+                                    st.session_state[randomize_flag] = True
+                                    st.rerun()
+                            with template_action_cols[1]:
+                                generate_rules_button = st.button(
+                                    "Generate rules from templates",
+                                    key=f"{rule_editor_key}_generate",
+                                    help="Auto-generate a set of sound-change rules using the selected templates.",
+                                )
+                            with template_action_cols[2]:
+                                st.caption("Templates control which kinds of changes are eligible.")
+
+                            if generate_rules_button:
+                                _apply_template_rules(selected_templates)
+
+                            with st.expander("Template explanations", expanded=False):
+                                for template_id in template_options:
+                                    label = SOUND_CHANGE_TEMPLATE_LABELS.get(template_id, template_id)
+                                    description = SOUND_CHANGE_TEMPLATE_DESCRIPTIONS.get(template_id, "")
+                                    st.markdown(f"- **{label}**: {description}")
+
+                            edited_rules = st.data_editor(
+                                st.session_state[rule_editor_key],
+                                hide_index=True,
+                                use_container_width=True,
+                                num_rows="dynamic",
+                                key=f"{rule_editor_key}_editor",
+                                column_config={
+                                    "from": st.column_config.TextColumn(
+                                        "From",
+                                        help="Segment to replace (IPA).",
+                                    ),
+                                    "to": st.column_config.TextColumn(
+                                        "To",
+                                        help="Replacement segment (IPA). Leave blank to delete.",
+                                    ),
+                                    "enabled": st.column_config.CheckboxColumn(
+                                        "Enabled",
+                                        help="Toggle to include/exclude this change.",
+                                    ),
+                                    "notes": st.column_config.TextColumn(
+                                        "Notes",
+                                        help="Optional reminder about why this rule exists.",
+                                    ),
+                                },
+                            )
+                            if hasattr(edited_rules, "to_dict"):
+                                edited_rules = edited_rules.to_dict(orient="records")
+
+                            cleaned_rules = []
+                            seen_from: set[str] = set()
+                            invalid_rules: List[str] = []
+                            for rule in edited_rules:
+                                if not isinstance(rule, dict):
+                                    continue
+                                frm = str(rule.get("from", "")).strip()
+                                to = str(rule.get("to", "")).strip()
+                                enabled = bool(rule.get("enabled", True))
+                                if not frm:
+                                    invalid_rules.append("Missing 'from' value.")
+                                    continue
+                                if frm in seen_from:
+                                    invalid_rules.append(f"Duplicate rule for '{frm}'.")
+                                    continue
+                                seen_from.add(frm)
+                                cleaned_rules.append(
+                                    {
+                                        "from": frm,
+                                        "to": to,
+                                        "enabled": enabled,
+                                        "notes": str(rule.get("notes", "")),
+                                    }
+                                )
+                            if invalid_rules:
+                                st.warning("Rule validation warnings: " + "; ".join(sorted(set(invalid_rules))))
+                            if not cleaned_rules:
+                                st.info("No valid rules yet; you can still create a daughter with an empty changeset.")
+
+                        with step_preview:
+                            parent_language = languages[selected_parent]
+                            parent_inventory = parent_language.get("inventory", {})
+                            st.markdown("**Preview**")
+                            st.caption(f"Parent {selected_parent} → Child {child_id_input or '(auto)'}")
+
+                            changeset = {
+                                "schema_version": 1,
+                                "changeset_id": f"chg_{selected_parent}_{child_id_input}",
+                                "name": f"{selected_parent}→{child_id_input}",
+                                "description": f"{len(cleaned_rules)} sound-change rule(s)",
+                                "rules": cleaned_rules,
+                            }
+                            preview_language = family_generator.preview_child_language(
+                                project_dir=project_dir,
+                                parent_language_id=selected_parent,
+                                child_name=child_name,
+                                child_id=child_id_input,
+                                changeset=changeset,
+                                override_settings=override_settings,
+                            )
+                            diff = sound_change_engine.diff_inventory(parent_inventory, preview_language.get("inventory", {}))
+                            help_button("inventory_diff", "create")
+                            diff_cols = st.columns(2)
+                            with diff_cols[0]:
+                                st.metric("Added vowels", str(len(diff["added_vowels"])))
+                                st.metric("Removed vowels", str(len(diff["removed_vowels"])))
+                            with diff_cols[1]:
+                                st.metric("Added consonants", str(len(diff["added_consonants"])))
+                                st.metric("Removed consonants", str(len(diff["removed_consonants"])))
+
+                            if diff["added_vowels"] or diff["removed_vowels"] or diff["added_consonants"] or diff["removed_consonants"]:
+                                st.dataframe(
+                                    [
+                                        {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
+                                        {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
+                                        {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
+                                        {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
+                                    ],
+                                    hide_index=True,
+                                    use_container_width=True,
+                                )
+                            summary = language_diff.summarize_rule_effects(parent_inventory, changeset)
+                            st.caption(f"Rules enabled: {summary['rule_count']}")
+
+                            lexicon_preview = language_diff.sample_lexicon_diff(parent_language, preview_language, n=12)
+                            if lexicon_preview:
+                                help_button("lexicon_diff", "create")
+                                preview_rows = []
+                                for row in lexicon_preview:
+                                    parent_ipa = str(row.get("parent_ipa", ""))
+                                    child_ipa = str(row.get("child_ipa", ""))
+                                    preview_rows.append(
+                                        {
+                                            "id": row.get("id", ""),
+                                            "meaning": row.get("meaning", ""),
+                                            "parent_ipa": parent_ipa,
+                                            "parent_sound_like": ipa_text_to_sound_like(
+                                                parent_ipa,
+                                                use_segment_separators=False,
+                                                profile_name=romanization_profile,
+                                            ),
+                                            "child_ipa": child_ipa,
+                                            "child_sound_like": ipa_text_to_sound_like(
+                                                child_ipa,
+                                                use_segment_separators=False,
+                                                profile_name=romanization_profile,
+                                            ),
+                                        }
+                                    )
+                                st.dataframe(preview_rows, hide_index=True, use_container_width=True)
+
+                            if st.button(
+                                "Create Daughter",
+                                type="primary",
+                                use_container_width=True,
+                                help="Save the daughter language into the project.",
+                            ):
+                                if child_id_input in existing_ids:
+                                    st.error("Please pick a unique child ID.")
+                                else:
+                                    created = family_generator.create_child_language(
+                                        project_dir=project_dir,
+                                        parent_language_id=selected_parent,
+                                        child_name=child_name,
+                                        child_id=child_id_input,
+                                        changeset=changeset,
+                                        override_settings=override_settings,
+                                    )
+                                    project = project_io.load_project(project_dir)
+                                    st.session_state["family_project"] = project
+                                    st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                                    st.session_state["family_selected_id"] = created.get("meta", {}).get("language_id")
+                                    st.session_state["family_notice"] = (
+                                        f"Created daughter language: {created.get('meta', {}).get('name')}"
+                                    )
+                                    st.rerun()
+
+                    elif view == "Compare":
+                        ids = sorted(list(languages.keys()))
+                        default_child = st.session_state.get("family_selected_id") or ids[0]
+                        child_id = st.selectbox(
+                            "Child language",
+                            options=ids,
+                            index=ids.index(default_child) if default_child in ids else 0,
+                            help="Language being compared (descendant).",
+                        )
+                        child_language = languages[child_id]
+                        parent_id = child_language.get("meta", {}).get("parent_id") or ids[0]
+                        parent_id = st.selectbox(
+                            "Parent language",
+                            options=ids,
+                            index=ids.index(parent_id) if parent_id in ids else 0,
+                            help="Language to compare against (ancestor or peer).",
+                        )
+                        parent_language = languages[parent_id]
+
+                        diff = sound_change_engine.diff_inventory(
+                            parent_language.get("inventory", {}),
+                            child_language.get("inventory", {}),
+                        )
+                        st.markdown("**Inventory diff**")
+                        help_button("inventory_diff", "compare")
+                        st.dataframe(
+                            [
+                                {"Type": "Vowel+", "Segments": ", ".join(diff["added_vowels"])},
+                                {"Type": "Vowel-", "Segments": ", ".join(diff["removed_vowels"])},
+                                {"Type": "Consonant+", "Segments": ", ".join(diff["added_consonants"])},
+                                {"Type": "Consonant-", "Segments": ", ".join(diff["removed_consonants"])},
+                            ],
+                            hide_index=True,
+                            use_container_width=True,
+                        )
+
+                        st.markdown("**Lexicon sample diff**")
+                        help_button("lexicon_diff", "compare")
+                        rows = language_diff.sample_lexicon_diff(parent_language, child_language, n=20)
                         compare_rows = []
-                        for entry in current_lexicon:
-                            if not isinstance(entry, dict):
-                                continue
-                            if selected_sources and entry_source_label(entry) not in selected_sources:
-                                continue
-                            entry_id = str(entry.get("id", "")).strip()
-                            meaning = str(entry.get("meaning", "")).strip()
-                            if needle and needle not in f"{entry_id} {meaning}".lower():
-                                continue
-                            entry_pos = str(entry.get("pos", "")).strip()
-                            if selected_compare_pos and entry_pos not in selected_compare_pos:
-                                continue
-                            entry_ipa = str(entry.get("ipa", "")).strip()
-                            other_entry = compare_map.get(entry_id, {})
-                            other_ipa = str(other_entry.get("ipa", "")).strip()
+                        for row in rows:
+                            parent_ipa = str(row.get("parent_ipa", ""))
+                            child_ipa = str(row.get("child_ipa", ""))
                             compare_rows.append(
                                 {
-                                    "Entry": entry_id,
-                                    "Meaning": meaning,
-                                    "IPA": entry_ipa,
-                                    "Sound-like": ipa_text_to_sound_like(
-                                        entry_ipa,
+                                    "id": row.get("id", ""),
+                                    "meaning": row.get("meaning", ""),
+                                    "parent_ipa": parent_ipa,
+                                    "parent_sound_like": ipa_text_to_sound_like(
+                                        parent_ipa,
                                         use_segment_separators=False,
                                         profile_name=romanization_profile,
                                     ),
-                                    "Compare IPA": other_ipa,
-                                    "Compare Sound-like": ipa_text_to_sound_like(
-                                        other_ipa,
+                                    "child_ipa": child_ipa,
+                                    "child_sound_like": ipa_text_to_sound_like(
+                                        child_ipa,
                                         use_segment_separators=False,
                                         profile_name=romanization_profile,
-                                    )
-                                    if other_ipa
-                                    else "",
+                                    ),
                                 }
                             )
-                            if len(compare_rows) >= compare_count:
-                                break
-
                         st.dataframe(compare_rows, hide_index=True, use_container_width=True)
 
-                        st.divider()
-                        st.markdown("**Danger zone**")
-                        root_language_id = project.get("root_language_id") if isinstance(project, dict) else None
-                        if selected_id == root_language_id:
-                            st.info("Root languages cannot be deleted from a family project.")
-                        else:
-                            confirm_delete = st.checkbox(
-                                "I understand this will permanently delete the language file.",
-                                key=f"family_delete_confirm_{selected_id}",
+                    else:
+                        selected_language = languages[selected_id]
+                        meta = selected_language.get("meta", {})
+                        st.markdown(f"**{meta.get('name', selected_id)}**")
+                        meta_cols = st.columns(4)
+                        meta_cols[0].metric("Year", str(meta.get("year", "?")))
+                        meta_cols[1].metric("Parent", str(meta.get("parent_id", "—")))
+                        meta_cols[2].metric("Changeset", str(meta.get("changeset_id", "—")))
+                        meta_cols[3].metric("Lexicon", str(len(selected_language.get("lexicon", []))))
+
+                        model = project_io.hydrate_language_model(selected_language)
+                        detail_tabs = st.tabs(["Overview", "Lexicon", "Samples"])
+
+                        pos_order = ["N", "V", "ADJ", "ADV", "PRON", "NUM", "DEM", "ADP", "NEG", "CONJ", "INT", "PART"]
+                        pos_options = [pos for pos in pos_order if pos in POS_LABELS]
+                        pos_options.extend([pos for pos in POS_LABELS.keys() if pos not in pos_options])
+
+                        def format_pos_label(value: str) -> str:
+                            label = POS_LABELS.get(value, value)
+                            return f"{label} ({value})" if value and label != value else label
+
+                        def save_family_language(updated_language: Dict[str, Any], updated_meta: Dict[str, Any]) -> None:
+                            updated_language["meta"] = updated_meta
+                            normalized = project_io.normalize_language_snapshot(updated_language)
+                            normalized["meta"] = updated_meta
+                            languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+                            project_io.save_language(normalized, languages_dir / f"{selected_id}.json")
+                            st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+
+                        with detail_tabs[0]:
+                            inventory = selected_language.get("inventory", {})
+                            st.markdown("**Language name**")
+                            def _auto_name_family() -> None:
+                                suggested = suggest_language_name(model, romanization_profile)
+                                if suggested:
+                                    meta["name"] = suggested
+                                    st.session_state[f"family_name_{selected_id}"] = suggested
+                                    save_family_language(selected_language, meta)
+                                    st.session_state["family_notice"] = f"Generated name: {suggested}"
+                                else:
+                                    st.session_state["family_notice"] = (
+                                        "Generate a lexicon first to auto-name this language."
+                                    )
+
+                            name_cols = st.columns([3, 1, 1])
+                            with name_cols[0]:
+                                name_value = st.text_input(
+                                    "Display name",
+                                    value=str(meta.get("name", selected_id)),
+                                    key=f"family_name_{selected_id}",
+                                    help="Rename this language for display and exports.",
+                                )
+                            with name_cols[1]:
+                                if st.button(
+                                    "Save name",
+                                    key=f"family_name_save_{selected_id}",
+                                    help="Persist the new name to disk.",
+                                ):
+                                    if name_value.strip():
+                                        meta["name"] = name_value.strip()
+                                        save_family_language(selected_language, meta)
+                                        st.success("Language name updated.")
+                                        st.rerun()
+                            with name_cols[2]:
+                                st.button(
+                                    "Auto-name",
+                                    key=f"family_name_auto_{selected_id}",
+                                    help="Generate a language name from the lexicon.",
+                                    on_click=_auto_name_family,
+                                )
+                            display_col_1, display_col_2 = st.columns(2)
+                            with display_col_1:
+                                display_segment_table(
+                                    "Vowels",
+                                    inventory.get("vowels", []) if isinstance(inventory, dict) else [],
+                                    profile_name=romanization_profile,
+                                )
+                            with display_col_2:
+                                display_segment_table(
+                                    "Consonants",
+                                    inventory.get("consonants", []) if isinstance(inventory, dict) else [],
+                                    profile_name=romanization_profile,
+                                )
+                            st.markdown("**Language notes**")
+                            notes_key = f"family_notes_{selected_id}"
+                            notes_value = st.text_area(
+                                "Description / reminders",
+                                value=str(meta.get("notes", "")),
+                                key=notes_key,
+                                height=140,
+                                placeholder="Add notes about this language.",
+                                help="Private notes saved with this language.",
                             )
                             if st.button(
-                                "Delete language",
-                                key=f"family_delete_{selected_id}",
-                                disabled=not confirm_delete,
+                                "Save notes",
+                                key=f"family_notes_save_{selected_id}",
+                                help="Persist notes to disk.",
                             ):
-                                languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
-                                target_path = languages_dir / f"{selected_id}.json"
-                                if target_path.exists():
-                                    target_path.unlink()
-                                language_index = project.get("language_index", [])
-                                if not isinstance(language_index, list):
-                                    language_index = []
-                                language_index = [
-                                    item
-                                    for item in language_index
-                                    if not (isinstance(item, dict) and item.get("language_id") == selected_id)
-                                ]
-                                project["language_index"] = language_index
-                                project_io.save_project(project)
-                                st.session_state["family_selected_id"] = parent_id or project.get("root_language_id")
-                                st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
-                                st.success("Language deleted.")
+                                meta["notes"] = notes_value
+                                save_family_language(selected_language, meta)
+                                st.success("Notes saved.")
                                 st.rerun()
 
-                    with detail_tabs[1]:
-                        st.markdown("**Custom word builder**")
-                        lexicon_model = model
-                        root_ids: List[str] = []
-                        root_label_map: Dict[str, str] = {}
-                        builder_col_1, builder_col_2 = st.columns(2)
-                        with builder_col_1:
-                            meaning_tag = st.text_input(
-                                "Meaning tag",
-                                key=f"family_custom_word_meaning_{selected_id}",
-                            )
-                            selected_pos = st.selectbox(
-                                "Part of speech",
-                                options=pos_options,
-                                format_func=format_pos_label,
-                                key=f"family_custom_word_pos_{selected_id}",
-                            )
-                            auto_gloss = st.checkbox(
-                                "Auto gloss",
-                                value=True,
-                                key=f"family_custom_word_auto_gloss_{selected_id}",
-                            )
-                            gloss_input = st.text_input(
-                                "Gloss",
-                                key=f"family_custom_word_gloss_{selected_id}",
-                                disabled=auto_gloss,
-                            )
-                            gloss_value = ""
-                            if auto_gloss and meaning_tag.strip():
-                                gloss_value = concept_gloss(meaning_tag.strip(), selected_pos)
-                                st.caption(f"Gloss: {gloss_value}")
-                            elif gloss_input.strip():
-                                gloss_value = gloss_input.strip()
+                            st.divider()
+                            st.markdown("**Quick compare**")
+                            def entry_source_label(entry: Dict[str, Any]) -> str:
+                                if is_custom_entry(entry):
+                                    return "Custom"
+                                entry_id = str(entry.get("id", ""))
+                                source = str(entry.get("source", ""))
+                                pos = str(entry.get("pos", ""))
+                                if source.startswith("concept-list:"):
+                                    return "Concept roots"
+                                if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
+                                    return "Particles"
+                                return "Other"
 
-                        with builder_col_2:
-                            mode_label = st.radio(
-                                "Build mode",
-                                options=["Random", "Use existing root"],
-                                horizontal=True,
-                                key=f"family_custom_word_mode_{selected_id}",
+                            compare_options = [
+                                {"label": "(none)", "id": ""},
+                            ]
+                            for lang_id in languages.keys():
+                                if lang_id == selected_id:
+                                    continue
+                                meta_other = languages.get(lang_id, {}).get("meta", {})
+                                label = f"{meta_other.get('name', lang_id)} ({lang_id})"
+                                compare_options.append({"label": label, "id": lang_id})
+
+                            parent_id = meta.get("parent_id")
+                            default_compare_id = parent_id if parent_id in languages else (project.get("root_language_id") or "")
+                            default_index = 0
+                            for idx, option in enumerate(compare_options):
+                                if option["id"] == default_compare_id:
+                                    default_index = idx
+                                    break
+
+                            compare_label = st.selectbox(
+                                "Compare against",
+                                options=[option["label"] for option in compare_options],
+                                index=default_index,
+                                key=f"family_compare_target_{selected_id}",
+                                help="Pick another language to compare word-by-word.",
                             )
-                            custom_meta: Dict[str, Any] = {}
-                            if mode_label == "Random":
-                                custom_range = st.slider(
-                                    "Syllables per word",
-                                    min_value=1,
-                                    max_value=5,
-                                    value=tuple(model.get("syllable_range", [1, 2])),
-                                    key=f"family_custom_word_random_range_{selected_id}",
+                            compare_id = ""
+                            for option in compare_options:
+                                if option["label"] == compare_label:
+                                    compare_id = option["id"]
+                                    break
+
+                            compare_search = st.text_input(
+                                "Search entries",
+                                key=f"family_compare_search_{selected_id}",
+                                placeholder="Filter by id or meaning",
+                                help="Filter by entry ID or meaning tag.",
+                            )
+                            current_lexicon = model.get("lexicon", [])
+                            if not isinstance(current_lexicon, list):
+                                current_lexicon = []
+                            compare_filter_cols = st.columns(3)
+                            with compare_filter_cols[0]:
+                                compare_count = st.slider(
+                                    "Rows to show",
+                                    min_value=10,
+                                    max_value=200,
+                                    value=40,
+                                    step=10,
+                                    key=f"family_compare_count_{selected_id}",
+                                    help="Limit the number of rows shown.",
                                 )
-                                custom_meta = {
-                                    "mode": "random",
-                                    "syllable_range": [int(custom_range[0]), int(custom_range[1])],
-                                }
-                            else:
-                                lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
-                                for entry in lexicon_entries:
-                                    if not isinstance(entry, dict):
-                                        continue
-                                    entry_id = str(entry.get("id", "")).strip()
-                                    pos = str(entry.get("pos", "")).strip()
-                                    if not entry_id or entry_id.startswith("PART:") or pos == "PART":
-                                        continue
-                                    meaning = str(entry.get("meaning", "")).strip()
-                                    label = f"{entry_id} · {meaning}" if meaning else entry_id
-                                    root_ids.append(entry_id)
-                                    root_label_map[entry_id] = label
-                                selected_root = st.selectbox(
-                                    "Root to derive from",
-                                    options=root_ids if root_ids else ["(none)"],
-                                    format_func=lambda value: root_label_map.get(value, value),
-                                    key=f"family_custom_word_root_{selected_id}",
-                                    disabled=not root_ids,
+                            with compare_filter_cols[1]:
+                                compare_sources = sorted(
+                                    {entry_source_label(entry) for entry in current_lexicon if isinstance(entry, dict)}
                                 )
-                                if not root_ids:
-                                    st.warning("No eligible roots found to derive from.")
-                                    selected_root = ""
-
-                                affix_mode_label = st.selectbox(
-                                    "Affix mode",
-                                    options=["Auto", "Prefix", "Suffix", "Both"],
-                                    key=f"family_custom_word_affix_mode_{selected_id}",
+                                selected_sources = st.multiselect(
+                                    "Source filter",
+                                    options=compare_sources,
+                                    default=compare_sources,
+                                    key=f"family_compare_sources_{selected_id}",
+                                    help="Filter by entry origin.",
                                 )
-                                affix_range = st.slider(
-                                    "Affix syllables",
-                                    min_value=1,
-                                    max_value=4,
-                                    value=(1, 1),
-                                    key=f"family_custom_word_affix_range_{selected_id}",
+                            with compare_filter_cols[2]:
+                                compare_pos_codes = sorted(
+                                    {
+                                        str(entry.get("pos", "")).strip()
+                                        for entry in current_lexicon
+                                        if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                                    }
                                 )
-                                custom_meta = {
-                                    "mode": "rooted",
-                                    "root_id": selected_root,
-                                    "affix_mode": affix_mode_label.lower(),
-                                    "affix_syllable_range": [int(affix_range[0]), int(affix_range[1])],
-                                }
-
-                        preview_key = f"family_custom_word_preview_{selected_id}"
-                        preview_state = st.session_state.get(preview_key)
-                        can_generate = bool(meaning_tag.strip())
-                        if mode_label == "Use existing root":
-                            can_generate = can_generate and bool(custom_meta.get("root_id"))
-
-                        if st.button(
-                            "Generate candidate",
-                            key=f"family_custom_word_generate_{selected_id}",
-                            disabled=not can_generate,
-                        ):
-                            ipa = generate_custom_word_form(
-                                language_model=lexicon_model,
-                                custom_meta=custom_meta,
-                                phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
-                            )
-                            if not ipa:
-                                st.error("Could not generate a candidate. Try adjusting the settings.")
-                            else:
-                                st.session_state[preview_key] = {
-                                    "ipa": ipa,
-                                    "custom_meta": custom_meta,
-                                    "meaning": meaning_tag.strip(),
-                                    "pos": selected_pos,
-                                    "gloss": gloss_value,
-                                }
-                                preview_state = st.session_state[preview_key]
-
-                        if isinstance(preview_state, dict) and preview_state.get("ipa"):
-                            preview_ipa = str(preview_state.get("ipa", ""))
-                            preview_col_1, preview_col_2 = st.columns(2)
-                            with preview_col_1:
-                                st.markdown(f"**IPA**: `{preview_ipa}`")
-                            with preview_col_2:
-                                st.markdown(
-                                    f"**Sound-like**: `{ipa_text_to_sound_like(preview_ipa, use_segment_separators=False, profile_name=romanization_profile)}`"
+                                selected_compare_pos = st.multiselect(
+                                    "Part of speech filter",
+                                    options=compare_pos_codes,
+                                    default=compare_pos_codes,
+                                    format_func=format_pos_label,
+                                    key=f"family_compare_pos_{selected_id}",
+                                    help="Filter by grammatical category.",
                                 )
 
-                        add_disabled = not (isinstance(preview_state, dict) and preview_state.get("ipa")) or not meaning_tag.strip()
-                        if st.button(
-                            "Add to lexicon",
-                            key=f"family_custom_word_add_{selected_id}",
-                            disabled=add_disabled,
-                        ):
-                            entry = build_custom_entry(
-                                language_model=lexicon_model,
-                                meaning=meaning_tag.strip(),
-                                pos=selected_pos,
-                                gloss=gloss_value,
-                                custom_meta=preview_state.get("custom_meta") if isinstance(preview_state, dict) else None,
-                                ipa_override=preview_state.get("ipa") if isinstance(preview_state, dict) else None,
-                                phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
-                            )
-                            lexicon = lexicon_model.get("lexicon", [])
-                            if not isinstance(lexicon, list):
-                                lexicon = []
-                            lexicon.append(entry)
-                            lexicon_model["lexicon"] = lexicon
-                            lexicon_model = rebuild_indices(lexicon_model)
-                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
-                            save_family_language(selected_language, meta)
-                            st.session_state[preview_key] = None
-                            st.success("Custom entry added to the lexicon.")
-                            st.rerun()
-
-                        st.divider()
-                        st.markdown("**Lexicon overview**")
-
-                        lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
-                        if not isinstance(lexicon_entries, list):
-                            lexicon_entries = []
-
-                        search_term = st.text_input(
-                            "Search lexicon",
-                            key=f"family_lexicon_search_{selected_id}",
-                        )
-
-                        def entry_source_label(entry: Dict[str, Any]) -> str:
-                            if is_custom_entry(entry):
-                                return "Custom"
-                            entry_id = str(entry.get("id", ""))
-                            source = str(entry.get("source", ""))
-                            pos = str(entry.get("pos", ""))
-                            if source.startswith("concept-list:"):
-                                return "Concept roots"
-                            if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
-                                return "Particles"
-                            return "Other"
-
-                        source_order = ["Concept roots", "Custom", "Particles", "Other"]
-                        available_sources = sorted(
-                            {entry_source_label(entry) for entry in lexicon_entries if isinstance(entry, dict)}
-                        )
-                        source_options = [label for label in source_order if label in available_sources]
-                        selected_sources = st.multiselect(
-                            "Source filter",
-                            options=source_options if source_options else source_order,
-                            default=source_options,
-                            key=f"family_lexicon_sources_{selected_id}",
-                        )
-
-                        pos_codes = sorted(
-                            {
-                                str(entry.get("pos", "")).strip()
-                                for entry in lexicon_entries
-                                if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                            compare_lexicon = []
+                            if compare_id and compare_id in languages:
+                                compare_language = project_io.hydrate_language_model(languages[compare_id])
+                                compare_lexicon = compare_language.get("lexicon", [])
+                                if not isinstance(compare_lexicon, list):
+                                    compare_lexicon = []
+                            compare_map = {
+                                str(entry.get("id", "")).strip(): entry
+                                for entry in compare_lexicon
+                                if isinstance(entry, dict)
                             }
-                        )
-                        selected_pos_codes = st.multiselect(
-                            "Part of speech filter",
-                            options=pos_codes,
-                            default=pos_codes,
-                            format_func=format_pos_label,
-                            key=f"family_lexicon_pos_{selected_id}",
-                        )
+                            needle = compare_search.strip().lower()
+                            compare_rows = []
+                            for entry in current_lexicon:
+                                if not isinstance(entry, dict):
+                                    continue
+                                if selected_sources and entry_source_label(entry) not in selected_sources:
+                                    continue
+                                entry_id = str(entry.get("id", "")).strip()
+                                meaning = str(entry.get("meaning", "")).strip()
+                                if needle and needle not in f"{entry_id} {meaning}".lower():
+                                    continue
+                                entry_pos = str(entry.get("pos", "")).strip()
+                                if selected_compare_pos and entry_pos not in selected_compare_pos:
+                                    continue
+                                entry_ipa = str(entry.get("ipa", "")).strip()
+                                other_entry = compare_map.get(entry_id, {})
+                                other_ipa = str(other_entry.get("ipa", "")).strip()
+                                compare_rows.append(
+                                    {
+                                        "Entry": entry_id,
+                                        "Meaning": meaning,
+                                        "IPA": entry_ipa,
+                                        "Sound-like": ipa_text_to_sound_like(
+                                            entry_ipa,
+                                            use_segment_separators=False,
+                                            profile_name=romanization_profile,
+                                        ),
+                                        "Compare IPA": other_ipa,
+                                        "Compare Sound-like": ipa_text_to_sound_like(
+                                            other_ipa,
+                                            use_segment_separators=False,
+                                            profile_name=romanization_profile,
+                                        )
+                                        if other_ipa
+                                        else "",
+                                    }
+                                )
+                                if len(compare_rows) >= compare_count:
+                                    break
 
-                        def matches_search(entry: Dict[str, Any], needle: str) -> bool:
-                            if not needle:
-                                return True
-                            hay = " ".join(
-                                [
-                                    str(entry.get("id", "")),
-                                    str(entry.get("meaning", "")),
-                                    str(entry.get("gloss", "")),
-                                    str(entry.get("ipa", "")),
-                                ]
-                            ).lower()
-                            return needle in hay
+                            st.dataframe(compare_rows, hide_index=True, use_container_width=True)
 
-                        filtered_entries: List[Dict[str, Any]] = []
-                        needle = search_term.strip().lower()
-                        for entry in lexicon_entries:
-                            if not isinstance(entry, dict):
-                                continue
-                            if selected_sources and entry_source_label(entry) not in selected_sources:
-                                continue
-                            entry_pos = str(entry.get("pos", "")).strip()
-                            if selected_pos_codes and entry_pos not in selected_pos_codes:
-                                continue
-                            if not matches_search(entry, needle):
-                                continue
-                            filtered_entries.append(entry)
+                            st.divider()
+                            st.markdown("**Danger zone**")
+                            root_language_id = project.get("root_language_id") if isinstance(project, dict) else None
+                            if selected_id == root_language_id:
+                                st.info("Root languages cannot be deleted from a family project.")
+                            else:
+                                confirm_delete = st.checkbox(
+                                    "I understand this will permanently delete the language file.",
+                                    key=f"family_delete_confirm_{selected_id}",
+                                    help="Required confirmation before deletion.",
+                                )
+                                if st.button(
+                                    "Delete language",
+                                    key=f"family_delete_{selected_id}",
+                                    disabled=not confirm_delete,
+                                    help="Delete this language from the project.",
+                                ):
+                                    languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+                                    target_path = languages_dir / f"{selected_id}.json"
+                                    if target_path.exists():
+                                        target_path.unlink()
+                                    language_index = project.get("language_index", [])
+                                    if not isinstance(language_index, list):
+                                        language_index = []
+                                    language_index = [
+                                        item
+                                        for item in language_index
+                                        if not (isinstance(item, dict) and item.get("language_id") == selected_id)
+                                    ]
+                                    project["language_index"] = language_index
+                                    project_io.save_project(project)
+                                    st.session_state["family_selected_id"] = parent_id or project.get("root_language_id")
+                                    st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                                    st.success("Language deleted.")
+                                    st.rerun()
 
-                        st.caption("Edits and deletions apply to all entries in this lexicon.")
-                        st.caption(f"Showing {len(filtered_entries)} of {len(lexicon_entries)} entries.")
-                        overview_rows = [
-                            {
-                                "Entry": str(entry.get("id", "")),
-                                "IPA": str(entry.get("ipa", "")),
-                                "Sound-like": ipa_text_to_sound_like(
-                                    str(entry.get("ipa", "")),
-                                    use_segment_separators=False,
-                                    profile_name=romanization_profile,
-                                ),
-                                "Gloss": str(entry.get("gloss", "")),
-                                "Meaning tag": str(entry.get("meaning", "")),
-                                "POS": str(entry.get("pos", "")),
-                                "Source": entry_source_label(entry),
-                                "Custom": "Yes" if is_custom_entry(entry) else "No",
-                                "Delete": False,
-                                "Re-roll": False,
-                            }
-                            for entry in filtered_entries
-                        ]
-                        edited_rows = st.data_editor(
-                            overview_rows,
-                            hide_index=True,
-                            use_container_width=True,
-                            key=f"family_lexicon_table_{selected_id}",
-                            column_config={
-                                "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
-                                "Delete": st.column_config.CheckboxColumn("Delete", default=False),
-                                "Entry": st.column_config.TextColumn("Entry", disabled=True),
-                                "IPA": st.column_config.TextColumn("IPA", disabled=True),
-                                "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
-                                "Gloss": st.column_config.TextColumn("Gloss"),
-                                "Meaning tag": st.column_config.TextColumn("Meaning tag"),
-                                "POS": st.column_config.SelectboxColumn("POS", options=pos_options),
-                                "Source": st.column_config.TextColumn("Source", disabled=True),
-                                "Custom": st.column_config.TextColumn("Custom", disabled=True),
-                            },
-                        )
-                        if hasattr(edited_rows, "to_dict"):
-                            edited_rows = edited_rows.to_dict(orient="records")
-                        if not isinstance(edited_rows, list):
-                            edited_rows = []
+                        with detail_tabs[1]:
+                            st.markdown("**Custom word builder**")
+                            lexicon_model = model
+                            root_ids: List[str] = []
+                            root_label_map: Dict[str, str] = {}
+                            builder_col_1, builder_col_2 = st.columns(2)
+                            with builder_col_1:
+                                meaning_tag = st.text_input(
+                                    "Meaning tag",
+                                    key=f"family_custom_word_meaning_{selected_id}",
+                                    help="Short semantic label used for search and glossing.",
+                                )
+                                selected_pos = st.selectbox(
+                                    "Part of speech",
+                                    options=pos_options,
+                                    format_func=format_pos_label,
+                                    key=f"family_custom_word_pos_{selected_id}",
+                                    help="Grammatical category for the new word.",
+                                )
+                                auto_gloss = st.checkbox(
+                                    "Auto gloss",
+                                    value=True,
+                                    key=f"family_custom_word_auto_gloss_{selected_id}",
+                                    help="Automatically generate a gloss from the meaning tag.",
+                                )
+                                gloss_input = st.text_input(
+                                    "Gloss",
+                                    key=f"family_custom_word_gloss_{selected_id}",
+                                    disabled=auto_gloss,
+                                    help="Short gloss used in sentence samples (manual override).",
+                                )
+                                gloss_value = ""
+                                if auto_gloss and meaning_tag.strip():
+                                    gloss_value = concept_gloss(meaning_tag.strip(), selected_pos)
+                                    st.caption(f"Gloss: {gloss_value}")
+                                elif gloss_input.strip():
+                                    gloss_value = gloss_input.strip()
 
-                        entry_map = {
-                            str(entry.get("id", "")).strip(): entry
-                            for entry in lexicon_entries
-                            if isinstance(entry, dict)
-                        }
-                        pending_changes = False
-                        for row in edited_rows:
-                            if not isinstance(row, dict):
-                                continue
-                            row_id = str(row.get("Entry", "")).strip()
-                            entry = entry_map.get(row_id)
-                            if not entry:
-                                continue
-                            if row.get("Delete") is True:
-                                pending_changes = True
-                                break
-                            row_meaning = str(row.get("Meaning tag", "")).strip()
-                            row_gloss = str(row.get("Gloss", "")).strip()
-                            row_pos = str(row.get("POS", "")).strip()
-                            if (
-                                row_meaning != str(entry.get("meaning", "")).strip()
-                                or row_gloss != str(entry.get("gloss", "")).strip()
-                                or row_pos != str(entry.get("pos", "")).strip()
+                            with builder_col_2:
+                                mode_label = st.radio(
+                                    "Build mode",
+                                    options=["Random", "Use existing root"],
+                                    horizontal=True,
+                                    key=f"family_custom_word_mode_{selected_id}",
+                                    help="Random builds from phonotactics; rooted derives from an existing entry.",
+                                )
+                                custom_meta: Dict[str, Any] = {}
+                                if mode_label == "Random":
+                                    custom_range = st.slider(
+                                        "Syllables per word",
+                                        min_value=1,
+                                        max_value=5,
+                                        value=tuple(model.get("syllable_range", [1, 2])),
+                                        key=f"family_custom_word_random_range_{selected_id}",
+                                        help="Total syllable range for the new word.",
+                                    )
+                                    custom_meta = {
+                                        "mode": "random",
+                                        "syllable_range": [int(custom_range[0]), int(custom_range[1])],
+                                    }
+                                else:
+                                    lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
+                                    for entry in lexicon_entries:
+                                        if not isinstance(entry, dict):
+                                            continue
+                                        entry_id = str(entry.get("id", "")).strip()
+                                        pos = str(entry.get("pos", "")).strip()
+                                        if not entry_id or entry_id.startswith("PART:") or pos == "PART":
+                                            continue
+                                        meaning = str(entry.get("meaning", "")).strip()
+                                        label = f"{entry_id} · {meaning}" if meaning else entry_id
+                                        root_ids.append(entry_id)
+                                        root_label_map[entry_id] = label
+                                    selected_root = st.selectbox(
+                                        "Root to derive from",
+                                        options=root_ids if root_ids else ["(none)"],
+                                        format_func=lambda value: root_label_map.get(value, value),
+                                        key=f"family_custom_word_root_{selected_id}",
+                                        disabled=not root_ids,
+                                        help="Pick an existing root to attach affixes to.",
+                                    )
+                                    if not root_ids:
+                                        st.warning("No eligible roots found to derive from.")
+                                        selected_root = ""
+
+                                    affix_mode_label = st.selectbox(
+                                        "Affix mode",
+                                        options=["Auto", "Prefix", "Suffix", "Both"],
+                                        key=f"family_custom_word_affix_mode_{selected_id}",
+                                        help="Where the generated affix should attach.",
+                                    )
+                                    affix_range = st.slider(
+                                        "Affix syllables",
+                                        min_value=1,
+                                        max_value=4,
+                                        value=(1, 1),
+                                        key=f"family_custom_word_affix_range_{selected_id}",
+                                        help="Syllable range for the affix portion.",
+                                    )
+                                    custom_meta = {
+                                        "mode": "rooted",
+                                        "root_id": selected_root,
+                                        "affix_mode": affix_mode_label.lower(),
+                                        "affix_syllable_range": [int(affix_range[0]), int(affix_range[1])],
+                                    }
+
+                            preview_key = f"family_custom_word_preview_{selected_id}"
+                            preview_state = st.session_state.get(preview_key)
+                            can_generate = bool(meaning_tag.strip())
+                            if mode_label == "Use existing root":
+                                can_generate = can_generate and bool(custom_meta.get("root_id"))
+
+                            if st.button(
+                                "Generate candidate",
+                                key=f"family_custom_word_generate_{selected_id}",
+                                disabled=not can_generate,
+                                help="Generate a new candidate form using the current settings.",
                             ):
-                                pending_changes = True
-                                break
+                                ipa = generate_custom_word_form(
+                                    language_model=lexicon_model,
+                                    custom_meta=custom_meta,
+                                    phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
+                                )
+                                if not ipa:
+                                    st.error("Could not generate a candidate. Try adjusting the settings.")
+                                else:
+                                    st.session_state[preview_key] = {
+                                        "ipa": ipa,
+                                        "custom_meta": custom_meta,
+                                        "meaning": meaning_tag.strip(),
+                                        "pos": selected_pos,
+                                        "gloss": gloss_value,
+                                    }
+                                    preview_state = st.session_state[preview_key]
 
-                        if st.button(
-                            "Apply edits / deletions",
-                            key=f"family_lexicon_apply_{selected_id}",
-                            disabled=not pending_changes,
-                        ):
-                            delete_ids: List[str] = []
-                            edit_count = 0
-                            overrides = meta.get("lexicon_overrides", {})
-                            if not isinstance(overrides, dict):
-                                overrides = {}
+                            if isinstance(preview_state, dict) and preview_state.get("ipa"):
+                                preview_ipa = str(preview_state.get("ipa", ""))
+                                preview_col_1, preview_col_2 = st.columns(2)
+                                with preview_col_1:
+                                    st.markdown(f"**IPA**: `{preview_ipa}`")
+                                with preview_col_2:
+                                    st.markdown(
+                                        f"**Sound-like**: `{ipa_text_to_sound_like(preview_ipa, use_segment_separators=False, profile_name=romanization_profile)}`"
+                                    )
+
+                            add_disabled = not (isinstance(preview_state, dict) and preview_state.get("ipa")) or not meaning_tag.strip()
+                            if st.button(
+                                "Add to lexicon",
+                                key=f"family_custom_word_add_{selected_id}",
+                                disabled=add_disabled,
+                                help="Persist the previewed word into the lexicon.",
+                            ):
+                                entry = build_custom_entry(
+                                    language_model=lexicon_model,
+                                    meaning=meaning_tag.strip(),
+                                    pos=selected_pos,
+                                    gloss=gloss_value,
+                                    custom_meta=preview_state.get("custom_meta") if isinstance(preview_state, dict) else None,
+                                    ipa_override=preview_state.get("ipa") if isinstance(preview_state, dict) else None,
+                                    phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
+                                )
+                                lexicon = lexicon_model.get("lexicon", [])
+                                if not isinstance(lexicon, list):
+                                    lexicon = []
+                                lexicon.append(entry)
+                                lexicon_model["lexicon"] = lexicon
+                                lexicon_model = rebuild_indices(lexicon_model)
+                                selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                                save_family_language(selected_language, meta)
+                                st.session_state[preview_key] = None
+                                st.success("Custom entry added to the lexicon.")
+                                st.rerun()
+
+                            st.divider()
+                            st.markdown("**Lexicon overview**")
+
+                            lexicon_entries = lexicon_model.get("lexicon", []) if isinstance(lexicon_model, dict) else []
+                            if not isinstance(lexicon_entries, list):
+                                lexicon_entries = []
+
+                            search_term = st.text_input(
+                                "Search lexicon",
+                                key=f"family_lexicon_search_{selected_id}",
+                                help="Filter by ID, meaning, gloss, or IPA.",
+                            )
+
+                            def entry_source_label(entry: Dict[str, Any]) -> str:
+                                if is_custom_entry(entry):
+                                    return "Custom"
+                                entry_id = str(entry.get("id", ""))
+                                source = str(entry.get("source", ""))
+                                pos = str(entry.get("pos", ""))
+                                if source.startswith("concept-list:"):
+                                    return "Concept roots"
+                                if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
+                                    return "Particles"
+                                return "Other"
+
+                            source_order = ["Concept roots", "Custom", "Particles", "Other"]
+                            available_sources = sorted(
+                                {entry_source_label(entry) for entry in lexicon_entries if isinstance(entry, dict)}
+                            )
+                            source_options = [label for label in source_order if label in available_sources]
+                            selected_sources = st.multiselect(
+                                "Source filter",
+                                options=source_options if source_options else source_order,
+                                default=source_options,
+                                key=f"family_lexicon_sources_{selected_id}",
+                                help="Filter by entry origin.",
+                            )
+
+                            pos_codes = sorted(
+                                {
+                                    str(entry.get("pos", "")).strip()
+                                    for entry in lexicon_entries
+                                    if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                                }
+                            )
+                            selected_pos_codes = st.multiselect(
+                                "Part of speech filter",
+                                options=pos_codes,
+                                default=pos_codes,
+                                format_func=format_pos_label,
+                                key=f"family_lexicon_pos_{selected_id}",
+                                help="Filter by grammatical category.",
+                            )
+
+                            def matches_search(entry: Dict[str, Any], needle: str) -> bool:
+                                if not needle:
+                                    return True
+                                hay = " ".join(
+                                    [
+                                        str(entry.get("id", "")),
+                                        str(entry.get("meaning", "")),
+                                        str(entry.get("gloss", "")),
+                                        str(entry.get("ipa", "")),
+                                    ]
+                                ).lower()
+                                return needle in hay
+
+                            filtered_entries: List[Dict[str, Any]] = []
+                            needle = search_term.strip().lower()
+                            for entry in lexicon_entries:
+                                if not isinstance(entry, dict):
+                                    continue
+                                if selected_sources and entry_source_label(entry) not in selected_sources:
+                                    continue
+                                entry_pos = str(entry.get("pos", "")).strip()
+                                if selected_pos_codes and entry_pos not in selected_pos_codes:
+                                    continue
+                                if not matches_search(entry, needle):
+                                    continue
+                                filtered_entries.append(entry)
+
+                            st.caption("Edits and deletions apply to all entries in this lexicon.")
+                            st.caption(f"Showing {len(filtered_entries)} of {len(lexicon_entries)} entries.")
+                            overview_rows = [
+                                {
+                                    "Entry": str(entry.get("id", "")),
+                                    "IPA": str(entry.get("ipa", "")),
+                                    "Sound-like": ipa_text_to_sound_like(
+                                        str(entry.get("ipa", "")),
+                                        use_segment_separators=False,
+                                        profile_name=romanization_profile,
+                                    ),
+                                    "Gloss": str(entry.get("gloss", "")),
+                                    "Meaning tag": str(entry.get("meaning", "")),
+                                    "POS": str(entry.get("pos", "")),
+                                    "Source": entry_source_label(entry),
+                                    "Custom": "Yes" if is_custom_entry(entry) else "No",
+                                    "Delete": False,
+                                    "Re-roll": False,
+                                }
+                                for entry in filtered_entries
+                            ]
+                            edited_rows = st.data_editor(
+                                overview_rows,
+                                hide_index=True,
+                                use_container_width=True,
+                                height=520,
+                                key=f"family_lexicon_table_{selected_id}",
+                                column_config={
+                                    "Re-roll": st.column_config.CheckboxColumn(
+                                        "Re-roll",
+                                        default=False,
+                                        help="Regenerate this entry's IPA form.",
+                                    ),
+                                    "Delete": st.column_config.CheckboxColumn(
+                                        "Delete",
+                                        default=False,
+                                        help="Remove this entry from the lexicon.",
+                                    ),
+                                    "Entry": st.column_config.TextColumn("Entry", disabled=True, help="Stable entry ID."),
+                                    "IPA": st.column_config.TextColumn("IPA", disabled=True, help="Canonical IPA form."),
+                                    "Sound-like": st.column_config.TextColumn(
+                                        "Sound-like", disabled=True, help="Approximate romanization display."
+                                    ),
+                                    "Gloss": st.column_config.TextColumn("Gloss", help="Edit the gloss field."),
+                                    "Meaning tag": st.column_config.TextColumn("Meaning tag", help="Edit the meaning tag."),
+                                    "POS": st.column_config.SelectboxColumn(
+                                        "POS", options=pos_options, help="Edit part of speech."
+                                    ),
+                                    "Source": st.column_config.TextColumn("Source", disabled=True, help="Entry origin."),
+                                    "Custom": st.column_config.TextColumn("Custom", disabled=True, help="Custom entry flag."),
+                                },
+                            )
+                            if hasattr(edited_rows, "to_dict"):
+                                edited_rows = edited_rows.to_dict(orient="records")
+                            if not isinstance(edited_rows, list):
+                                edited_rows = []
+
+                            entry_map = {
+                                str(entry.get("id", "")).strip(): entry
+                                for entry in lexicon_entries
+                                if isinstance(entry, dict)
+                            }
+                            pending_changes = False
                             for row in edited_rows:
                                 if not isinstance(row, dict):
                                     continue
@@ -4037,258 +4589,302 @@ def render_language_family_ui() -> None:
                                 entry = entry_map.get(row_id)
                                 if not entry:
                                     continue
-                                wants_delete = row.get("Delete") is True
-                                if wants_delete:
-                                    delete_ids.append(row_id)
-                                    overrides.pop(row_id, None)
-                                    continue
+                                if row.get("Delete") is True:
+                                    pending_changes = True
+                                    break
                                 row_meaning = str(row.get("Meaning tag", "")).strip()
                                 row_gloss = str(row.get("Gloss", "")).strip()
                                 row_pos = str(row.get("POS", "")).strip()
-                                changed = False
-                                if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
-                                    entry["meaning"] = row_meaning
-                                    changed = True
-                                if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
-                                    entry["gloss"] = row_gloss
-                                    changed = True
-                                if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
-                                    entry["pos"] = row_pos
-                                    changed = True
-                                if changed:
-                                    edit_count += 1
+                                if (
+                                    row_meaning != str(entry.get("meaning", "")).strip()
+                                    or row_gloss != str(entry.get("gloss", "")).strip()
+                                    or row_pos != str(entry.get("pos", "")).strip()
+                                ):
+                                    pending_changes = True
+                                    break
 
-                            if delete_ids:
-                                lexicon_model["lexicon"] = [
-                                    entry
-                                    for entry in lexicon_entries
-                                    if str(entry.get("id", "")).strip() not in set(delete_ids)
-                                ]
-                            meta["lexicon_overrides"] = overrides
-                            lexicon_model = rebuild_indices(lexicon_model)
-                            selected_language["meta"] = meta
-                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
-                            save_family_language(selected_language, meta)
-                            if edit_count or delete_ids:
-                                st.success("Lexicon updates applied.")
-                            st.rerun()
+                            if st.button(
+                                "Apply edits / deletions",
+                                key=f"family_lexicon_apply_{selected_id}",
+                                disabled=not pending_changes,
+                                help="Commit edits and deletions to the lexicon.",
+                            ):
+                                delete_ids: List[str] = []
+                                edit_count = 0
+                                overrides = meta.get("lexicon_overrides", {})
+                                if not isinstance(overrides, dict):
+                                    overrides = {}
+                                for row in edited_rows:
+                                    if not isinstance(row, dict):
+                                        continue
+                                    row_id = str(row.get("Entry", "")).strip()
+                                    entry = entry_map.get(row_id)
+                                    if not entry:
+                                        continue
+                                    wants_delete = row.get("Delete") is True
+                                    if wants_delete:
+                                        delete_ids.append(row_id)
+                                        overrides.pop(row_id, None)
+                                        continue
+                                    row_meaning = str(row.get("Meaning tag", "")).strip()
+                                    row_gloss = str(row.get("Gloss", "")).strip()
+                                    row_pos = str(row.get("POS", "")).strip()
+                                    changed = False
+                                    if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
+                                        entry["meaning"] = row_meaning
+                                        changed = True
+                                    if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
+                                        entry["gloss"] = row_gloss
+                                        changed = True
+                                    if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
+                                        entry["pos"] = row_pos
+                                        changed = True
+                                    if changed:
+                                        edit_count += 1
 
-                        overview_rerolls = [
-                            str(row.get("Entry", "")).strip()
-                            for row in edited_rows
-                            if isinstance(row, dict) and row.get("Re-roll") is True
-                        ]
+                                if delete_ids:
+                                    lexicon_model["lexicon"] = [
+                                        entry
+                                        for entry in lexicon_entries
+                                        if str(entry.get("id", "")).strip() not in set(delete_ids)
+                                    ]
+                                meta["lexicon_overrides"] = overrides
+                                lexicon_model = rebuild_indices(lexicon_model)
+                                selected_language["meta"] = meta
+                                selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                                save_family_language(selected_language, meta)
+                                if edit_count or delete_ids:
+                                    st.success("Lexicon updates applied.")
+                                st.rerun()
 
-                        csv_rows = [
-                            {
-                                "id": str(entry.get("id", "")),
-                                "ipa": str(entry.get("ipa", "")),
-                                "sound_like": ipa_text_to_sound_like(
-                                    str(entry.get("ipa", "")),
-                                    use_segment_separators=False,
-                                    profile_name=romanization_profile,
-                                ),
-                                "meaning": str(entry.get("meaning", "")),
-                                "gloss": str(entry.get("gloss", "")),
-                                "pos": str(entry.get("pos", "")),
-                                "source": entry_source_label(entry),
-                            }
-                            for entry in filtered_entries
-                            if isinstance(entry, dict)
-                        ]
-                        lexicon_csv = build_lexicon_csv(csv_rows)
-                        st.download_button(
-                            label="Download lexicon CSV",
-                            data=lexicon_csv,
-                            file_name=f"{sanitize_name(meta.get('name', selected_id))}_lexicon.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                        )
-                        if st.button(
-                            f"Re-roll {len(overview_rerolls)} selected",
-                            key=f"family_reroll_{selected_id}",
-                            disabled=not overview_rerolls,
-                        ):
-                            overrides = meta.get("lexicon_overrides", {})
-                            if not isinstance(overrides, dict):
-                                overrides = {}
-                            for entry_id in overview_rerolls:
-                                reroll_lexicon_entry(
-                                    lexicon_model,
-                                    entry_id=entry_id,
-                                    phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
-                                )
-                                overrides[entry_id] = find_entry_ipa(lexicon_model, entry_id)
-                            meta["lexicon_overrides"] = overrides
-                            selected_language["meta"] = meta
-                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
-                            save_family_language(selected_language, meta)
-                            st.success("Re-rolled entries saved.")
-                            st.rerun()
+                            overview_rerolls = [
+                                str(row.get("Entry", "")).strip()
+                                for row in edited_rows
+                                if isinstance(row, dict) and row.get("Re-roll") is True
+                            ]
 
-                    with detail_tabs[2]:
-                        st.markdown("**Word preview**")
-                        lexicon_entries = model.get("lexicon", [])
-                        if not isinstance(lexicon_entries, list):
-                            lexicon_entries = []
-
-                        def entry_source_label(entry: Dict[str, Any]) -> str:
-                            if is_custom_entry(entry):
-                                return "Custom"
-                            entry_id = str(entry.get("id", ""))
-                            source = str(entry.get("source", ""))
-                            pos = str(entry.get("pos", ""))
-                            if source.startswith("concept-list:"):
-                                return "Concept roots"
-                            if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
-                                return "Particles"
-                            return "Other"
-
-                        preview_search = st.text_input(
-                            "Search words",
-                            key=f"family_word_preview_search_{selected_id}",
-                            placeholder="Filter by id, meaning, or gloss",
-                        )
-                        preview_filters = st.columns(3)
-                        with preview_filters[0]:
-                            preview_limit = st.slider(
-                                "Rows to show",
-                                min_value=20,
-                                max_value=300,
-                                value=80,
-                                step=20,
-                                key=f"family_word_preview_limit_{selected_id}",
-                            )
-                        with preview_filters[1]:
-                            preview_sources = sorted(
-                                {entry_source_label(entry) for entry in lexicon_entries if isinstance(entry, dict)}
-                            )
-                            selected_preview_sources = st.multiselect(
-                                "Source filter",
-                                options=preview_sources,
-                                default=preview_sources,
-                                key=f"family_word_preview_sources_{selected_id}",
-                            )
-                        with preview_filters[2]:
-                            preview_pos_codes = sorted(
+                            csv_rows = [
                                 {
-                                    str(entry.get("pos", "")).strip()
-                                    for entry in lexicon_entries
-                                    if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
-                                }
-                            )
-                            selected_preview_pos = st.multiselect(
-                                "Part of speech filter",
-                                options=preview_pos_codes,
-                                default=preview_pos_codes,
-                                format_func=format_pos_label,
-                                key=f"family_word_preview_pos_{selected_id}",
-                            )
-
-                        needle = preview_search.strip().lower()
-                        preview_rows = []
-                        for entry in lexicon_entries:
-                            if not isinstance(entry, dict):
-                                continue
-                            if selected_preview_sources and entry_source_label(entry) not in selected_preview_sources:
-                                continue
-                            entry_pos = str(entry.get("pos", "")).strip()
-                            if selected_preview_pos and entry_pos not in selected_preview_pos:
-                                continue
-                            entry_id = str(entry.get("id", "")).strip()
-                            meaning = str(entry.get("meaning", "")).strip()
-                            gloss = str(entry.get("gloss", "")).strip()
-                            if needle and needle not in f"{entry_id} {meaning} {gloss}".lower():
-                                continue
-                            ipa_value = str(entry.get("ipa", "")).strip()
-                            preview_rows.append(
-                                {
-                                    "Entry": entry_id,
-                                    "IPA": ipa_value,
-                                    "Sound-like": ipa_text_to_sound_like(
-                                        ipa_value,
+                                    "id": str(entry.get("id", "")),
+                                    "ipa": str(entry.get("ipa", "")),
+                                    "sound_like": ipa_text_to_sound_like(
+                                        str(entry.get("ipa", "")),
                                         use_segment_separators=False,
                                         profile_name=romanization_profile,
                                     ),
-                                    "Gloss": gloss,
-                                    "Meaning tag": meaning,
-                                    "POS": format_pos_label(entry_pos),
-                                    "Source": entry_source_label(entry),
+                                    "meaning": str(entry.get("meaning", "")),
+                                    "gloss": str(entry.get("gloss", "")),
+                                    "pos": str(entry.get("pos", "")),
+                                    "source": entry_source_label(entry),
                                 }
+                                for entry in filtered_entries
+                                if isinstance(entry, dict)
+                            ]
+                            lexicon_csv = build_lexicon_csv(csv_rows)
+                            st.download_button(
+                                label="Download lexicon CSV",
+                                data=lexicon_csv,
+                                file_name=f"{sanitize_name(meta.get('name', selected_id))}_lexicon.csv",
+                                mime="text/csv",
+                                use_container_width=True,
+                                help="Download the filtered lexicon as CSV.",
                             )
-                            if len(preview_rows) >= preview_limit:
-                                break
+                            if st.button(
+                                f"Re-roll {len(overview_rerolls)} selected",
+                                key=f"family_reroll_{selected_id}",
+                                disabled=not overview_rerolls,
+                                help="Regenerate IPA forms for the selected entries.",
+                            ):
+                                overrides = meta.get("lexicon_overrides", {})
+                                if not isinstance(overrides, dict):
+                                    overrides = {}
+                                for entry_id in overview_rerolls:
+                                    reroll_lexicon_entry(
+                                        lexicon_model,
+                                        entry_id=entry_id,
+                                        phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
+                                    )
+                                    overrides[entry_id] = find_entry_ipa(lexicon_model, entry_id)
+                                meta["lexicon_overrides"] = overrides
+                                selected_language["meta"] = meta
+                                selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                                save_family_language(selected_language, meta)
+                                st.success("Re-rolled entries saved.")
+                                st.rerun()
 
-                        st.caption(f"Showing {len(preview_rows)} of {len(lexicon_entries)} entries.")
-                        st.dataframe(preview_rows, hide_index=True, use_container_width=True)
+                        with detail_tabs[2]:
+                            st.markdown("**Word preview**")
+                            lexicon_entries = model.get("lexicon", [])
+                            if not isinstance(lexicon_entries, list):
+                                lexicon_entries = []
 
-                        st.divider()
-                        st.markdown("**Sample sentences**")
-                        sample_sentence_count = st.number_input(
-                            "Sentence samples",
-                            min_value=1,
-                            max_value=20,
-                            value=5,
-                            step=1,
-                            key=f"family_sentence_count_{selected_id}",
-                        )
-                        words_range = st.slider(
-                            "Words per sentence",
-                            min_value=2,
-                            max_value=12,
-                            value=(4, 8),
-                            key=f"family_words_range_{selected_id}",
-                        )
-                        if st.button("Generate sentences", key=f"family_generate_sentences_{selected_id}"):
-                            sentences = build_sample_sentences(
-                                vowels=model.get("inventory", {}).get("vowels", []),
-                                consonants=model.get("inventory", {}).get("consonants", []),
-                                sample_count=int(sample_sentence_count),
-                                syllable_range=tuple(model.get("syllable_range", [1, 2])),
-                                words_range=tuple(words_range),
-                                syllable_separator=str(model.get("syllable_separator", "")),
-                                style_name=str(model.get("style_name", DEFAULT_STYLE_PRESET)),
-                                concept_list_name=str(model.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
-                                grammar_profile_name=str(model.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
-                                language_model=model,
-                                phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
+                            def entry_source_label(entry: Dict[str, Any]) -> str:
+                                if is_custom_entry(entry):
+                                    return "Custom"
+                                entry_id = str(entry.get("id", ""))
+                                source = str(entry.get("source", ""))
+                                pos = str(entry.get("pos", ""))
+                                if source.startswith("concept-list:"):
+                                    return "Concept roots"
+                                if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
+                                    return "Particles"
+                                return "Other"
+
+                            preview_search = st.text_input(
+                                "Search words",
+                                key=f"family_word_preview_search_{selected_id}",
+                                placeholder="Filter by id, meaning, or gloss",
+                                help="Filter by ID, meaning, gloss, or IPA.",
                             )
-                            st.session_state[f"family_sentences_{selected_id}"] = sentences
-                        sentences = st.session_state.get(f"family_sentences_{selected_id}", [])
-                        if sentences:
-                            st.dataframe(
-                                [
+                            preview_filters = st.columns(3)
+                            with preview_filters[0]:
+                                preview_limit = st.slider(
+                                    "Rows to show",
+                                    min_value=20,
+                                    max_value=300,
+                                    value=80,
+                                    step=20,
+                                    key=f"family_word_preview_limit_{selected_id}",
+                                    help="Limit the number of rows shown.",
+                                )
+                            with preview_filters[1]:
+                                preview_sources = sorted(
+                                    {entry_source_label(entry) for entry in lexicon_entries if isinstance(entry, dict)}
+                                )
+                                selected_preview_sources = st.multiselect(
+                                    "Source filter",
+                                    options=preview_sources,
+                                    default=preview_sources,
+                                    key=f"family_word_preview_sources_{selected_id}",
+                                    help="Filter by entry origin.",
+                                )
+                            with preview_filters[2]:
+                                preview_pos_codes = sorted(
                                     {
-                                        "IPA": s.get("ipa", ""),
-                                        "Gloss": s.get("gloss", ""),
-                                        "Template": s.get("template", ""),
+                                        str(entry.get("pos", "")).strip()
+                                        for entry in lexicon_entries
+                                        if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                                    }
+                                )
+                                selected_preview_pos = st.multiselect(
+                                    "Part of speech filter",
+                                    options=preview_pos_codes,
+                                    default=preview_pos_codes,
+                                    format_func=format_pos_label,
+                                    key=f"family_word_preview_pos_{selected_id}",
+                                    help="Filter by grammatical category.",
+                                )
+
+                            needle = preview_search.strip().lower()
+                            preview_rows = []
+                            for entry in lexicon_entries:
+                                if not isinstance(entry, dict):
+                                    continue
+                                if selected_preview_sources and entry_source_label(entry) not in selected_preview_sources:
+                                    continue
+                                entry_pos = str(entry.get("pos", "")).strip()
+                                if selected_preview_pos and entry_pos not in selected_preview_pos:
+                                    continue
+                                entry_id = str(entry.get("id", "")).strip()
+                                meaning = str(entry.get("meaning", "")).strip()
+                                gloss = str(entry.get("gloss", "")).strip()
+                                if needle and needle not in f"{entry_id} {meaning} {gloss}".lower():
+                                    continue
+                                ipa_value = str(entry.get("ipa", "")).strip()
+                                preview_rows.append(
+                                    {
+                                        "Entry": entry_id,
+                                        "IPA": ipa_value,
                                         "Sound-like": ipa_text_to_sound_like(
-                                            str(s.get("ipa", "")),
+                                            ipa_value,
                                             use_segment_separators=False,
                                             profile_name=romanization_profile,
                                         ),
+                                        "Gloss": gloss,
+                                        "Meaning tag": meaning,
+                                        "POS": format_pos_label(entry_pos),
+                                        "Source": entry_source_label(entry),
                                     }
-                                    for s in sentences
-                                ],
-                                hide_index=True,
-                                use_container_width=True,
-                            )
-                        else:
-                            st.info("No sentences generated yet.")
+                                )
+                                if len(preview_rows) >= preview_limit:
+                                    break
 
-    with help_col:
-        st.markdown("### Help")
-        topic_key = st.session_state.get("help_topic")
-        if topic_key and topic_key in help_topics:
-            topic = help_topics[topic_key]
-            st.markdown(f"**{topic['title']}**")
-            st.write(topic["body"])
-        else:
-            st.write("Click a ? icon to learn about a control.")
+                            st.caption(f"Showing {len(preview_rows)} of {len(lexicon_entries)} entries.")
+                            st.dataframe(preview_rows, hide_index=True, use_container_width=True)
+
+                            st.divider()
+                            st.markdown("**Sample sentences**")
+                            sample_sentence_count = st.number_input(
+                                "Sentence samples",
+                                min_value=1,
+                                max_value=20,
+                                value=5,
+                                step=1,
+                                key=f"family_sentence_count_{selected_id}",
+                                help="How many sentences to generate per click.",
+                            )
+                            words_range = st.slider(
+                                "Words per sentence",
+                                min_value=2,
+                                max_value=12,
+                                value=(4, 8),
+                                key=f"family_words_range_{selected_id}",
+                                help="Range of word counts per sentence.",
+                            )
+                            if st.button(
+                                "Generate sentences",
+                                key=f"family_generate_sentences_{selected_id}",
+                                help="Generate sample sentences for this language.",
+                            ):
+                                sentences = build_sample_sentences(
+                                    vowels=model.get("inventory", {}).get("vowels", []),
+                                    consonants=model.get("inventory", {}).get("consonants", []),
+                                    sample_count=int(sample_sentence_count),
+                                    syllable_range=tuple(model.get("syllable_range", [1, 2])),
+                                    words_range=tuple(words_range),
+                                    syllable_separator=str(model.get("syllable_separator", "")),
+                                    style_name=str(model.get("style_name", DEFAULT_STYLE_PRESET)),
+                                    concept_list_name=str(model.get("concept_list_name", DEFAULT_CONCEPT_LIST)),
+                                    grammar_profile_name=str(model.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)),
+                                    language_model=model,
+                                    phonotactic_profile_overrides=model.get("phonotactic_profile_overrides"),
+                                )
+                                st.session_state[f"family_sentences_{selected_id}"] = sentences
+                            sentences = st.session_state.get(f"family_sentences_{selected_id}", [])
+                            if sentences:
+                                st.dataframe(
+                                    [
+                                        {
+                                            "IPA": s.get("ipa", ""),
+                                            "Gloss": s.get("gloss", ""),
+                                            "Template": s.get("template", ""),
+                                            "Sound-like": ipa_text_to_sound_like(
+                                                str(s.get("ipa", "")),
+                                                use_segment_separators=False,
+                                                profile_name=romanization_profile,
+                                            ),
+                                        }
+                                        for s in sentences
+                                    ],
+                                    hide_index=True,
+                                    use_container_width=True,
+                                )
+                            else:
+                                st.info("No sentences generated yet.")
+
+        with help_col:
+            st.markdown("### Help")
+            topic_key = st.session_state.get("help_topic")
+            if topic_key and topic_key in help_topics:
+                topic = help_topics[topic_key]
+                st.markdown(f"**{topic['title']}**")
+                st.write(topic["body"])
+            else:
+                st.write("Click a ? icon to learn about a control.")
 
 
 def main() -> None:
-    st.set_page_config(page_title="Sound Inventory Generator", page_icon="🔤", layout="wide")
+    st.set_page_config(page_title="Conlang Sound Toolkit", page_icon="🔤", layout="wide")
     inject_custom_css()
     render_hero()
 
@@ -4297,6 +4893,7 @@ def main() -> None:
         options=["Single Language", "Language Family"],
         index=0,
         key="app_mode",
+        help="Switch between single-language and family workflows.",
     )
     if mode == "Language Family":
         render_language_family_ui()

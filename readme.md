@@ -1,17 +1,39 @@
-# Sound Inventory Generator
+# Conlang Sound Toolkit
 
-Generate plausible phoneme inventories by mixing language presets, adding optional random segments, and applying optional sound-change rules.
+Build phonology-driven languages, generate lexicons with custom words, and evolve daughter languages via sound changes.
 
 ## What this project does
 
-- Loads preset inventories from `presets/*.json`.
-- Mixes selected presets with user-defined weights.
-- Samples each preset's segments using per-segment `representation` weights (if present).
-- Optionally adds random segments from a master preset (default: `random_master`).
-- Optionally applies rule sets from `rules/*.json`.
-- Exports:
-  - a JSON inventory (`<name>.json`, including sampled representation traces)
-  - minimal CLDF-style CSV files (`languages.csv`, `inventories.csv`, `values.csv`)
+- Mix preset inventories to generate a phoneme inventory.
+- Apply sound-change rule sets.
+- Generate lexicon-backed word and sentence samples from concept lists, grammar profiles, and phonotactic styles.
+- Add, edit, delete, and re-roll custom lexicon entries.
+- Build language families, define sound-change templates, and compare parent/child lexica.
+- Export presets, pronunciation guides, lexicon CSVs, and full snapshots.
+- Import PHOIBLE inventories into presets.
+
+## UI usage (Streamlit)
+
+1. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Start the UI:
+
+```bash
+streamlit run app.py
+```
+
+3. In the UI you can:
+
+- configure inventories and rules,
+- review vowels and consonants with sound-like hints,
+- generate lexicon-backed word and sentence samples,
+- create custom words and curate the full lexicon,
+- export presets, lexicon CSVs, and snapshot JSONs,
+- build and compare language families.
 
 ## CLI usage
 
@@ -27,7 +49,7 @@ python sound_inventory_generator.py \
 
 ## Preset format
 
-Presets now support weighted segment entries:
+Presets support weighted segment entries:
 
 ```json
 {
@@ -46,29 +68,3 @@ Presets now support weighted segment entries:
 `representation` controls how likely a segment is to be sampled when mixing. Larger values make a segment more likely to appear in generated inventories. Values are relative and do not need to sum to 1.
 
 Legacy list format (e.g. `"vowels": ["i", "a"]`) still works and is treated as `representation: 1.0` for each segment.
-
-## Simple UI usage (Streamlit)
-
-1. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-2. Start the UI:
-
-```bash
-streamlit run app.py
-```
-
-3. In the UI you can:
-
-- choose presets and weights,
-- set random weight and master preset,
-- apply rule sets,
-- view source-sound mixing guides and sound-like hints anywhere IPA is shown,
-- generate and preview vowels/consonants,
-- generate lexicon-backed sample words/sentences from the latest inventory (with phonotactic styles, concept lists, grammar profiles, POS tags, and gloss hints),
-- get validation feedback for concept/grammar/style profile definitions while iterating,
-- save outputs to an output folder,
-- save the latest result as a reusable preset in `presets/`.

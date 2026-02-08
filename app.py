@@ -2447,7 +2447,7 @@ def render_single_language_ui() -> None:
                     continue
                 filtered_entries.append(entry)
 
-            st.caption("Edits and deletions apply only to custom entries. Concept roots and particles stay locked.")
+            st.caption("Edits and deletions apply to all entries in this lexicon.")
             st.caption(f"Showing {len(filtered_entries)} of {len(lexicon_entries)} entries.")
             overview_rows = [
                 {
@@ -2527,8 +2527,6 @@ def render_single_language_ui() -> None:
             if apply_changes:
                 delete_ids: List[str] = []
                 edit_count = 0
-                ignored_edits = 0
-                ignored_deletes = 0
                 for row in edited_overview_rows:
                     if not isinstance(row, dict):
                         continue
@@ -2538,34 +2536,23 @@ def render_single_language_ui() -> None:
                         continue
                     wants_delete = row.get("Delete") is True
                     if wants_delete:
-                        if is_custom_entry(entry):
-                            delete_ids.append(row_id)
-                        else:
-                            ignored_deletes += 1
+                        delete_ids.append(row_id)
                         continue
                     row_meaning = str(row.get("Meaning tag", "")).strip()
                     row_gloss = str(row.get("Gloss", "")).strip()
                     row_pos = str(row.get("POS", "")).strip()
-                    if is_custom_entry(entry):
-                        changed = False
-                        if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
-                            entry["meaning"] = row_meaning
-                            changed = True
-                        if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
-                            entry["gloss"] = row_gloss
-                            changed = True
-                        if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
-                            entry["pos"] = row_pos
-                            changed = True
-                        if changed:
-                            edit_count += 1
-                    else:
-                        if (
-                            row_meaning != str(entry.get("meaning", "")).strip()
-                            or row_gloss != str(entry.get("gloss", "")).strip()
-                            or row_pos != str(entry.get("pos", "")).strip()
-                        ):
-                            ignored_edits += 1
+                    changed = False
+                    if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
+                        entry["meaning"] = row_meaning
+                        changed = True
+                    if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
+                        entry["gloss"] = row_gloss
+                        changed = True
+                    if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
+                        entry["pos"] = row_pos
+                        changed = True
+                    if changed:
+                        edit_count += 1
 
                 if delete_ids:
                     lexicon_model["lexicon"] = [
@@ -2587,10 +2574,6 @@ def render_single_language_ui() -> None:
                         phonotactic_profile_overrides=phonotactic_overrides,
                     )
                 st.session_state.pop("sample_sentences", None)
-                if ignored_edits:
-                    st.warning(f"Ignored {ignored_edits} edit(s) on locked entries.")
-                if ignored_deletes:
-                    st.warning(f"Ignored {ignored_deletes} delete(s) on locked entries.")
                 if edit_count or delete_ids:
                     st.success("Lexicon updates applied.")
                 st.rerun()
@@ -2774,6 +2757,18 @@ def render_language_family_ui() -> None:
     romanization_profile = st.session_state.get("romanization_profile", DEFAULT_ROMANIZATION_PROFILE)
     if romanization_profile not in ROMANIZATION_PROFILES:
         romanization_profile = DEFAULT_ROMANIZATION_PROFILE
+
+    display_col, _ = st.columns([1.1, 2.9])
+    with display_col:
+        romanization_profile = st.selectbox(
+            "Romanization profile",
+            options=list(ROMANIZATION_PROFILES.keys()),
+            index=list(ROMANIZATION_PROFILES.keys()).index(romanization_profile)
+            if romanization_profile in ROMANIZATION_PROFILES
+            else 0,
+            key="romanization_profile",
+            help="Display-only: how IPA renders to sound-like text.",
+        )
 
     notice = st.session_state.pop("family_notice", None)
     if notice:
@@ -3374,7 +3369,29 @@ def render_language_family_ui() -> None:
                         lexicon_preview = language_diff.sample_lexicon_diff(parent_language, preview_language, n=12)
                         if lexicon_preview:
                             help_button("lexicon_diff", "create")
-                            st.dataframe(lexicon_preview, hide_index=True, use_container_width=True)
+                            preview_rows = []
+                            for row in lexicon_preview:
+                                parent_ipa = str(row.get("parent_ipa", ""))
+                                child_ipa = str(row.get("child_ipa", ""))
+                                preview_rows.append(
+                                    {
+                                        "id": row.get("id", ""),
+                                        "meaning": row.get("meaning", ""),
+                                        "parent_ipa": parent_ipa,
+                                        "parent_sound_like": ipa_text_to_sound_like(
+                                            parent_ipa,
+                                            use_segment_separators=False,
+                                            profile_name=romanization_profile,
+                                        ),
+                                        "child_ipa": child_ipa,
+                                        "child_sound_like": ipa_text_to_sound_like(
+                                            child_ipa,
+                                            use_segment_separators=False,
+                                            profile_name=romanization_profile,
+                                        ),
+                                    }
+                                )
+                            st.dataframe(preview_rows, hide_index=True, use_container_width=True)
 
                         if st.button("Create Daughter", type="primary", use_container_width=True):
                             if child_id_input in existing_ids:
@@ -3434,7 +3451,29 @@ def render_language_family_ui() -> None:
                     st.markdown("**Lexicon sample diff**")
                     help_button("lexicon_diff", "compare")
                     rows = language_diff.sample_lexicon_diff(parent_language, child_language, n=20)
-                    st.dataframe(rows, hide_index=True, use_container_width=True)
+                    compare_rows = []
+                    for row in rows:
+                        parent_ipa = str(row.get("parent_ipa", ""))
+                        child_ipa = str(row.get("child_ipa", ""))
+                        compare_rows.append(
+                            {
+                                "id": row.get("id", ""),
+                                "meaning": row.get("meaning", ""),
+                                "parent_ipa": parent_ipa,
+                                "parent_sound_like": ipa_text_to_sound_like(
+                                    parent_ipa,
+                                    use_segment_separators=False,
+                                    profile_name=romanization_profile,
+                                ),
+                                "child_ipa": child_ipa,
+                                "child_sound_like": ipa_text_to_sound_like(
+                                    child_ipa,
+                                    use_segment_separators=False,
+                                    profile_name=romanization_profile,
+                                ),
+                            }
+                        )
+                    st.dataframe(compare_rows, hide_index=True, use_container_width=True)
 
                 else:
                     selected_language = languages[selected_id]
@@ -3494,6 +3533,181 @@ def render_language_family_ui() -> None:
                             save_family_language(selected_language, meta)
                             st.success("Notes saved.")
                             st.rerun()
+
+                        st.divider()
+                        st.markdown("**Quick compare**")
+                        def entry_source_label(entry: Dict[str, Any]) -> str:
+                            if is_custom_entry(entry):
+                                return "Custom"
+                            entry_id = str(entry.get("id", ""))
+                            source = str(entry.get("source", ""))
+                            pos = str(entry.get("pos", ""))
+                            if source.startswith("concept-list:"):
+                                return "Concept roots"
+                            if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
+                                return "Particles"
+                            return "Other"
+
+                        compare_options = [
+                            {"label": "(none)", "id": ""},
+                        ]
+                        for lang_id in languages.keys():
+                            if lang_id == selected_id:
+                                continue
+                            meta_other = languages.get(lang_id, {}).get("meta", {})
+                            label = f"{meta_other.get('name', lang_id)} ({lang_id})"
+                            compare_options.append({"label": label, "id": lang_id})
+
+                        parent_id = meta.get("parent_id")
+                        default_compare_id = parent_id if parent_id in languages else (project.get("root_language_id") or "")
+                        default_index = 0
+                        for idx, option in enumerate(compare_options):
+                            if option["id"] == default_compare_id:
+                                default_index = idx
+                                break
+
+                        compare_label = st.selectbox(
+                            "Compare against",
+                            options=[option["label"] for option in compare_options],
+                            index=default_index,
+                            key=f"family_compare_target_{selected_id}",
+                        )
+                        compare_id = ""
+                        for option in compare_options:
+                            if option["label"] == compare_label:
+                                compare_id = option["id"]
+                                break
+
+                        compare_search = st.text_input(
+                            "Search entries",
+                            key=f"family_compare_search_{selected_id}",
+                            placeholder="Filter by id or meaning",
+                        )
+                        current_lexicon = model.get("lexicon", [])
+                        if not isinstance(current_lexicon, list):
+                            current_lexicon = []
+                        compare_filter_cols = st.columns(3)
+                        with compare_filter_cols[0]:
+                            compare_count = st.slider(
+                                "Rows to show",
+                                min_value=10,
+                                max_value=200,
+                                value=40,
+                                step=10,
+                                key=f"family_compare_count_{selected_id}",
+                            )
+                        with compare_filter_cols[1]:
+                            compare_sources = sorted(
+                                {entry_source_label(entry) for entry in current_lexicon if isinstance(entry, dict)}
+                            )
+                            selected_sources = st.multiselect(
+                                "Source filter",
+                                options=compare_sources,
+                                default=compare_sources,
+                                key=f"family_compare_sources_{selected_id}",
+                            )
+                        with compare_filter_cols[2]:
+                            compare_pos_codes = sorted(
+                                {
+                                    str(entry.get("pos", "")).strip()
+                                    for entry in current_lexicon
+                                    if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                                }
+                            )
+                            selected_compare_pos = st.multiselect(
+                                "Part of speech filter",
+                                options=compare_pos_codes,
+                                default=compare_pos_codes,
+                                format_func=format_pos_label,
+                                key=f"family_compare_pos_{selected_id}",
+                            )
+
+                        compare_lexicon = []
+                        if compare_id and compare_id in languages:
+                            compare_language = project_io.hydrate_language_model(languages[compare_id])
+                            compare_lexicon = compare_language.get("lexicon", [])
+                            if not isinstance(compare_lexicon, list):
+                                compare_lexicon = []
+                        compare_map = {
+                            str(entry.get("id", "")).strip(): entry
+                            for entry in compare_lexicon
+                            if isinstance(entry, dict)
+                        }
+                        needle = compare_search.strip().lower()
+                        compare_rows = []
+                        for entry in current_lexicon:
+                            if not isinstance(entry, dict):
+                                continue
+                            if selected_sources and entry_source_label(entry) not in selected_sources:
+                                continue
+                            entry_id = str(entry.get("id", "")).strip()
+                            meaning = str(entry.get("meaning", "")).strip()
+                            if needle and needle not in f"{entry_id} {meaning}".lower():
+                                continue
+                            entry_pos = str(entry.get("pos", "")).strip()
+                            if selected_compare_pos and entry_pos not in selected_compare_pos:
+                                continue
+                            entry_ipa = str(entry.get("ipa", "")).strip()
+                            other_entry = compare_map.get(entry_id, {})
+                            other_ipa = str(other_entry.get("ipa", "")).strip()
+                            compare_rows.append(
+                                {
+                                    "Entry": entry_id,
+                                    "Meaning": meaning,
+                                    "IPA": entry_ipa,
+                                    "Sound-like": ipa_text_to_sound_like(
+                                        entry_ipa,
+                                        use_segment_separators=False,
+                                        profile_name=romanization_profile,
+                                    ),
+                                    "Compare IPA": other_ipa,
+                                    "Compare Sound-like": ipa_text_to_sound_like(
+                                        other_ipa,
+                                        use_segment_separators=False,
+                                        profile_name=romanization_profile,
+                                    )
+                                    if other_ipa
+                                    else "",
+                                }
+                            )
+                            if len(compare_rows) >= compare_count:
+                                break
+
+                        st.dataframe(compare_rows, hide_index=True, use_container_width=True)
+
+                        st.divider()
+                        st.markdown("**Danger zone**")
+                        root_language_id = project.get("root_language_id") if isinstance(project, dict) else None
+                        if selected_id == root_language_id:
+                            st.info("Root languages cannot be deleted from a family project.")
+                        else:
+                            confirm_delete = st.checkbox(
+                                "I understand this will permanently delete the language file.",
+                                key=f"family_delete_confirm_{selected_id}",
+                            )
+                            if st.button(
+                                "Delete language",
+                                key=f"family_delete_{selected_id}",
+                                disabled=not confirm_delete,
+                            ):
+                                languages_dir = Path(project_dir) / project.get("paths", {}).get("languages_dir", "languages")
+                                target_path = languages_dir / f"{selected_id}.json"
+                                if target_path.exists():
+                                    target_path.unlink()
+                                language_index = project.get("language_index", [])
+                                if not isinstance(language_index, list):
+                                    language_index = []
+                                language_index = [
+                                    item
+                                    for item in language_index
+                                    if not (isinstance(item, dict) and item.get("language_id") == selected_id)
+                                ]
+                                project["language_index"] = language_index
+                                project_io.save_project(project)
+                                st.session_state["family_selected_id"] = parent_id or project.get("root_language_id")
+                                st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+                                st.success("Language deleted.")
+                                st.rerun()
 
                     with detail_tabs[1]:
                         st.markdown("**Custom word builder**")
@@ -3735,7 +3949,7 @@ def render_language_family_ui() -> None:
                                 continue
                             filtered_entries.append(entry)
 
-                        st.caption("Edits and deletions apply only to custom entries.")
+                        st.caption("Edits and deletions apply to all entries in this lexicon.")
                         st.caption(f"Showing {len(filtered_entries)} of {len(lexicon_entries)} entries.")
                         overview_rows = [
                             {
@@ -3813,8 +4027,6 @@ def render_language_family_ui() -> None:
                         ):
                             delete_ids: List[str] = []
                             edit_count = 0
-                            ignored_edits = 0
-                            ignored_deletes = 0
                             overrides = meta.get("lexicon_overrides", {})
                             if not isinstance(overrides, dict):
                                 overrides = {}
@@ -3827,35 +4039,24 @@ def render_language_family_ui() -> None:
                                     continue
                                 wants_delete = row.get("Delete") is True
                                 if wants_delete:
-                                    if is_custom_entry(entry):
-                                        delete_ids.append(row_id)
-                                        overrides.pop(row_id, None)
-                                    else:
-                                        ignored_deletes += 1
+                                    delete_ids.append(row_id)
+                                    overrides.pop(row_id, None)
                                     continue
                                 row_meaning = str(row.get("Meaning tag", "")).strip()
                                 row_gloss = str(row.get("Gloss", "")).strip()
                                 row_pos = str(row.get("POS", "")).strip()
-                                if is_custom_entry(entry):
-                                    changed = False
-                                    if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
-                                        entry["meaning"] = row_meaning
-                                        changed = True
-                                    if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
-                                        entry["gloss"] = row_gloss
-                                        changed = True
-                                    if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
-                                        entry["pos"] = row_pos
-                                        changed = True
-                                    if changed:
-                                        edit_count += 1
-                                else:
-                                    if (
-                                        row_meaning != str(entry.get("meaning", "")).strip()
-                                        or row_gloss != str(entry.get("gloss", "")).strip()
-                                        or row_pos != str(entry.get("pos", "")).strip()
-                                    ):
-                                        ignored_edits += 1
+                                changed = False
+                                if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
+                                    entry["meaning"] = row_meaning
+                                    changed = True
+                                if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
+                                    entry["gloss"] = row_gloss
+                                    changed = True
+                                if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
+                                    entry["pos"] = row_pos
+                                    changed = True
+                                if changed:
+                                    edit_count += 1
 
                             if delete_ids:
                                 lexicon_model["lexicon"] = [
@@ -3868,10 +4069,6 @@ def render_language_family_ui() -> None:
                             selected_language["meta"] = meta
                             selected_language["lexicon"] = lexicon_model.get("lexicon", [])
                             save_family_language(selected_language, meta)
-                            if ignored_edits:
-                                st.warning(f"Ignored {ignored_edits} edit(s) on locked entries.")
-                            if ignored_deletes:
-                                st.warning(f"Ignored {ignored_deletes} delete(s) on locked entries.")
                             if edit_count or delete_ids:
                                 st.success("Lexicon updates applied.")
                             st.rerun()
@@ -3930,6 +4127,102 @@ def render_language_family_ui() -> None:
                             st.rerun()
 
                     with detail_tabs[2]:
+                        st.markdown("**Word preview**")
+                        lexicon_entries = model.get("lexicon", [])
+                        if not isinstance(lexicon_entries, list):
+                            lexicon_entries = []
+
+                        def entry_source_label(entry: Dict[str, Any]) -> str:
+                            if is_custom_entry(entry):
+                                return "Custom"
+                            entry_id = str(entry.get("id", ""))
+                            source = str(entry.get("source", ""))
+                            pos = str(entry.get("pos", ""))
+                            if source.startswith("concept-list:"):
+                                return "Concept roots"
+                            if source.startswith("grammar:") or entry_id.startswith("PART:") or pos == "PART":
+                                return "Particles"
+                            return "Other"
+
+                        preview_search = st.text_input(
+                            "Search words",
+                            key=f"family_word_preview_search_{selected_id}",
+                            placeholder="Filter by id, meaning, or gloss",
+                        )
+                        preview_filters = st.columns(3)
+                        with preview_filters[0]:
+                            preview_limit = st.slider(
+                                "Rows to show",
+                                min_value=20,
+                                max_value=300,
+                                value=80,
+                                step=20,
+                                key=f"family_word_preview_limit_{selected_id}",
+                            )
+                        with preview_filters[1]:
+                            preview_sources = sorted(
+                                {entry_source_label(entry) for entry in lexicon_entries if isinstance(entry, dict)}
+                            )
+                            selected_preview_sources = st.multiselect(
+                                "Source filter",
+                                options=preview_sources,
+                                default=preview_sources,
+                                key=f"family_word_preview_sources_{selected_id}",
+                            )
+                        with preview_filters[2]:
+                            preview_pos_codes = sorted(
+                                {
+                                    str(entry.get("pos", "")).strip()
+                                    for entry in lexicon_entries
+                                    if isinstance(entry, dict) and str(entry.get("pos", "")).strip()
+                                }
+                            )
+                            selected_preview_pos = st.multiselect(
+                                "Part of speech filter",
+                                options=preview_pos_codes,
+                                default=preview_pos_codes,
+                                format_func=format_pos_label,
+                                key=f"family_word_preview_pos_{selected_id}",
+                            )
+
+                        needle = preview_search.strip().lower()
+                        preview_rows = []
+                        for entry in lexicon_entries:
+                            if not isinstance(entry, dict):
+                                continue
+                            if selected_preview_sources and entry_source_label(entry) not in selected_preview_sources:
+                                continue
+                            entry_pos = str(entry.get("pos", "")).strip()
+                            if selected_preview_pos and entry_pos not in selected_preview_pos:
+                                continue
+                            entry_id = str(entry.get("id", "")).strip()
+                            meaning = str(entry.get("meaning", "")).strip()
+                            gloss = str(entry.get("gloss", "")).strip()
+                            if needle and needle not in f"{entry_id} {meaning} {gloss}".lower():
+                                continue
+                            ipa_value = str(entry.get("ipa", "")).strip()
+                            preview_rows.append(
+                                {
+                                    "Entry": entry_id,
+                                    "IPA": ipa_value,
+                                    "Sound-like": ipa_text_to_sound_like(
+                                        ipa_value,
+                                        use_segment_separators=False,
+                                        profile_name=romanization_profile,
+                                    ),
+                                    "Gloss": gloss,
+                                    "Meaning tag": meaning,
+                                    "POS": format_pos_label(entry_pos),
+                                    "Source": entry_source_label(entry),
+                                }
+                            )
+                            if len(preview_rows) >= preview_limit:
+                                break
+
+                        st.caption(f"Showing {len(preview_rows)} of {len(lexicon_entries)} entries.")
+                        st.dataframe(preview_rows, hide_index=True, use_container_width=True)
+
+                        st.divider()
                         st.markdown("**Sample sentences**")
                         sample_sentence_count = st.number_input(
                             "Sentence samples",

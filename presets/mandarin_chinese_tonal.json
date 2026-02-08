@@ -1,20 +1,16 @@
 {
-  "name": "Korean",
+  "name": "Mandarin Chinese (16) - Tonal",
   "vowels": [
     {
       "segment": "a",
       "representation": 1.0
     },
     {
-      "segment": "aː",
+      "segment": "a˞",
       "representation": 1.0
     },
     {
-      "segment": "e",
-      "representation": 1.0
-    },
-    {
-      "segment": "eː",
+      "segment": "a̟˞",
       "representation": 1.0
     },
     {
@@ -22,23 +18,11 @@
       "representation": 1.0
     },
     {
-      "segment": "iː",
-      "representation": 1.0
-    },
-    {
-      "segment": "o",
-      "representation": 1.0
-    },
-    {
-      "segment": "oː",
-      "representation": 1.0
-    },
-    {
       "segment": "u",
       "representation": 1.0
     },
     {
-      "segment": "uː",
+      "segment": "u˞",
       "representation": 1.0
     },
     {
@@ -46,15 +30,15 @@
       "representation": 1.0
     },
     {
-      "segment": "æ",
+      "segment": "ɑ̃˞",
       "representation": 1.0
     },
     {
-      "segment": "æː",
+      "segment": "ə˞",
       "representation": 1.0
     },
     {
-      "segment": "ø",
+      "segment": "ə̃˞",
       "representation": 1.0
     },
     {
@@ -62,21 +46,21 @@
       "representation": 1.0
     },
     {
-      "segment": "ɤː",
-      "representation": 1.0
-    },
-    {
-      "segment": "ɯ",
-      "representation": 1.0
-    },
-    {
-      "segment": "ɯː",
+      "segment": "ɤ˞",
       "representation": 1.0
     }
   ],
   "consonants": [
     {
-      "segment": "h",
+      "segment": "cç",
+      "representation": 1.0
+    },
+    {
+      "segment": "cçʰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "f",
       "representation": 1.0
     },
     {
@@ -89,10 +73,6 @@
     },
     {
       "segment": "kʰ",
-      "representation": 1.0
-    },
-    {
-      "segment": "kˀ",
       "representation": 1.0
     },
     {
@@ -116,15 +96,7 @@
       "representation": 1.0
     },
     {
-      "segment": "pˀ",
-      "representation": 1.0
-    },
-    {
       "segment": "s",
-      "representation": 1.0
-    },
-    {
-      "segment": "sˀ",
       "representation": 1.0
     },
     {
@@ -132,23 +104,15 @@
       "representation": 1.0
     },
     {
+      "segment": "ts",
+      "representation": 1.0
+    },
+    {
+      "segment": "tsʰ",
+      "representation": 1.0
+    },
+    {
       "segment": "tʰ",
-      "representation": 1.0
-    },
-    {
-      "segment": "tˀ",
-      "representation": 1.0
-    },
-    {
-      "segment": "t̠ʃ",
-      "representation": 1.0
-    },
-    {
-      "segment": "t̠ʃʰ",
-      "representation": 1.0
-    },
-    {
-      "segment": "t̠ʃˀ",
       "representation": 1.0
     },
     {
@@ -156,20 +120,68 @@
       "representation": 1.0
     },
     {
+      "segment": "w˞",
+      "representation": 1.0
+    },
+    {
+      "segment": "ç",
+      "representation": 1.0
+    },
+    {
       "segment": "ŋ",
       "representation": 1.0
     },
     {
-      "segment": "ʔ",
+      "segment": "ɥ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʂ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʈʂ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʈʂʰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʐ",
+      "representation": 1.0
+    },
+    {
+      "segment": "χ",
+      "representation": 1.0
+    },
+    {
+      "segment": "˥",
+      "representation": 1.0
+    },
+    {
+      "segment": "˥˦",
+      "representation": 1.0
+    },
+    {
+      "segment": "˧˥",
+      "representation": 1.0
+    },
+    {
+      "segment": "˧˨˥",
       "representation": 1.0
     }
   ],
   "phoible": {
-    "inventory_id": "1",
-    "language_name": "Korean",
+    "inventory_id": "16",
+    "language_name": "Mandarin Chinese",
     "specific_dialect": "",
-    "glottocode": "kore1280",
-    "iso": "kor",
+    "glottocode": "mand1415",
+    "iso": "cmn",
     "source": "spa",
     "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv"
   }

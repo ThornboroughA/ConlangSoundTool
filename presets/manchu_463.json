@@ -1,0 +1,116 @@
+{
+  "name": "MANCHU (463)",
+  "vowels": [
+    {
+      "segment": "a",
+      "representation": 1.0
+    },
+    {
+      "segment": "e̞",
+      "representation": 1.0
+    },
+    {
+      "segment": "i",
+      "representation": 1.0
+    },
+    {
+      "segment": "o̞",
+      "representation": 1.0
+    },
+    {
+      "segment": "u",
+      "representation": 1.0
+    },
+    {
+      "segment": "ø",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɵ̞",
+      "representation": 1.0
+    }
+  ],
+  "consonants": [
+    {
+      "segment": "b",
+      "representation": 1.0
+    },
+    {
+      "segment": "d̠ʒ",
+      "representation": 1.0
+    },
+    {
+      "segment": "d̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "f",
+      "representation": 1.0
+    },
+    {
+      "segment": "j",
+      "representation": 1.0
+    },
+    {
+      "segment": "k",
+      "representation": 1.0
+    },
+    {
+      "segment": "l̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "m",
+      "representation": 1.0
+    },
+    {
+      "segment": "n̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "p",
+      "representation": 0.2
+    },
+    {
+      "segment": "r̪|r",
+      "representation": 1.0
+    },
+    {
+      "segment": "s̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "t̠ʃ",
+      "representation": 1.0
+    },
+    {
+      "segment": "t̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "x",
+      "representation": 1.0
+    },
+    {
+      "segment": "ŋ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɡ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʃ",
+      "representation": 1.0
+    }
+  ],
+  "phoible": {
+    "inventory_id": "463",
+    "language_name": "MANCHU",
+    "specific_dialect": "",
+    "glottocode": "manc1252",
+    "iso": "mnc",
+    "source": "upsid",
+    "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv"
+  }
+}

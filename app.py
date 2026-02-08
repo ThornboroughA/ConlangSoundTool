@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import csv
 import io
 import json
 import random
 import re
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -216,6 +218,10 @@ ROMANIZATION_PROFILES: Dict[str, Dict[str, str]] = {
     "ASCII": IPA_TO_ROMAN_ASCII,
 }
 DEFAULT_ROMANIZATION_PROFILE = "Diacritics (recommended)"
+PHOIBLE_DEFAULT_URL = "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv"
+PHOIBLE_CORE_WEIGHT_DEFAULT = 1.0
+PHOIBLE_MARGINAL_WEIGHT_DEFAULT = 0.35
+PHOIBLE_MAX_RESULTS = 200
 
 def romanization_map(profile_name: str) -> Dict[str, str]:
     """Return the chosen IPA->romanization map with safe fallback."""
@@ -456,6 +462,261 @@ def default_preset_selection(presets: List[str]) -> List[str]:
     if selected:
         return selected
     return presets[: min(2, len(presets))]
+
+
+def _clean_phoible_value(value: Any) -> str:
+    text = str(value).strip()
+    return "" if text.upper() == "NA" else text
+
+
+@st.cache_data(show_spinner=True)
+def load_phoible_index(url: str) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, str]]]]:
+    inventories: Dict[str, Dict[str, Any]] = {}
+    rows_by_inventory: Dict[str, List[Dict[str, str]]] = {}
+
+    with urllib.request.urlopen(url) as response:  # nosec - user controlled URL in UI
+        reader = csv.DictReader(io.TextIOWrapper(response, encoding="utf-8"))
+        for row in reader:
+            inventory_id = _clean_phoible_value(row.get("InventoryID", ""))
+            if not inventory_id:
+                continue
+            rows_by_inventory.setdefault(inventory_id, []).append(row)
+            entry = inventories.get(inventory_id)
+            if entry is None:
+                language_name = _clean_phoible_value(row.get("LanguageName", "(unknown)")) or "(unknown)"
+                specific_dialect = _clean_phoible_value(row.get("SpecificDialect", ""))
+                entry = {
+                    "inventory_id": inventory_id,
+                    "language_name": language_name,
+                    "specific_dialect": specific_dialect,
+                    "glottocode": _clean_phoible_value(row.get("Glottocode", "")),
+                    "iso": _clean_phoible_value(row.get("ISO6393", "")),
+                    "source": _clean_phoible_value(row.get("Source", "")),
+                    "vowel_count": 0,
+                    "consonant_count": 0,
+                    "tone_count": 0,
+                    "segment_count": 0,
+                }
+                inventories[inventory_id] = entry
+
+            segment_class = _clean_phoible_value(row.get("SegmentClass", "")).lower()
+            if segment_class == "vowel":
+                entry["vowel_count"] += 1
+            elif segment_class == "consonant":
+                entry["consonant_count"] += 1
+            elif segment_class == "tone":
+                entry["tone_count"] += 1
+            entry["segment_count"] += 1
+
+    inventory_list = sorted(
+        inventories.values(),
+        key=lambda item: (item.get("language_name", "").lower(), item.get("inventory_id", "")),
+    )
+    return inventory_list, rows_by_inventory
+
+
+def filter_phoible_inventories(inventories: List[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
+    cleaned = query.strip().lower()
+    if not cleaned:
+        return inventories[:PHOIBLE_MAX_RESULTS]
+
+    def _matches(entry: Dict[str, Any]) -> bool:
+        return any(
+            cleaned in str(entry.get(key, "")).lower()
+            for key in ["language_name", "specific_dialect", "inventory_id", "glottocode", "iso", "source"]
+        )
+
+    return [entry for entry in inventories if _matches(entry)]
+
+
+def build_phoible_preset(
+    rows: List[Dict[str, str]],
+    name: str,
+    include_marginal: bool,
+    include_tones: bool,
+    core_weight: float,
+    marginal_weight: float,
+    meta: Dict[str, Any],
+) -> Dict[str, Any]:
+    vowels_raw: List[Dict[str, Any]] = []
+    consonants_raw: List[Dict[str, Any]] = []
+
+    for row in rows:
+        segment = _clean_phoible_value(row.get("Phoneme", ""))
+        if not segment:
+            continue
+        segment_class = _clean_phoible_value(row.get("SegmentClass", "")).lower()
+        if segment_class == "vowel":
+            target = vowels_raw
+        elif segment_class == "consonant":
+            target = consonants_raw
+        elif segment_class == "tone":
+            if not include_tones:
+                continue
+            target = consonants_raw
+        else:
+            continue
+
+        is_marginal = _clean_phoible_value(row.get("Marginal", "")).upper() == "TRUE"
+        if is_marginal and not include_marginal:
+            continue
+        weight = float(marginal_weight if is_marginal else core_weight)
+        target.append({"segment": segment, "representation": weight})
+
+    vowels_entries = generator._normalize_segment_entries(vowels_raw)
+    consonants_entries = generator._normalize_segment_entries(consonants_raw)
+
+    return {
+        "name": name,
+        "vowels": vowels_entries,
+        "consonants": consonants_entries,
+        "phoible": meta,
+    }
+
+
+def render_phoible_importer() -> None:
+    with st.expander("Import preset from PHOIBLE", expanded=False):
+        st.caption(
+            "Pull inventories directly from PHOIBLE. PHOIBLE does not provide per-language frequency weights, "
+            "so representation values are derived from the marginal flag (configurable below)."
+        )
+        enable_phoible = st.checkbox("Enable PHOIBLE search", value=False, key="phoible_enable")
+        if not enable_phoible:
+            return
+
+        url = st.text_input(
+            "PHOIBLE CSV URL",
+            value=st.session_state.get("phoible_url", PHOIBLE_DEFAULT_URL),
+            key="phoible_url",
+        )
+
+        try:
+            inventories, rows_by_inventory = load_phoible_index(url)
+        except Exception as exc:  # pragma: no cover - network safety net
+            st.error(f"Could not load PHOIBLE data: {exc}")
+            return
+
+        query = st.text_input(
+            "Search (language, dialect, ISO, Glottocode, or inventory ID)",
+            value=st.session_state.get("phoible_query", ""),
+            key="phoible_query",
+        )
+        matches = filter_phoible_inventories(inventories, query)
+        if not query:
+            st.info(f"Showing the first {min(len(matches), PHOIBLE_MAX_RESULTS)} inventories. Type to filter.")
+        st.caption(f"Matches: {len(matches)}")
+
+        if not matches:
+            st.warning("No matches found. Try a different search term.")
+            return
+
+        labels: Dict[str, Dict[str, Any]] = {}
+        for entry in matches[:PHOIBLE_MAX_RESULTS]:
+            dialect = f" — {entry['specific_dialect']}" if entry.get("specific_dialect") else ""
+            label = (
+                f"{entry['language_name']}{dialect} "
+                f"({entry.get('iso') or '—'}, {entry.get('glottocode') or '—'}) "
+                f"· Inv {entry['inventory_id']} · "
+                f"{entry['vowel_count']}V/{entry['consonant_count']}C"
+            )
+            labels[label] = entry
+
+        selected_label = st.selectbox(
+            "Matching inventories",
+            options=list(labels.keys()),
+            key="phoible_selected_label",
+        )
+        selected_entry = labels[selected_label]
+        inventory_id = selected_entry["inventory_id"]
+        rows = rows_by_inventory.get(inventory_id, [])
+        st.caption(
+            f"Inventory {inventory_id} includes {selected_entry['segment_count']} segments "
+            f"({selected_entry['vowel_count']} vowels, {selected_entry['consonant_count']} consonants, "
+            f"{selected_entry['tone_count']} tones)."
+        )
+
+        include_marginal = st.checkbox("Include marginal segments", value=True, key="phoible_include_marginal")
+        include_tones = st.checkbox("Include tone segments (stored as consonants)", value=False, key="phoible_include_tones")
+        core_weight = st.slider(
+            "Core segment representation weight",
+            min_value=0.2,
+            max_value=2.0,
+            value=PHOIBLE_CORE_WEIGHT_DEFAULT,
+            step=0.05,
+            key="phoible_core_weight",
+        )
+        marginal_weight = st.slider(
+            "Marginal segment representation weight",
+            min_value=0.05,
+            max_value=1.0,
+            value=PHOIBLE_MARGINAL_WEIGHT_DEFAULT,
+            step=0.05,
+            key="phoible_marginal_weight",
+        )
+
+        default_display_name = selected_entry["language_name"]
+        if selected_entry.get("specific_dialect"):
+            default_display_name = f"{default_display_name} {selected_entry['specific_dialect']}"
+        default_display_name = f"{default_display_name} ({inventory_id})"
+        suggested_filename = sanitize_name(f"{selected_entry['language_name']}_{inventory_id}")
+
+        selected_key = f"{selected_entry.get('language_name','')}-{inventory_id}"
+        last_key = st.session_state.get("phoible_last_selected")
+        if selected_key != last_key:
+            st.session_state["phoible_last_selected"] = selected_key
+            st.session_state["phoible_preset_name"] = default_display_name
+            st.session_state["phoible_preset_filename"] = suggested_filename
+
+        preset_display_name = st.text_input(
+            "Preset display name",
+            value=st.session_state.get("phoible_preset_name", default_display_name),
+            key="phoible_preset_name",
+        )
+        preset_filename = st.text_input(
+            "Preset filename (without .json)",
+            value=st.session_state.get("phoible_preset_filename", suggested_filename),
+            key="phoible_preset_filename",
+        )
+        overwrite_existing = st.checkbox("Overwrite existing preset file", value=False, key="phoible_overwrite")
+
+        if st.button("Create preset from PHOIBLE", type="primary", use_container_width=True):
+            safe_name = sanitize_name(preset_filename)
+            if not safe_name:
+                st.error("Provide a valid preset filename.")
+                return
+            preset_path = Path(generator.PRESETS_DIR) / f"{safe_name}.json"
+            if preset_path.exists() and not overwrite_existing:
+                st.error(f"`{preset_path.name}` already exists. Enable overwrite to replace it.")
+                return
+
+            meta = {
+                "inventory_id": inventory_id,
+                "language_name": selected_entry.get("language_name"),
+                "specific_dialect": selected_entry.get("specific_dialect"),
+                "glottocode": selected_entry.get("glottocode"),
+                "iso": selected_entry.get("iso"),
+                "source": selected_entry.get("source"),
+                "source_url": url,
+            }
+            preset_payload = build_phoible_preset(
+                rows=rows,
+                name=preset_display_name,
+                include_marginal=include_marginal,
+                include_tones=include_tones,
+                core_weight=core_weight,
+                marginal_weight=marginal_weight,
+                meta=meta,
+            )
+
+            if not preset_payload["vowels"] or not preset_payload["consonants"]:
+                st.error("Preset must include at least one vowel and one consonant.")
+                return
+
+            with preset_path.open("w", encoding="utf-8") as file:
+                json.dump(preset_payload, file, ensure_ascii=False, indent=2)
+
+            st.session_state["preset_notice"] = f"PHOIBLE preset saved: {preset_path.name}"
+            st.rerun()
 
 
 def sanitize_name(value: str) -> str:
@@ -826,6 +1087,10 @@ def render_single_language_ui() -> None:
         st.error("No preset files found. Add JSON files to presets/ and reload.")
         st.stop()
 
+    preset_notice = st.session_state.pop("preset_notice", None)
+    if preset_notice:
+        st.success(preset_notice)
+
     latest_inventory = st.session_state.get("last_inventory")
     latest_language_name = st.session_state.get("last_language_name", "GeneratedLanguage")
     latest_rule_sets = st.session_state.get("last_rule_sets", [])
@@ -896,7 +1161,7 @@ def render_single_language_ui() -> None:
                 "Random weight (master pool)",
                 min_value=0.0,
                 max_value=1.0,
-                value=0.10,
+                value=0.15,
                 step=0.05,
             )
 
@@ -915,7 +1180,7 @@ def render_single_language_ui() -> None:
 
         with run_col:
             st.markdown("**Output settings**")
-            language_name = st.text_input("Generated language name", value="GeneratedLanguage")
+            language_name = st.text_input("Generated language name", value="ProtoLanguage")
             output_dir_value = st.text_input("Output folder", value="outputs/ui_run")
             use_seed = st.checkbox("Use fixed random seed", value=False)
             seed_value = st.number_input(
@@ -948,6 +1213,9 @@ def render_single_language_ui() -> None:
                 master_preset=master_preset,
                 profile_name=romanization_profile,
             )
+
+        st.divider()
+        render_phoible_importer()
 
         if generate:
             if not selected_presets:

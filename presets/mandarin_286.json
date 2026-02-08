@@ -1,36 +1,16 @@
 {
-  "name": "Korean",
+  "name": "MANDARIN (286)",
   "vowels": [
     {
       "segment": "a",
       "representation": 1.0
     },
     {
-      "segment": "aː",
-      "representation": 1.0
-    },
-    {
-      "segment": "e",
-      "representation": 1.0
-    },
-    {
-      "segment": "eː",
-      "representation": 1.0
+      "segment": "a˞",
+      "representation": 0.1
     },
     {
       "segment": "i",
-      "representation": 1.0
-    },
-    {
-      "segment": "iː",
-      "representation": 1.0
-    },
-    {
-      "segment": "o",
-      "representation": 1.0
-    },
-    {
-      "segment": "oː",
       "representation": 1.0
     },
     {
@@ -38,45 +18,29 @@
       "representation": 1.0
     },
     {
-      "segment": "uː",
-      "representation": 1.0
-    },
-    {
       "segment": "y",
       "representation": 1.0
     },
     {
-      "segment": "æ",
-      "representation": 1.0
+      "segment": "ə˞",
+      "representation": 0.1
     },
     {
-      "segment": "æː",
-      "representation": 1.0
-    },
-    {
-      "segment": "ø",
-      "representation": 1.0
-    },
-    {
-      "segment": "ɤ",
-      "representation": 1.0
-    },
-    {
-      "segment": "ɤː",
-      "representation": 1.0
-    },
-    {
-      "segment": "ɯ",
-      "representation": 1.0
-    },
-    {
-      "segment": "ɯː",
+      "segment": "ɤ̟",
       "representation": 1.0
     }
   ],
   "consonants": [
     {
-      "segment": "h",
+      "segment": "cç",
+      "representation": 1.0
+    },
+    {
+      "segment": "cçʰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "f",
       "representation": 1.0
     },
     {
@@ -92,11 +56,7 @@
       "representation": 1.0
     },
     {
-      "segment": "kˀ",
-      "representation": 1.0
-    },
-    {
-      "segment": "l",
+      "segment": "l̪|l",
       "representation": 1.0
     },
     {
@@ -116,39 +76,23 @@
       "representation": 1.0
     },
     {
-      "segment": "pˀ",
+      "segment": "s̪|s",
       "representation": 1.0
     },
     {
-      "segment": "s",
+      "segment": "t̪s̪|ts",
       "representation": 1.0
     },
     {
-      "segment": "sˀ",
+      "segment": "t̪s̪ʰ|tsʰ",
       "representation": 1.0
     },
     {
-      "segment": "t",
+      "segment": "t̪|t",
       "representation": 1.0
     },
     {
-      "segment": "tʰ",
-      "representation": 1.0
-    },
-    {
-      "segment": "tˀ",
-      "representation": 1.0
-    },
-    {
-      "segment": "t̠ʃ",
-      "representation": 1.0
-    },
-    {
-      "segment": "t̠ʃʰ",
-      "representation": 1.0
-    },
-    {
-      "segment": "t̠ʃˀ",
+      "segment": "t̪ʰ|tʰ",
       "representation": 1.0
     },
     {
@@ -156,21 +100,45 @@
       "representation": 1.0
     },
     {
+      "segment": "ç",
+      "representation": 1.0
+    },
+    {
       "segment": "ŋ",
       "representation": 1.0
     },
     {
-      "segment": "ʔ",
+      "segment": "ɥ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʂ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʈʂ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʈʂʰ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʐ",
+      "representation": 1.0
+    },
+    {
+      "segment": "χ",
       "representation": 1.0
     }
   ],
   "phoible": {
-    "inventory_id": "1",
-    "language_name": "Korean",
+    "inventory_id": "286",
+    "language_name": "MANDARIN",
     "specific_dialect": "",
-    "glottocode": "kore1280",
-    "iso": "kor",
-    "source": "spa",
+    "glottocode": "mand1415",
+    "iso": "cmn",
+    "source": "upsid",
     "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv"
   }
 }

@@ -1092,6 +1092,7 @@ def build_language_snapshot(
     inventory: Dict[str, Any],
     language_model: Optional[Dict[str, Any]] = None,
     language_id: Optional[str] = None,
+    notes: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build a v1 language snapshot payload from the current model/inventory."""
     base: Dict[str, Any] = {}
@@ -1110,6 +1111,12 @@ def build_language_snapshot(
     base["lexicon"] = list(base.get("lexicon", [])) if isinstance(base.get("lexicon", []), list) else []
 
     snapshot = project_io.normalize_language_snapshot(base)
+    notes_value = ""
+    meta_base = base.get("meta")
+    if isinstance(meta_base, dict):
+        notes_value = str(meta_base.get("notes", ""))
+    if notes is not None:
+        notes_value = str(notes)
     safe_id = language_id or sanitize_name(language_name)
     snapshot["meta"] = {
         "language_id": safe_id,
@@ -1118,7 +1125,7 @@ def build_language_snapshot(
         "parent_id": None,
         "changeset_id": None,
         "created_at": datetime.now().isoformat(),
-        "notes": "",
+        "notes": notes_value,
         "lexicon_overrides": {},
     }
     return snapshot
@@ -1260,30 +1267,49 @@ def display_segment_table(
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
+def build_lexicon_csv(rows: Sequence[Dict[str, str]]) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "ipa", "sound_like", "meaning", "gloss", "pos", "source"])
+    for row in rows:
+        writer.writerow(
+            [
+                row.get("id", ""),
+                row.get("ipa", ""),
+                row.get("sound_like", ""),
+                row.get("meaning", ""),
+                row.get("gloss", ""),
+                row.get("pos", ""),
+                row.get("source", ""),
+            ]
+        )
+    return output.getvalue()
+
+
 def inject_custom_css() -> None:
     """Apply visual polish while keeping Streamlit-native layout behavior."""
     st.markdown(
         """
         <style>
-        @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap");
+        @import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Sora:wght@300;400;500;600;700&display=swap");
 
         :root {
-            --bg-start: #f7f1e8;
-            --bg-end: #e9f1ed;
-            --panel: rgba(255, 255, 255, 0.9);
-            --ink-strong: #1e2a2b;
-            --ink-muted: #4f6460;
-            --line: #d7e2da;
-            --accent: #1a6b62;
-            --accent-soft: #2f8f82;
-            --accent-warm: #c07d36;
-            --accent-cool: #3b6b92;
+            --bg-start: #f4efe7;
+            --bg-end: #e6f0ee;
+            --panel: rgba(255, 255, 255, 0.92);
+            --ink-strong: #172224;
+            --ink-muted: #516463;
+            --line: rgba(23, 34, 36, 0.12);
+            --accent: #0f766e;
+            --accent-soft: #14b8a6;
+            --accent-warm: #d97706;
+            --accent-cool: #2563eb;
         }
 
         .stApp {
             background:
-                radial-gradient(1100px 520px at 8% -20%, #f1dfc6 0%, transparent 60%),
-                radial-gradient(900px 520px at 100% 0%, #d9ece4 0%, transparent 65%),
+                radial-gradient(1200px 520px at 4% -18%, rgba(245, 214, 164, 0.55) 0%, transparent 60%),
+                radial-gradient(980px 560px at 100% 0%, rgba(175, 220, 214, 0.55) 0%, transparent 65%),
                 linear-gradient(180deg, var(--bg-start), var(--bg-end));
         }
 
@@ -1295,7 +1321,7 @@ def inject_custom_css() -> None:
 
         html, body, .stApp, [data-testid="stAppViewContainer"] {
             color: var(--ink-strong);
-            font-family: "IBM Plex Sans", "Segoe UI", "Trebuchet MS", sans-serif;
+            font-family: "Sora", "Segoe UI", "Trebuchet MS", sans-serif;
         }
 
         .material-symbols-rounded {
@@ -1304,7 +1330,7 @@ def inject_custom_css() -> None:
 
         h1, h2, h3, [data-testid="stMarkdownContainer"] h1,
         [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3 {
-            font-family: "Fraunces", "Palatino Linotype", "Book Antiqua", serif;
+            font-family: "DM Serif Display", "Palatino Linotype", "Book Antiqua", serif;
             letter-spacing: 0.01em;
         }
 
@@ -1315,25 +1341,25 @@ def inject_custom_css() -> None:
 
         .hero-shell {
             border: 1px solid var(--line);
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(246, 248, 244, 0.86));
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 248, 246, 0.92));
             border-radius: 18px;
-            padding: 1.1rem 1.2rem 1.15rem;
+            padding: 1.15rem 1.3rem 1.2rem;
             margin-bottom: 1rem;
-            box-shadow: 0 14px 30px rgba(30, 45, 40, 0.08);
+            box-shadow: 0 18px 36px rgba(17, 24, 24, 0.09);
             animation: riseIn 0.6s ease-out;
         }
 
         .hero-eyebrow {
             display: inline-block;
             text-transform: uppercase;
-            letter-spacing: 0.09em;
-            font-size: 0.74rem;
+            letter-spacing: 0.12em;
+            font-size: 0.7rem;
             color: var(--accent);
-            background: rgba(26, 107, 98, 0.12);
-            border: 1px solid rgba(26, 107, 98, 0.3);
+            background: rgba(15, 118, 110, 0.12);
+            border: 1px solid rgba(15, 118, 110, 0.3);
             border-radius: 999px;
-            padding: 0.2rem 0.55rem;
-            margin-bottom: 0.45rem;
+            padding: 0.18rem 0.6rem;
+            margin-bottom: 0.5rem;
             font-weight: 600;
         }
 
@@ -1351,40 +1377,69 @@ def inject_custom_css() -> None:
         }
 
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, rgba(246, 251, 248, 0.98), rgba(236, 245, 239, 0.98));
+            background: linear-gradient(180deg, rgba(248, 252, 251, 0.98), rgba(236, 246, 244, 0.98));
             border-right: 1px solid var(--line);
         }
 
         [data-testid="stMetric"] {
             border: 1px solid var(--line);
             background: var(--panel);
-            border-radius: 12px;
-            padding: 0.55rem 0.7rem;
+            border-radius: 14px;
+            padding: 0.6rem 0.75rem;
+            box-shadow: 0 12px 24px rgba(15, 118, 110, 0.06);
         }
 
         [data-testid="stExpander"] {
             border: 1px solid var(--line);
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.78);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.82);
+            box-shadow: 0 10px 18px rgba(17, 24, 24, 0.06);
         }
 
         [data-testid="stDataFrame"] {
             border: 1px solid var(--line);
-            border-radius: 12px;
+            border-radius: 14px;
             overflow: hidden;
+            box-shadow: 0 10px 20px rgba(17, 24, 24, 0.05);
         }
 
         .stButton > button, .stDownloadButton > button {
-            border-radius: 10px;
-            border: 1px solid rgba(26, 107, 98, 0.4);
-            background: linear-gradient(180deg, #ffffff, #eef6f2);
+            border-radius: 12px;
+            border: 1px solid rgba(15, 118, 110, 0.28);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(236, 246, 244, 0.96));
+            box-shadow: 0 10px 20px rgba(15, 118, 110, 0.08);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+
+        .stButton > button:hover, .stDownloadButton > button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 26px rgba(15, 118, 110, 0.12);
+            border-color: rgba(15, 118, 110, 0.45);
         }
 
         .stButton > button[kind="primary"] {
             border: none;
-            background: linear-gradient(145deg, var(--accent), var(--accent-soft));
+            background: linear-gradient(135deg, var(--accent), var(--accent-soft));
             color: white;
-            box-shadow: 0 10px 20px rgba(26, 107, 98, 0.24);
+            box-shadow: 0 12px 26px rgba(15, 118, 110, 0.24);
+        }
+
+        .stButton > button[kind="primary"]:hover {
+            box-shadow: 0 16px 32px rgba(15, 118, 110, 0.28);
+        }
+
+        [data-testid="stTextInput"] input,
+        [data-testid="stTextArea"] textarea,
+        [data-testid="stNumberInput"] input {
+            border-radius: 10px;
+            border: 1px solid rgba(23, 34, 36, 0.15);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        [data-testid="stSelectbox"] [data-baseweb="select"] {
+            border-radius: 10px;
+            border: 1px solid rgba(23, 34, 36, 0.15);
+            background: rgba(255, 255, 255, 0.95);
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -1392,14 +1447,14 @@ def inject_custom_css() -> None:
         }
 
         .stTabs [data-baseweb="tab"] {
-            border-radius: 9px;
+            border-radius: 10px;
             border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.78);
+            background: rgba(255, 255, 255, 0.84);
         }
 
         .stTabs [aria-selected="true"] {
-            border-color: rgba(26, 107, 98, 0.42);
-            background: rgba(236, 246, 242, 0.96);
+            border-color: rgba(15, 118, 110, 0.45);
+            background: rgba(232, 246, 244, 0.96);
         }
 
         .section-kicker {
@@ -1675,6 +1730,14 @@ def render_single_language_ui() -> None:
                         for segment, value in latest_inventory.get("consonants_representation", {}).items()
                     },
                 )
+            st.markdown("**Language notes**")
+            st.text_area(
+                "Description / reminders",
+                value=st.session_state.get("language_notes", ""),
+                key="language_notes",
+                height=140,
+                placeholder="Add any notes you want to remember about this language.",
+            )
 
     with tab_samples:
         st.markdown('<div class="section-kicker">Step 3</div>', unsafe_allow_html=True)
@@ -2384,6 +2447,7 @@ def render_single_language_ui() -> None:
                     continue
                 filtered_entries.append(entry)
 
+            st.caption("Edits and deletions apply only to custom entries. Concept roots and particles stay locked.")
             st.caption(f"Showing {len(filtered_entries)} of {len(lexicon_entries)} entries.")
             overview_rows = [
                 {
@@ -2396,8 +2460,10 @@ def render_single_language_ui() -> None:
                     ),
                     "Gloss": str(entry.get("gloss", "")),
                     "Meaning tag": str(entry.get("meaning", "")),
-                    "Part of speech": format_pos_label(str(entry.get("pos", ""))),
+                    "POS": str(entry.get("pos", "")),
                     "Source": entry_source_label(entry),
+                    "Custom": "Yes" if is_custom_entry(entry) else "No",
+                    "Delete": False,
                     "Re-roll": False,
                 }
                 for entry in filtered_entries
@@ -2409,13 +2475,15 @@ def render_single_language_ui() -> None:
                 key="lexicon_overview_table",
                 column_config={
                     "Re-roll": st.column_config.CheckboxColumn("Re-roll", default=False),
+                    "Delete": st.column_config.CheckboxColumn("Delete", default=False),
                     "Entry": st.column_config.TextColumn("Entry", disabled=True),
                     "IPA": st.column_config.TextColumn("IPA", disabled=True),
                     "Sound-like": st.column_config.TextColumn("Sound-like", disabled=True),
-                    "Gloss": st.column_config.TextColumn("Gloss", disabled=True),
-                    "Meaning tag": st.column_config.TextColumn("Meaning tag", disabled=True),
-                    "Part of speech": st.column_config.TextColumn("Part of speech", disabled=True),
+                    "Gloss": st.column_config.TextColumn("Gloss"),
+                    "Meaning tag": st.column_config.TextColumn("Meaning tag"),
+                    "POS": st.column_config.SelectboxColumn("POS", options=pos_options),
                     "Source": st.column_config.TextColumn("Source", disabled=True),
+                    "Custom": st.column_config.TextColumn("Custom", disabled=True),
                 },
             )
 
@@ -2424,11 +2492,139 @@ def render_single_language_ui() -> None:
             if not isinstance(edited_overview_rows, list):
                 edited_overview_rows = []
 
+            entry_map = {
+                str(entry.get("id", "")).strip(): entry
+                for entry in lexicon_entries
+                if isinstance(entry, dict)
+            }
+            pending_changes = False
+            for row in edited_overview_rows:
+                if not isinstance(row, dict):
+                    continue
+                row_id = str(row.get("Entry", "")).strip()
+                entry = entry_map.get(row_id)
+                if not entry:
+                    continue
+                if row.get("Delete") is True:
+                    pending_changes = True
+                    break
+                row_meaning = str(row.get("Meaning tag", "")).strip()
+                row_gloss = str(row.get("Gloss", "")).strip()
+                row_pos = str(row.get("POS", "")).strip()
+                if (
+                    row_meaning != str(entry.get("meaning", "")).strip()
+                    or row_gloss != str(entry.get("gloss", "")).strip()
+                    or row_pos != str(entry.get("pos", "")).strip()
+                ):
+                    pending_changes = True
+                    break
+
+            apply_changes = st.button(
+                "Apply edits / deletions",
+                key="lexicon_overview_apply",
+                disabled=sample_generation_disabled or not pending_changes,
+            )
+            if apply_changes:
+                delete_ids: List[str] = []
+                edit_count = 0
+                ignored_edits = 0
+                ignored_deletes = 0
+                for row in edited_overview_rows:
+                    if not isinstance(row, dict):
+                        continue
+                    row_id = str(row.get("Entry", "")).strip()
+                    entry = entry_map.get(row_id)
+                    if not entry:
+                        continue
+                    wants_delete = row.get("Delete") is True
+                    if wants_delete:
+                        if is_custom_entry(entry):
+                            delete_ids.append(row_id)
+                        else:
+                            ignored_deletes += 1
+                        continue
+                    row_meaning = str(row.get("Meaning tag", "")).strip()
+                    row_gloss = str(row.get("Gloss", "")).strip()
+                    row_pos = str(row.get("POS", "")).strip()
+                    if is_custom_entry(entry):
+                        changed = False
+                        if row_meaning and row_meaning != str(entry.get("meaning", "")).strip():
+                            entry["meaning"] = row_meaning
+                            changed = True
+                        if row_gloss and row_gloss != str(entry.get("gloss", "")).strip():
+                            entry["gloss"] = row_gloss
+                            changed = True
+                        if row_pos and row_pos in pos_options and row_pos != str(entry.get("pos", "")).strip():
+                            entry["pos"] = row_pos
+                            changed = True
+                        if changed:
+                            edit_count += 1
+                    else:
+                        if (
+                            row_meaning != str(entry.get("meaning", "")).strip()
+                            or row_gloss != str(entry.get("gloss", "")).strip()
+                            or row_pos != str(entry.get("pos", "")).strip()
+                        ):
+                            ignored_edits += 1
+
+                if delete_ids:
+                    lexicon_model["lexicon"] = [
+                        entry for entry in lexicon_entries if str(entry.get("id", "")).strip() not in set(delete_ids)
+                    ]
+                lexicon_model = rebuild_indices(lexicon_model)
+                st.session_state["sample_language_model"] = lexicon_model
+                if sample_words:
+                    st.session_state["sample_words"] = build_sample_words(
+                        latest_vowels,
+                        latest_consonants,
+                        sample_count=max(1, int(concept_entry_count)),
+                        syllable_range=sample_syllable_range,
+                        syllable_separator=syllable_separator,
+                        style_name=selected_style,
+                        concept_list_name=selected_concept_list,
+                        grammar_profile_name=selected_grammar_profile,
+                        language_model=lexicon_model,
+                        phonotactic_profile_overrides=phonotactic_overrides,
+                    )
+                st.session_state.pop("sample_sentences", None)
+                if ignored_edits:
+                    st.warning(f"Ignored {ignored_edits} edit(s) on locked entries.")
+                if ignored_deletes:
+                    st.warning(f"Ignored {ignored_deletes} delete(s) on locked entries.")
+                if edit_count or delete_ids:
+                    st.success("Lexicon updates applied.")
+                st.rerun()
+
             overview_rerolls = [
                 str(row.get("Entry", "")).strip()
                 for row in edited_overview_rows
                 if isinstance(row, dict) and row.get("Re-roll") is True
             ]
+            csv_rows = [
+                {
+                    "id": str(entry.get("id", "")),
+                    "ipa": str(entry.get("ipa", "")),
+                    "sound_like": ipa_text_to_sound_like(
+                        str(entry.get("ipa", "")),
+                        use_segment_separators=show_segment_separators,
+                        profile_name=romanization_profile,
+                    ),
+                    "meaning": str(entry.get("meaning", "")),
+                    "gloss": str(entry.get("gloss", "")),
+                    "pos": str(entry.get("pos", "")),
+                    "source": entry_source_label(entry),
+                }
+                for entry in filtered_entries
+                if isinstance(entry, dict)
+            ]
+            lexicon_csv = build_lexicon_csv(csv_rows)
+            st.download_button(
+                label="Download lexicon CSV",
+                data=lexicon_csv,
+                file_name=f"{sanitize_name(latest_language_name)}_lexicon.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
             reroll_overview_button = st.button(
                 f"Re-roll {len(overview_rerolls)} selected entries",
                 key="lexicon_overview_reroll",
@@ -2496,6 +2692,7 @@ def render_single_language_ui() -> None:
                 language_name=latest_language_name,
                 inventory=latest_inventory,
                 language_model=st.session_state.get("sample_language_model"),
+                notes=st.session_state.get("language_notes", ""),
             )
             snapshot_json = json.dumps(snapshot_payload, ensure_ascii=False, indent=2)
             st.download_button(
@@ -2532,6 +2729,7 @@ def render_single_language_ui() -> None:
                     st.session_state["sample_style_preset"] = hydrated.get("style_name", DEFAULT_STYLE_PRESET)
                     st.session_state["sample_concept_list"] = hydrated.get("concept_list_name", DEFAULT_CONCEPT_LIST)
                     st.session_state["sample_grammar_profile"] = hydrated.get("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)
+                    st.session_state["language_notes"] = str(meta.get("notes", ""))
                     syllable_range = hydrated.get("syllable_range", [1, 1])
                     if isinstance(syllable_range, (list, tuple)) and len(syllable_range) == 2:
                         st.session_state["sample_syllable_range"] = (int(syllable_range[0]), int(syllable_range[1]))
@@ -2728,6 +2926,7 @@ def render_language_family_ui() -> None:
                     inventory=latest_inventory,
                     language_model=model if isinstance(model, dict) else None,
                     language_id="proto",
+                    notes=st.session_state.get("language_notes", ""),
                 )
                 st.caption(f"Proto ready: {snapshot_summary(proto_snapshot)}")
             else:

@@ -71,12 +71,19 @@ def _normalize_segment_entries(raw_items: Any) -> List[Dict[str, Any]]:
         if not segment:
             continue
 
+        # Some sources include alternative phoneme spellings joined by "|".
+        # Split them to keep inventories normalized.
+        segments = [part.strip() for part in segment.split("|") if part.strip()]
+        if not segments:
+            continue
+
         representation = max(0.0, representation)
-        if segment not in merged:
-            merged[segment] = {"segment": segment, "representation": representation}
-            ordered_segments.append(segment)
-        else:
-            merged[segment]["representation"] += representation
+        for seg in segments:
+            if seg not in merged:
+                merged[seg] = {"segment": seg, "representation": representation}
+                ordered_segments.append(seg)
+            else:
+                merged[seg]["representation"] += representation
 
     return [merged[segment] for segment in ordered_segments]
 

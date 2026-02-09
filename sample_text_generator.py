@@ -50,6 +50,142 @@ STYLE_PRESETS: Dict[str, Dict[str, object]] = {
 }
 DEFAULT_STYLE_PRESET = "Balanced"
 
+SOUND_TEMPLATE_AUTO_LABEL = "Auto (from inventory)"
+SOUND_TEMPLATE_NONE_LABEL = "None"
+SOUND_TEMPLATES: Dict[str, Dict[str, object]] = {
+    "Smooth": {
+        "description": "Soft syllable flow with open vowels and gentle codas.",
+        "phonotactics_overrides": {
+            "style_template_blend": 0.25,
+            "template_weights_by_position": {
+                "single": [("V", 0.20), ("CV", 0.48), ("VC", 0.05), ("CVC", 0.08), ("CVV", 0.14), ("VCV", 0.05)],
+                "initial": [("V", 0.16), ("CV", 0.54), ("VC", 0.03), ("CVC", 0.08), ("CVV", 0.14), ("CCV", 0.05)],
+                "medial": [("V", 0.14), ("CV", 0.46), ("VC", 0.04), ("CVC", 0.10), ("CVV", 0.16), ("VCV", 0.10)],
+                "final": [("V", 0.18), ("CV", 0.44), ("VC", 0.08), ("CVC", 0.12), ("CVV", 0.12), ("CVCC", 0.06)],
+            },
+            "soft_constraints": {
+                "hiatus_penalty": 0.20,
+                "final_complex_coda_penalty": 0.80,
+                "cluster_violation_penalty": 1.60,
+                "onsetless_word_penalty": 0.12,
+            },
+            "cluster": {
+                "max_attempts": 8,
+                "violation_penalty": 0.15,
+            },
+        },
+    },
+    "Punchy": {
+        "description": "Short, punchy shapes with heavier consonant edges.",
+        "phonotactics_overrides": {
+            "style_template_blend": 0.25,
+            "template_weights_by_position": {
+                "single": [("V", 0.05), ("CV", 0.35), ("VC", 0.14), ("CVC", 0.30), ("CCV", 0.10), ("CVCC", 0.06)],
+                "initial": [("V", 0.04), ("CV", 0.36), ("CVC", 0.28), ("CCV", 0.18), ("CVV", 0.06), ("VC", 0.08)],
+                "medial": [("V", 0.04), ("CV", 0.30), ("CVC", 0.32), ("VC", 0.12), ("CCV", 0.10), ("CVCC", 0.12)],
+                "final": [("V", 0.03), ("CV", 0.18), ("VC", 0.22), ("CVC", 0.36), ("CVCC", 0.16), ("CVV", 0.05)],
+            },
+            "soft_constraints": {
+                "hiatus_penalty": 0.50,
+                "final_complex_coda_penalty": 0.25,
+                "cluster_violation_penalty": 0.90,
+                "onsetless_word_penalty": 0.25,
+                "initial_velar_nasal_penalty": 5.0,
+            },
+            "cluster": {
+                "max_attempts": 14,
+                "violation_penalty": 0.28,
+                "rise_bonus": 1.40,
+                "fall_bonus": 1.40,
+            },
+        },
+    },
+    "Clustered": {
+        "description": "Dense consonant clusters and compact syllable cores.",
+        "phonotactics_overrides": {
+            "style_template_blend": 0.25,
+            "template_weights_by_position": {
+                "single": [("V", 0.03), ("CV", 0.22), ("VC", 0.08), ("CVC", 0.24), ("CCV", 0.20), ("CVCC", 0.23)],
+                "initial": [("V", 0.02), ("CV", 0.26), ("CVC", 0.20), ("CCV", 0.26), ("CCCV", 0.12), ("CVV", 0.06), ("VC", 0.08)],
+                "medial": [("V", 0.03), ("CV", 0.22), ("CVC", 0.28), ("CCV", 0.16), ("VCV", 0.07), ("CVCC", 0.24)],
+                "final": [("V", 0.02), ("CV", 0.16), ("VC", 0.18), ("CVC", 0.30), ("CVCC", 0.26), ("CCV", 0.08)],
+            },
+            "soft_constraints": {
+                "cluster_violation_penalty": 0.60,
+                "final_complex_coda_penalty": 0.18,
+                "hiatus_penalty": 0.60,
+                "onsetless_word_penalty": 0.35,
+            },
+            "cluster": {
+                "max_attempts": 24,
+                "violation_penalty": 0.45,
+                "rise_bonus": 1.45,
+                "fall_bonus": 1.45,
+                "medial_change_bonus": 1.25,
+            },
+        },
+    },
+    "Open-Vowel": {
+        "description": "Wide vowels and airy syllables with minimal codas.",
+        "phonotactics_overrides": {
+            "style_template_blend": 0.25,
+            "template_weights_by_position": {
+                "single": [("V", 0.30), ("CV", 0.42), ("CVV", 0.18), ("VC", 0.04), ("CVC", 0.04), ("VCV", 0.02)],
+                "initial": [("V", 0.28), ("CV", 0.44), ("CVV", 0.18), ("VC", 0.04), ("CVC", 0.04), ("CCV", 0.02)],
+                "medial": [("V", 0.24), ("CV", 0.40), ("CVV", 0.20), ("VCV", 0.10), ("VC", 0.04), ("CVC", 0.02)],
+                "final": [("V", 0.30), ("CV", 0.38), ("CVV", 0.18), ("VC", 0.06), ("CVC", 0.06), ("CVCC", 0.02)],
+            },
+            "soft_constraints": {
+                "onsetless_word_penalty": 0.05,
+                "hiatus_penalty": 0.12,
+                "final_complex_coda_penalty": 0.90,
+                "cluster_violation_penalty": 1.80,
+            },
+        },
+    },
+    "Harmonic": {
+        "description": "Encourages vowel harmony and smoother consonant-vowel pairing.",
+        "phonotactics_overrides": {
+            "style_template_blend": 0.25,
+            "template_weights_by_position": {
+                "single": [("V", 0.10), ("CV", 0.46), ("VC", 0.08), ("CVC", 0.22), ("CVV", 0.08), ("VCV", 0.06)],
+                "initial": [("V", 0.06), ("CV", 0.52), ("VC", 0.06), ("CVC", 0.22), ("CVV", 0.08), ("CCV", 0.06)],
+                "medial": [("V", 0.08), ("CV", 0.44), ("VC", 0.06), ("CVC", 0.22), ("CVV", 0.10), ("VCV", 0.10)],
+                "final": [("V", 0.06), ("CV", 0.30), ("VC", 0.16), ("CVC", 0.28), ("CVV", 0.08), ("CVCC", 0.12)],
+            },
+            "co_occurrence": {
+                "enabled": True,
+                "harmony_penalty": 0.85,
+                "front_back_harmony_bonus": 1.50,
+                "front_back_harmony_penalty": 0.65,
+                "labial_rounded_bonus": 1.30,
+                "palatal_front_bonus": 1.35,
+                "palatal_back_penalty": 0.70,
+                "dorsal_back_bonus": 1.30,
+                "dorsal_front_penalty": 0.75,
+            },
+        },
+    },
+    "Minimal-Coda": {
+        "description": "Coda-light words with open endings and simple clusters.",
+        "phonotactics_overrides": {
+            "style_template_blend": 0.25,
+            "template_weights_by_position": {
+                "single": [("V", 0.12), ("CV", 0.58), ("CVV", 0.12), ("VC", 0.06), ("CVC", 0.10), ("VCV", 0.02)],
+                "initial": [("V", 0.08), ("CV", 0.64), ("CVV", 0.14), ("VC", 0.04), ("CVC", 0.06), ("CCV", 0.04)],
+                "medial": [("V", 0.10), ("CV", 0.56), ("CVV", 0.16), ("VCV", 0.10), ("VC", 0.04), ("CVC", 0.04)],
+                "final": [("V", 0.20), ("CV", 0.56), ("CVV", 0.16), ("VC", 0.04), ("CVC", 0.02), ("CVCC", 0.02)],
+            },
+            "soft_constraints": {
+                "final_complex_coda_penalty": 1.20,
+                "cluster_violation_penalty": 1.40,
+                "onsetless_word_penalty": 0.12,
+                "hiatus_penalty": 0.25,
+            },
+        },
+    },
+}
+
 DEFAULT_PHONOTACTIC_PROFILE: Dict[str, object] = {
     "style_template_blend": 0.58,
     "template_weights_by_position": {
@@ -116,6 +252,12 @@ DEFAULT_PHONOTACTIC_PROFILE: Dict[str, object] = {
         "medial": {"ʔ": 0.72},
         "coda": {"h": 0.55},
         "word_final_coda": {"h": 0.40, "ʔ": 0.56},
+    },
+    "segment_frequency": {
+        "enabled": True,
+        "strength": 1.0,
+        "vowel_weights": {},
+        "consonant_weights": {},
     },
     "cluster": {
         "max_attempts": 12,
@@ -584,6 +726,17 @@ def resolve_phonotactic_profile(
     candidate_cfg["temperature"] = _clamp_float(candidate_cfg.get("temperature"), 0.85, 0.05, 4.0)
     profile["candidate_selection"] = candidate_cfg
 
+    segment_frequency_cfg = profile.get("segment_frequency")
+    if not isinstance(segment_frequency_cfg, dict):
+        segment_frequency_cfg = {}
+    segment_frequency_cfg = {
+        "enabled": bool(segment_frequency_cfg.get("enabled", True)),
+        "strength": _clamp_float(segment_frequency_cfg.get("strength"), 1.0, 0.0, 4.0),
+        "vowel_weights": normalize_representation_weights(segment_frequency_cfg.get("vowel_weights")),
+        "consonant_weights": normalize_representation_weights(segment_frequency_cfg.get("consonant_weights")),
+    }
+    profile["segment_frequency"] = segment_frequency_cfg
+
     co_occurrence_cfg = profile.get("co_occurrence")
     if not isinstance(co_occurrence_cfg, dict):
         co_occurrence_cfg = {}
@@ -875,6 +1028,28 @@ def _is_stop_like(segment: str) -> bool:
     return "stop" in classes or "affricate" in classes
 
 
+def _segment_frequency_weight(
+    segment: str,
+    is_vowel: bool,
+    phonotactic_profile: Dict[str, object],
+) -> float:
+    freq_cfg = phonotactic_profile.get("segment_frequency", {})
+    if not isinstance(freq_cfg, dict):
+        return 1.0
+    if not bool(freq_cfg.get("enabled", True)):
+        return 1.0
+    strength = _clamp_float(freq_cfg.get("strength"), 1.0, 0.0, 4.0)
+    if strength <= 0:
+        return 1.0
+    weights = freq_cfg.get("vowel_weights" if is_vowel else "consonant_weights", {})
+    if not isinstance(weights, dict):
+        return 1.0
+    raw = _as_float(weights.get(segment))
+    if raw is None:
+        return 1.0
+    return max(0.0, float(raw)) ** strength
+
+
 def _segment_weight_for_slot(
     segment: str,
     slot_role: str,
@@ -901,6 +1076,8 @@ def _segment_weight_for_slot(
             explicit = _as_float(value)
             if explicit is not None:
                 weight *= max(0.0, explicit)
+
+    weight *= _segment_frequency_weight(segment, False, phonotactic_profile)
 
     return max(0.0, float(weight))
 
@@ -1077,6 +1254,10 @@ def style_profile(style_name: str) -> Dict[str, object]:
     return STYLE_PRESETS.get(style_name, STYLE_PRESETS[DEFAULT_STYLE_PRESET])
 
 
+def sound_template(template_name: str) -> Optional[Dict[str, object]]:
+    return SOUND_TEMPLATES.get(template_name)
+
+
 def concept_list_profile(concept_list_name: str) -> Dict[str, object]:
     return CONCEPT_LIST_PRESETS.get(concept_list_name, CONCEPT_LIST_PRESETS[DEFAULT_CONCEPT_LIST])
 
@@ -1090,6 +1271,236 @@ def _as_float(value: object) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def normalize_representation_weights(value: object) -> Dict[str, float]:
+    if not isinstance(value, dict):
+        return {}
+    cleaned: Dict[str, float] = {}
+    for segment, raw_weight in value.items():
+        weight = _as_float(raw_weight)
+        if weight is None or weight <= 0:
+            continue
+        cleaned[str(segment)] = float(weight)
+    if not cleaned:
+        return {}
+    mean = sum(cleaned.values()) / float(len(cleaned))
+    if mean <= 0:
+        return {}
+    normalized: Dict[str, float] = {}
+    for segment, weight in cleaned.items():
+        scaled = weight / mean
+        if scaled < 0.25:
+            scaled = 0.25
+        elif scaled > 4.0:
+            scaled = 4.0
+        normalized[segment] = float(scaled)
+    return normalized
+
+
+def _clamp_unit(value: float) -> float:
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return float(value)
+
+
+def inventory_features(
+    vowels: Sequence[str],
+    consonants: Sequence[str],
+    vowels_representation: Optional[Dict[str, Any]] = None,
+    consonants_representation: Optional[Dict[str, Any]] = None,
+) -> Dict[str, float]:
+    vowel_weight = 0.0
+    consonant_weight = 0.0
+
+    front_weight = 0.0
+    back_weight = 0.0
+    rounded_weight = 0.0
+
+    for vowel in vowels:
+        weight = 1.0
+        if isinstance(vowels_representation, dict):
+            rep = _as_float(vowels_representation.get(vowel))
+            if rep is not None and rep > 0:
+                weight = float(rep)
+        vowel_weight += weight
+        features = _vowel_features(vowel)
+        if "front" in features:
+            front_weight += weight
+        if "back" in features:
+            back_weight += weight
+        if "rounded" in features:
+            rounded_weight += weight
+
+    for consonant in consonants:
+        weight = 1.0
+        if isinstance(consonants_representation, dict):
+            rep = _as_float(consonants_representation.get(consonant))
+            if rep is not None and rep > 0:
+                weight = float(rep)
+        consonant_weight += weight
+
+    total_weight = vowel_weight + consonant_weight
+    vowel_ratio = vowel_weight / total_weight if total_weight > 0 else 0.5
+
+    front_share = front_weight / vowel_weight if vowel_weight > 0 else 0.0
+    back_share = back_weight / vowel_weight if vowel_weight > 0 else 0.0
+    rounded_share = rounded_weight / vowel_weight if vowel_weight > 0 else 0.0
+
+    harmony_score = _clamp_unit(min(front_share, back_share) * 2.0) * (0.5 + 0.5 * _clamp_unit(rounded_share))
+    open_score = _clamp_unit((vowel_ratio - 0.45) / 0.30)
+    compact_score = _clamp_unit((1.0 - vowel_ratio - 0.45) / 0.30)
+    cluster_score = _clamp_unit((1.0 - vowel_ratio - 0.55) / 0.30)
+
+    return {
+        "vowel_ratio": vowel_ratio,
+        "front_share": front_share,
+        "back_share": back_share,
+        "rounded_share": rounded_share,
+        "harmony_score": harmony_score,
+        "open_score": open_score,
+        "compact_score": compact_score,
+        "cluster_score": cluster_score,
+    }
+
+
+def auto_template_weights(features: Dict[str, float]) -> Dict[str, float]:
+    open_score = float(features.get("open_score", 0.0))
+    compact_score = float(features.get("compact_score", 0.0))
+    cluster_score = float(features.get("cluster_score", 0.0))
+    harmony_score = float(features.get("harmony_score", 0.0))
+
+    weights = {
+        "Smooth": 0.25 + 0.75 * open_score,
+        "Open-Vowel": 0.20 + 0.80 * open_score,
+        "Punchy": 0.25 + 0.75 * compact_score,
+        "Clustered": 0.15 + 0.85 * cluster_score,
+        "Harmonic": 0.10 + 0.90 * harmony_score,
+        "Minimal-Coda": 0.20 + 0.60 * open_score,
+    }
+    total = sum(weights.values())
+    if total <= 0:
+        equal = 1.0 / float(len(weights)) if weights else 0.0
+        return {name: equal for name in weights}
+    return {name: float(weight) / total for name, weight in weights.items()}
+
+
+def _is_weighted_pair_list(value: object) -> bool:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return False
+    for item in value:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            return False
+    return True
+
+
+def blend_sound_templates(template_weights: Dict[str, float]) -> Dict[str, object]:
+    if not isinstance(template_weights, dict):
+        return {}
+
+    weighted_templates: List[Tuple[float, Dict[str, object]]] = []
+    for name, weight in template_weights.items():
+        if name not in SOUND_TEMPLATES:
+            continue
+        numeric_weight = _as_float(weight)
+        if numeric_weight is None or numeric_weight <= 0:
+            continue
+        overrides = SOUND_TEMPLATES[name].get("phonotactics_overrides")
+        if not isinstance(overrides, dict):
+            continue
+        weighted_templates.append((float(numeric_weight), overrides))
+
+    if not weighted_templates:
+        return {}
+
+    total_weight = sum(weight for weight, _ in weighted_templates)
+    if total_weight <= 0:
+        return {}
+
+    def _blend_values(values: List[Tuple[float, object]]) -> Optional[object]:
+        if not values:
+            return None
+        total = sum(weight for weight, _ in values)
+        if total <= 0:
+            return None
+
+        if all(isinstance(value, bool) for _, value in values):
+            score = sum(weight * (1.0 if value else 0.0) for weight, value in values) / total
+            return score >= 0.5
+
+        if all(isinstance(value, (int, float)) and not isinstance(value, bool) for _, value in values):
+            return sum(weight * float(value) for weight, value in values) / total
+
+        if all(isinstance(value, dict) for _, value in values):
+            merged: Dict[str, object] = {}
+            keys: Set[str] = set()
+            for _, value in values:
+                keys.update(str(key) for key in value.keys())
+            for key in keys:
+                sub_values = [(weight, value.get(key)) for weight, value in values if key in value]
+                blended = _blend_values(sub_values)
+                if blended is not None:
+                    merged[key] = blended
+            return merged
+
+        if all(_is_weighted_pair_list(value) for _, value in values):
+            label_order: List[str] = []
+            accumulator: Dict[str, float] = {}
+            for weight, pair_list in values:
+                for label, raw_weight in pair_list:
+                    numeric = _as_float(raw_weight)
+                    if numeric is None or numeric <= 0:
+                        continue
+                    label_value = str(label)
+                    if label_value not in accumulator:
+                        label_order.append(label_value)
+                        accumulator[label_value] = 0.0
+                    accumulator[label_value] += weight * float(numeric)
+            total_pairs = sum(accumulator.values())
+            if total_pairs <= 0:
+                return []
+            return [(label, accumulator[label] / total_pairs) for label in label_order if accumulator.get(label, 0.0) > 0]
+
+        # Fallback: pick highest-weight value.
+        best = max(values, key=lambda item: item[0])
+        return best[1]
+
+    merged = _blend_values(weighted_templates)
+    if isinstance(merged, dict):
+        return merged
+    return {}
+
+
+def resolve_sound_template_overrides(choice: str, inventory: Optional[Dict[str, Any]]) -> Dict[str, object]:
+    if not choice or choice == SOUND_TEMPLATE_NONE_LABEL:
+        return {}
+    if choice == SOUND_TEMPLATE_AUTO_LABEL:
+        if not isinstance(inventory, dict):
+            return {}
+        vowels = inventory.get("vowels", [])
+        consonants = inventory.get("consonants", [])
+        if not isinstance(vowels, list):
+            vowels = []
+        if not isinstance(consonants, list):
+            consonants = []
+        features = inventory_features(
+            vowels=vowels,
+            consonants=consonants,
+            vowels_representation=inventory.get("vowels_representation"),
+            consonants_representation=inventory.get("consonants_representation"),
+        )
+        weights = auto_template_weights(features)
+        return blend_sound_templates(weights)
+
+    template = sound_template(choice)
+    if not isinstance(template, dict):
+        return {}
+    overrides = template.get("phonotactics_overrides")
+    if not isinstance(overrides, dict):
+        return {}
+    return overrides
 
 
 def _validate_weighted_pairs(
@@ -1193,6 +1604,27 @@ def validate_generation_config() -> Dict[str, List[str]]:
             value=profile.get("syllable_shapes"),
             label_pattern=r"[CV]+",
         )
+        overrides = profile.get("phonotactics_overrides")
+        if overrides is not None and not isinstance(overrides, dict):
+            report["errors"].append(f"{owner}.phonotactics_overrides must be a dict when provided.")
+        elif isinstance(overrides, dict):
+            template_overrides = overrides.get("template_weights_by_position")
+            if isinstance(template_overrides, dict):
+                for position_name, weights in template_overrides.items():
+                    _validate_weighted_pairs(
+                        report,
+                        owner=owner,
+                        field_name=f"phonotactics_overrides.template_weights_by_position[{position_name}]",
+                        value=weights,
+                        label_pattern=r"[CV]+",
+                    )
+
+    if not SOUND_TEMPLATES:
+        report["warnings"].append("SOUND_TEMPLATES is empty.")
+    for name, profile in SOUND_TEMPLATES.items():
+        owner = f"SOUND_TEMPLATES[{name}]"
+        if not isinstance(profile.get("description"), str) or not str(profile.get("description", "")).strip():
+            report["errors"].append(f"{owner}.description must be a non-empty string.")
         overrides = profile.get("phonotactics_overrides")
         if overrides is not None and not isinstance(overrides, dict):
             report["errors"].append(f"{owner}.phonotactics_overrides must be a dict when provided.")
@@ -1568,6 +2000,7 @@ def _generate_syllable_candidate(
                     previous_vowel=active_previous_vowel,
                     phonotactic_profile=phonotactic_profile,
                 )
+                * _segment_frequency_weight(vowel_option, True, phonotactic_profile)
                 for vowel_option in vowels_list
             ]
             vowel = _weighted_segment_choice(vowels_list, vowel_weights)

@@ -58,6 +58,12 @@ def normalize_language_snapshot(language: Dict[str, Any]) -> Dict[str, Any]:
     inventory = language.get("inventory", {})
     if not isinstance(inventory, dict):
         inventory = {}
+    vowels_representation = inventory.get("vowels_representation")
+    if not isinstance(vowels_representation, dict):
+        vowels_representation = {}
+    consonants_representation = inventory.get("consonants_representation")
+    if not isinstance(consonants_representation, dict):
+        consonants_representation = {}
 
     snapshot: Dict[str, Any] = {
         "schema_version": int(language.get("schema_version", DEFAULT_SCHEMA_VERSION)),
@@ -71,6 +77,8 @@ def normalize_language_snapshot(language: Dict[str, Any]) -> Dict[str, Any]:
         "inventory": {
             "vowels": list(inventory.get("vowels", [])) if isinstance(inventory.get("vowels", []), list) else [],
             "consonants": list(inventory.get("consonants", [])) if isinstance(inventory.get("consonants", []), list) else [],
+            "vowels_representation": dict(vowels_representation),
+            "consonants_representation": dict(consonants_representation),
         },
         "lexicon": list(language.get("lexicon", [])) if isinstance(language.get("lexicon", []), list) else [],
     }
@@ -171,6 +179,10 @@ def hydrate_language_model(language: Dict[str, Any]) -> Dict[str, Any]:
         inventory = {}
     inventory.setdefault("vowels", [])
     inventory.setdefault("consonants", [])
+    if not isinstance(inventory.get("vowels_representation"), dict):
+        inventory["vowels_representation"] = {}
+    if not isinstance(inventory.get("consonants_representation"), dict):
+        inventory["consonants_representation"] = {}
     model["inventory"] = inventory
 
     lexicon = model.get("lexicon", [])

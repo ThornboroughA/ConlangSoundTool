@@ -29,18 +29,24 @@ from sample_text_generator import (
     DEFAULT_STYLE_PRESET,
     GRAMMAR_PROFILES,
     POS_LABELS,
+    SOUND_TEMPLATES,
+    SOUND_TEMPLATE_AUTO_LABEL,
+    SOUND_TEMPLATE_NONE_LABEL,
     STYLE_PRESETS,
+    auto_template_weights,
     build_custom_entry,
     build_language_model,
     build_sample_sentences,
     build_sample_words,
     concept_gloss,
+    inventory_features,
     generate_custom_word_form,
     is_custom_entry,
     language_model_summary,
     model_matches,
     rebuild_indices,
     reroll_lexicon_entry,
+    resolve_sound_template_overrides,
     validate_generation_config,
 )
 
@@ -1174,10 +1180,17 @@ def build_language_snapshot(
     base: Dict[str, Any] = {}
     if isinstance(language_model, dict):
         base.update(language_model)
-    base["inventory"] = {
+    base_inventory: Dict[str, Any] = {
         "vowels": list(inventory.get("vowels", [])) if isinstance(inventory.get("vowels", []), list) else [],
         "consonants": list(inventory.get("consonants", [])) if isinstance(inventory.get("consonants", []), list) else [],
     }
+    vowels_representation = inventory.get("vowels_representation")
+    if isinstance(vowels_representation, dict):
+        base_inventory["vowels_representation"] = vowels_representation
+    consonants_representation = inventory.get("consonants_representation")
+    if isinstance(consonants_representation, dict):
+        base_inventory["consonants_representation"] = consonants_representation
+    base["inventory"] = base_inventory
     base.setdefault("style_name", DEFAULT_STYLE_PRESET)
     base.setdefault("concept_list_name", DEFAULT_CONCEPT_LIST)
     base.setdefault("grammar_profile_name", DEFAULT_GRAMMAR_PROFILE)
@@ -1915,8 +1928,58 @@ def render_single_language_ui() -> None:
             )
 
             style_names = list(STYLE_PRESETS.keys())
+            sound_template_names = list(SOUND_TEMPLATES.keys())
+            sound_template_options = [SOUND_TEMPLATE_AUTO_LABEL, SOUND_TEMPLATE_NONE_LABEL] + sound_template_names
             concept_list_names = list(CONCEPT_LIST_PRESETS.keys())
             grammar_profile_names = list(GRAMMAR_PROFILES.keys())
+
+            st.markdown("**Sound template**")
+            template_col, influence_col = st.columns([2.2, 1.0])
+            with template_col:
+                selected_sound_template = st.selectbox(
+                    "Sound template",
+                    options=sound_template_options,
+                    index=0,
+                    key="sample_sound_template",
+                    help="Auto blends based on the inventory, or pick a named texture profile.",
+                )
+            with influence_col:
+                ui_source_influence = st.slider(
+                    "Source influence",
+                    min_value=0.0,
+                    max_value=2.0,
+                    value=1.0,
+                    step=0.05,
+                    key="phon_ui_source_influence",
+                    help="How strongly segment frequencies follow the source inventory.",
+                )
+
+            auto_mix_summary = ""
+            if selected_sound_template == SOUND_TEMPLATE_AUTO_LABEL:
+                mix_features = inventory_features(
+                    latest_inventory.get("vowels", []),
+                    latest_inventory.get("consonants", []),
+                    latest_inventory.get("vowels_representation", {}),
+                    latest_inventory.get("consonants_representation", {}),
+                )
+                auto_mix = auto_template_weights(mix_features)
+                auto_mix_summary = ", ".join(
+                    f"{name} {auto_mix.get(name, 0.0):.2f}" for name in sound_template_names
+                )
+                if auto_mix_summary:
+                    st.caption(f"Auto mix: {auto_mix_summary}")
+                st.caption(
+                    "Auto rationale: "
+                    f"vowel ratio {mix_features.get('vowel_ratio', 0.0):.2f}, "
+                    f"open {mix_features.get('open_score', 0.0):.2f}, "
+                    f"compact {mix_features.get('compact_score', 0.0):.2f}, "
+                    f"cluster {mix_features.get('cluster_score', 0.0):.2f}, "
+                    f"harmony {mix_features.get('harmony_score', 0.0):.2f}."
+                )
+            elif selected_sound_template in SOUND_TEMPLATES:
+                st.caption(str(SOUND_TEMPLATES[selected_sound_template].get("description", "")))
+            else:
+                st.caption("No sound template overrides applied.")
 
             profile_col_1, profile_col_2, profile_col_3 = st.columns(3)
             with profile_col_1:
@@ -2071,7 +2134,28 @@ def render_single_language_ui() -> None:
                     language="json",
                 )
 
-            phonotactic_overrides: Dict[str, Any] = {
+            sound_template_overrides = resolve_sound_template_overrides(
+                selected_sound_template,
+                latest_inventory if isinstance(latest_inventory, dict) else None,
+            )
+            segment_frequency_overrides = {
+                "segment_frequency": {
+                    "enabled": True,
+                    "strength": float(ui_source_influence),
+                    "vowel_weights": latest_inventory.get("vowels_representation", {})
+                    if isinstance(latest_inventory.get("vowels_representation", {}), dict)
+                    else {},
+                    "consonant_weights": latest_inventory.get("consonants_representation", {})
+                    if isinstance(latest_inventory.get("consonants_representation", {}), dict)
+                    else {},
+                }
+            }
+
+            phonotactic_overrides: Dict[str, Any] = deep_merge_dict(
+                sound_template_overrides if isinstance(sound_template_overrides, dict) else {},
+                segment_frequency_overrides,
+            )
+            phonotactic_overrides = deep_merge_dict(phonotactic_overrides, {
                 "candidate_selection": {
                     "candidates_per_word": int(ui_candidate_count),
                     "temperature": float(ui_temperature),
@@ -2098,7 +2182,7 @@ def render_single_language_ui() -> None:
                         "default": float((ui_noun_suffix_rate + ui_verb_suffix_rate) / 2.0),
                     },
                 },
-            }
+            })
             advanced_override_dict, advanced_override_error = parse_override_json(advanced_override_text)
             if advanced_override_error:
                 st.error(advanced_override_error)

@@ -104,6 +104,83 @@ VOWEL_LOWER_PAIRS: List[Tuple[str, str]] = [
     ("i", "ɪ"),
     ("u", "ʊ"),
 ]
+VOWEL_CENTRALIZE_PAIRS: List[Tuple[str, str]] = [
+    ("i", "ɪ"),
+    ("e", "ə"),
+    ("o", "ə"),
+    ("u", "ʊ"),
+    ("a", "ə"),
+    ("æ", "ə"),
+    ("y", "ʉ"),
+    ("ø", "ɵ"),
+    ("ɯ", "ɤ"),
+]
+VOWEL_FRONT_PAIRS: List[Tuple[str, str]] = [
+    ("u", "y"),
+    ("o", "ø"),
+    ("ɔ", "œ"),
+    ("ɯ", "u"),
+    ("ɑ", "æ"),
+]
+VOWEL_BACK_PAIRS: List[Tuple[str, str]] = [
+    ("i", "ɯ"),
+    ("e", "ɤ"),
+    ("ɛ", "ɤ"),
+    ("æ", "ɑ"),
+]
+FRICATIVE_VOICE_PAIRS: List[Tuple[str, str]] = [
+    ("f", "v"),
+    ("s", "z"),
+    ("ʃ", "ʒ"),
+    ("x", "ɣ"),
+    ("θ", "ð"),
+]
+FRICATIVE_DEVOICE_PAIRS: List[Tuple[str, str]] = [
+    ("v", "f"),
+    ("z", "s"),
+    ("ʒ", "ʃ"),
+    ("ɣ", "x"),
+    ("ð", "θ"),
+]
+STOP_LENITION_PAIRS: List[Tuple[str, str]] = [
+    ("p", "f"),
+    ("t", "s"),
+    ("k", "x"),
+    ("b", "v"),
+    ("d", "z"),
+    ("g", "ɣ"),
+]
+STOP_FORTITION_PAIRS: List[Tuple[str, str]] = [
+    ("f", "p"),
+    ("s", "t"),
+    ("x", "k"),
+    ("v", "b"),
+    ("z", "d"),
+    ("ɣ", "g"),
+]
+LIQUID_SHIFT_PAIRS: List[Tuple[str, str]] = [
+    ("l", "r"),
+    ("r", "l"),
+]
+
+TEMPLATE_BASE_WEIGHTS: Dict[str, float] = {
+    "stop_voicing": 0.9,
+    "stop_devoicing": 0.85,
+    "s_voicing": 0.8,
+    "h_loss": 1.1,
+    "approximant_shift": 0.7,
+    "r_shift": 0.7,
+    "liquid_shift": 0.8,
+    "fricative_voicing": 1.0,
+    "fricative_devoicing": 0.95,
+    "stop_lenition": 1.2,
+    "stop_fortition": 0.7,
+    "vowel_raise_pair": 1.1,
+    "vowel_lower_pair": 1.0,
+    "vowel_centralization": 1.0,
+    "vowel_fronting": 0.85,
+    "vowel_backing": 0.85,
+}
 
 
 def _pick_pair(pairs: Iterable[Tuple[str, str]], vowels: List[str], rng: random.Random) -> Optional[Tuple[str, str]]:
@@ -114,33 +191,75 @@ def _pick_pair(pairs: Iterable[Tuple[str, str]], vowels: List[str], rng: random.
 
 
 def _template_rule(template_id: str, vowels: List[str], consonants: List[str], rng: random.Random) -> Optional[Tuple[str, str]]:
+    candidates = _template_candidates(template_id, vowels, consonants)
+    return rng.choice(candidates) if candidates else None
+
+
+def _template_candidates(template_id: str, vowels: List[str], consonants: List[str]) -> List[Tuple[str, str]]:
     if template_id == "stop_voicing":
-        candidates = [(frm, to) for frm, to in [("p", "b"), ("t", "d"), ("k", "g")] if frm in consonants]
-        return rng.choice(candidates) if candidates else None
+        pairs = [("p", "b"), ("t", "d"), ("k", "g")]
+        return [(frm, to) for frm, to in pairs if frm in consonants]
     if template_id == "stop_devoicing":
-        candidates = [(frm, to) for frm, to in [("b", "p"), ("d", "t"), ("g", "k")] if frm in consonants]
-        return rng.choice(candidates) if candidates else None
+        pairs = [("b", "p"), ("d", "t"), ("g", "k")]
+        return [(frm, to) for frm, to in pairs if frm in consonants]
     if template_id == "s_voicing":
-        return ("s", "z") if "s" in consonants else None
+        return [("s", "z")] if "s" in consonants else []
     if template_id == "h_loss":
-        return ("h", "") if "h" in consonants else None
+        return [("h", "")] if "h" in consonants else []
     if template_id == "approximant_shift":
+        pairs = []
         if "w" in consonants:
-            return ("w", "v")
+            pairs.append(("w", "v"))
         if "v" in consonants:
-            return ("v", "w")
-        return None
+            pairs.append(("v", "w"))
+        return pairs
     if template_id == "r_shift":
+        pairs = []
         if "r" in consonants:
-            return ("r", "ɾ")
+            pairs.append(("r", "ɾ"))
         if "ɾ" in consonants:
-            return ("ɾ", "r")
-        return None
+            pairs.append(("ɾ", "r"))
+        return pairs
+    if template_id == "liquid_shift":
+        return [(frm, to) for frm, to in LIQUID_SHIFT_PAIRS if frm in consonants]
+    if template_id == "fricative_voicing":
+        return [(frm, to) for frm, to in FRICATIVE_VOICE_PAIRS if frm in consonants]
+    if template_id == "fricative_devoicing":
+        return [(frm, to) for frm, to in FRICATIVE_DEVOICE_PAIRS if frm in consonants]
+    if template_id == "stop_lenition":
+        return [(frm, to) for frm, to in STOP_LENITION_PAIRS if frm in consonants]
+    if template_id == "stop_fortition":
+        return [(frm, to) for frm, to in STOP_FORTITION_PAIRS if frm in consonants]
     if template_id == "vowel_raise_pair":
-        return _pick_pair(VOWEL_RAISE_PAIRS, vowels, rng)
+        return [pair for pair in VOWEL_RAISE_PAIRS if pair[0] in vowels]
     if template_id == "vowel_lower_pair":
-        return _pick_pair(VOWEL_LOWER_PAIRS, vowels, rng)
-    return None
+        return [pair for pair in VOWEL_LOWER_PAIRS if pair[0] in vowels]
+    if template_id == "vowel_centralization":
+        return [pair for pair in VOWEL_CENTRALIZE_PAIRS if pair[0] in vowels]
+    if template_id == "vowel_fronting":
+        return [pair for pair in VOWEL_FRONT_PAIRS if pair[0] in vowels]
+    if template_id == "vowel_backing":
+        return [pair for pair in VOWEL_BACK_PAIRS if pair[0] in vowels]
+    return []
+
+
+def _template_weight(template_id: str, vowels: List[str], consonants: List[str]) -> float:
+    candidates = _template_candidates(template_id, vowels, consonants)
+    if not candidates:
+        return 0.0
+    return TEMPLATE_BASE_WEIGHTS.get(template_id, 1.0) * float(len(candidates))
+
+
+def template_weights_for_inventory(
+    templates: List[str],
+    vowels: List[str],
+    consonants: List[str],
+) -> Dict[str, float]:
+    return {
+        template_id: _template_weight(template_id, vowels, consonants)
+        for template_id in templates
+        if isinstance(template_id, str)
+    }
 
 
 def _event_count(expected_events: float, rng: random.Random) -> int:
@@ -195,6 +314,116 @@ def generate_changeset(
     }
 
 
+def _distribute_events(total_events: int, stages: int, rng: random.Random) -> List[int]:
+    if stages <= 1:
+        return [max(1, total_events)]
+    base = max(1, total_events // stages)
+    counts = [base for _ in range(stages)]
+    remainder = max(0, total_events - sum(counts))
+    for index in range(remainder):
+        counts[index % stages] += 1
+    if len(counts) > 1:
+        rng.shuffle(counts)
+    return counts
+
+
+def estimate_time_based_plan(duration_years: int, events_per_1000_years: float, rng: random.Random) -> Tuple[int, int]:
+    expected_events = max(0.5, events_per_1000_years * (max(1, duration_years) / 1000.0))
+    total_events = _event_count(expected_events, rng)
+    if duration_years >= 1600:
+        stages = 4
+    elif duration_years >= 900:
+        stages = 3
+    elif duration_years >= 400:
+        stages = 2
+    else:
+        stages = 1
+    return max(1, total_events), stages
+
+
+def _weighted_template_choice(
+    templates: List[str],
+    vowels: List[str],
+    consonants: List[str],
+    rng: random.Random,
+) -> Optional[str]:
+    weights = template_weights_for_inventory(templates, vowels, consonants)
+    available = [(template_id, weight) for template_id, weight in weights.items() if weight > 0]
+    if not available:
+        return None
+    total = sum(weight for _, weight in available)
+    pick = rng.uniform(0, total)
+    cumulative = 0.0
+    for template_id, weight in available:
+        cumulative += weight
+        if pick <= cumulative:
+            return template_id
+    return available[-1][0]
+
+
+def generate_time_based_changeset(
+    parent_inventory: Dict[str, Any],
+    enabled_templates: List[str],
+    duration_years: int,
+    events_per_1000_years: float,
+    rng: random.Random,
+    changeset_id: str,
+    name: str,
+    description: str = "",
+) -> Dict[str, Any]:
+    vowels = parent_inventory.get("vowels", [])
+    consonants = parent_inventory.get("consonants", [])
+    if not isinstance(vowels, list):
+        vowels = []
+    if not isinstance(consonants, list):
+        consonants = []
+
+    total_events, stages = estimate_time_based_plan(duration_years, events_per_1000_years, rng)
+    stage_counts = _distribute_events(total_events, stages, rng)
+
+    rules: List[Dict[str, Any]] = []
+    used_from: Set[str] = set()
+    inventory_stage = {"vowels": list(vowels), "consonants": list(consonants)}
+    templates = [template for template in enabled_templates if isinstance(template, str)]
+    if not templates:
+        templates = []
+
+    for stage_index, stage_target in enumerate(stage_counts, start=1):
+        attempts = 0
+        max_attempts = max(25, stage_target * 10)
+        stage_rules: List[Dict[str, Any]] = []
+        stage_vowels = inventory_stage.get("vowels", []) if isinstance(inventory_stage, dict) else []
+        stage_consonants = inventory_stage.get("consonants", []) if isinstance(inventory_stage, dict) else []
+        while len(stage_rules) < stage_target and attempts < max_attempts:
+            attempts += 1
+            template_id = _weighted_template_choice(templates, stage_vowels, stage_consonants, rng)
+            if not template_id:
+                break
+            rule = _template_rule(template_id, stage_vowels, stage_consonants, rng)
+            if not rule:
+                continue
+            frm, to = rule
+            if frm in used_from:
+                continue
+            used_from.add(frm)
+            stage_rules.append({"from": frm, "to": to, "enabled": True, "notes": f"stage {stage_index}"})
+
+        if stage_rules:
+            rules.extend(stage_rules)
+            inventory_stage = sound_change_engine.apply_changeset_to_inventory(
+                inventory_stage, {"rules": stage_rules}
+            )
+
+    description = description or f"{len(rules)} changes across {stages} stage(s) over {duration_years} years"
+    return {
+        "schema_version": 1,
+        "changeset_id": changeset_id,
+        "name": name,
+        "description": description,
+        "rules": rules,
+    }
+
+
 def apply_lexicon_overrides(language: Dict[str, Any], overrides: Dict[str, str]) -> Dict[str, Any]:
     if not overrides:
         return language
@@ -208,6 +437,31 @@ def apply_lexicon_overrides(language: Dict[str, Any], overrides: Dict[str, str])
         if entry_id in overrides:
             entry["ipa"] = overrides[entry_id]
     return language
+
+
+def _merge_child_extras(rebuilt: Dict[str, Any], existing_child: Dict[str, Any]) -> Dict[str, Any]:
+    rebuilt_lexicon = rebuilt.get("lexicon", [])
+    if not isinstance(rebuilt_lexicon, list):
+        rebuilt_lexicon = []
+    existing_lexicon = existing_child.get("lexicon", [])
+    if not isinstance(existing_lexicon, list):
+        return rebuilt
+    rebuilt_ids = {
+        str(entry.get("id", "")).strip()
+        for entry in rebuilt_lexicon
+        if isinstance(entry, dict) and str(entry.get("id", "")).strip()
+    }
+    extras: List[Dict[str, Any]] = []
+    for entry in existing_lexicon:
+        if not isinstance(entry, dict):
+            continue
+        entry_id = str(entry.get("id", "")).strip()
+        if not entry_id or entry_id in rebuilt_ids:
+            continue
+        extras.append(entry)
+    if extras:
+        rebuilt["lexicon"] = list(rebuilt_lexicon) + extras
+    return rebuilt
 
 
 def _register_language(project: Dict[str, Any], language_id: str) -> None:
@@ -304,20 +558,19 @@ def generate_family(
             continue
 
         duration = max(1, (node.year or extant_year) - (parent.year or 0))
-        expected_events = events_per_1000_years * (duration / 1000.0)
         edge_rng = random.Random(_edge_seed(seed, parent.node_id, node.node_id))
-        event_count = _event_count(expected_events, edge_rng)
 
         changeset_id = f"chg_{parent.node_id}_{node.node_id}"
         changeset_name = f"{parent.node_id}→{node.node_id}"
-        changeset = generate_changeset(
+        changeset = generate_time_based_changeset(
             parent_inventory=parent_language.get("inventory", {}),
             enabled_templates=enabled_templates,
-            event_count=event_count,
+            duration_years=duration,
+            events_per_1000_years=events_per_1000_years,
             rng=edge_rng,
             changeset_id=changeset_id,
             name=changeset_name,
-            description=f"{event_count} sound-change event(s)",
+            description="",
         )
         project_io.save_changeset(changeset, changesets_dir / f"{changeset_id}.json")
 
@@ -417,6 +670,7 @@ def rebuild_subtree(project_dir: Path, root_language_id: str) -> None:
                 continue
             changeset = project_io.load_changeset(changeset_path)
             rebuilt = sound_change_engine.apply_changeset_to_language(parent_language, changeset)
+            rebuilt = _merge_child_extras(rebuilt, existing_child)
 
             for key in [
                 "style_name",
@@ -431,7 +685,17 @@ def rebuild_subtree(project_dir: Path, root_language_id: str) -> None:
 
             rebuilt["meta"] = meta
             overrides = meta.get("lexicon_overrides", {})
+            valid_ids: Set[str] = set()
+            lexicon = rebuilt.get("lexicon", [])
+            if isinstance(lexicon, list):
+                for entry in lexicon:
+                    if isinstance(entry, dict):
+                        entry_id = str(entry.get("id", "")).strip()
+                        if entry_id:
+                            valid_ids.add(entry_id)
             if isinstance(overrides, dict):
+                overrides = {key: value for key, value in overrides.items() if key in valid_ids}
+                meta["lexicon_overrides"] = overrides
                 rebuilt = apply_lexicon_overrides(rebuilt, overrides)
 
             rebuilt = project_io.normalize_language_snapshot(rebuilt)

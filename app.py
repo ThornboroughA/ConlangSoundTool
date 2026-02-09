@@ -389,8 +389,16 @@ SOUND_CHANGE_TEMPLATE_LABELS: Dict[str, str] = {
     "h_loss": "H loss (h→∅)",
     "approximant_shift": "Approximant shift (w↔v)",
     "r_shift": "R shift (r↔ɾ)",
+    "liquid_shift": "Liquid shift (l↔r)",
+    "fricative_voicing": "Fricative voicing (f→v, s→z, ʃ→ʒ)",
+    "fricative_devoicing": "Fricative devoicing (v→f, z→s, ʒ→ʃ)",
+    "stop_lenition": "Stop lenition (p→f, t→s, k→x)",
+    "stop_fortition": "Stop fortition (f→p, s→t, x→k)",
     "vowel_raise_pair": "Vowel raise (e→i, o→u, etc.)",
     "vowel_lower_pair": "Vowel lower (i→e, u→o, etc.)",
+    "vowel_centralization": "Vowel centralization (i→ɪ, e→ə, o→ə)",
+    "vowel_fronting": "Vowel fronting (u→y, o→ø)",
+    "vowel_backing": "Vowel backing (i→ɯ, e→ɤ)",
 }
 SOUND_CHANGE_TEMPLATE_DESCRIPTIONS: Dict[str, str] = {
     "stop_voicing": "Turns voiceless stops into voiced ones (like p→b).",
@@ -399,10 +407,24 @@ SOUND_CHANGE_TEMPLATE_DESCRIPTIONS: Dict[str, str] = {
     "h_loss": "Deletes h from words, a common historical change.",
     "approximant_shift": "Swaps w and v, modeling labial approximant/ fricative shifts.",
     "r_shift": "Alternates r with a tap ɾ, a frequent rhotic drift.",
+    "liquid_shift": "Swaps l and r, a frequent liquid shift in many families.",
+    "fricative_voicing": "Voices fricatives (f→v, s→z, etc.).",
+    "fricative_devoicing": "Devoices fricatives (v→f, z→s, etc.).",
+    "stop_lenition": "Softens stops into fricatives (p→f, t→s, k→x).",
+    "stop_fortition": "Hardens fricatives into stops (f→p, s→t, x→k).",
     "vowel_raise_pair": "Raises a vowel (like e→i or o→u).",
     "vowel_lower_pair": "Lowers a vowel (like i→e or u→o).",
+    "vowel_centralization": "Moves vowels toward the center (i→ɪ, e→ə, o→ə).",
+    "vowel_fronting": "Fronts back vowels (u→y, o→ø).",
+    "vowel_backing": "Backs front vowels (i→ɯ, e→ɤ).",
 }
-SOUND_CHANGE_VOWEL_TEMPLATES = {"vowel_raise_pair", "vowel_lower_pair"}
+SOUND_CHANGE_VOWEL_TEMPLATES = {
+    "vowel_raise_pair",
+    "vowel_lower_pair",
+    "vowel_centralization",
+    "vowel_fronting",
+    "vowel_backing",
+}
 
 ROMANIZATION_FALLBACK_VOWELS = set("aeiouyæœɨöü")
 ROMANIZATION_FALLBACK_VOWELS |= set("āēīōūȳǣôŏăŭ")
@@ -3126,34 +3148,64 @@ def render_language_family_ui() -> None:
         if st.button("?", key=key, help="Show an explanation for this section."):
             st.session_state["help_topic"] = topic_key
 
-    def pick_random_sound_templates(options: List[str]) -> List[str]:
+    def pick_random_sound_templates(
+        options: List[str],
+        parent_inventory: Dict[str, Any],
+        duration_years: int,
+    ) -> List[str]:
         if not options:
             return []
         rng = random.Random()
-        max_count = min(6, len(options))
-        min_count = min(3, len(options))
-        target_count = rng.randint(min_count, max_count) if max_count >= min_count else len(options)
-        vowel_options = [template for template in options if template in SOUND_CHANGE_VOWEL_TEMPLATES]
-        consonant_options = [template for template in options if template not in SOUND_CHANGE_VOWEL_TEMPLATES]
+        weights = family_generator.template_weights_for_inventory(
+            options,
+            parent_inventory.get("vowels", []) if isinstance(parent_inventory, dict) else [],
+            parent_inventory.get("consonants", []) if isinstance(parent_inventory, dict) else [],
+        )
+        weighted_options = [template for template in options if weights.get(template, 0.0) > 0]
+        if not weighted_options:
+            weighted_options = list(options)
+        max_count = min(8, len(weighted_options))
+        min_count = min(3, len(weighted_options))
+        baseline = max(3, min_count)
+        span = min(5, max_count - baseline)
+        target_count = baseline + max(0, min(span, duration_years // 350))
+        target_count = min(max_count, max(min_count, target_count))
+
         chosen: List[str] = []
-        if vowel_options:
-            chosen.append(rng.choice(vowel_options))
-        if consonant_options:
-            chosen.append(rng.choice(consonant_options))
-        chosen_set = set(chosen)
-        opposing_pairs = [
+        opposing_pairs = {
             ("stop_voicing", "stop_devoicing"),
             ("vowel_raise_pair", "vowel_lower_pair"),
-        ]
-        remaining = [template for template in options if template not in chosen_set]
-        for left, right in opposing_pairs:
-            if left in chosen_set and right in remaining:
-                remaining.remove(right)
-            if right in chosen_set and left in remaining:
-                remaining.remove(left)
-        remaining_count = max(0, target_count - len(chosen))
-        if remaining_count > 0:
-            chosen.extend(rng.sample(remaining, k=min(remaining_count, len(remaining))))
+        }
+
+        def _pick_weighted() -> Optional[str]:
+            total = sum(weights.get(template, 0.0) for template in weighted_options if template not in chosen)
+            if total <= 0:
+                remaining = [template for template in weighted_options if template not in chosen]
+                return rng.choice(remaining) if remaining else None
+            pick = rng.uniform(0, total)
+            cumulative = 0.0
+            for template in weighted_options:
+                if template in chosen:
+                    continue
+                cumulative += weights.get(template, 0.0)
+                if pick <= cumulative:
+                    return template
+            return None
+
+        while len(chosen) < target_count:
+            template_id = _pick_weighted()
+            if not template_id:
+                break
+            conflicting = False
+            for left, right in opposing_pairs:
+                if template_id == left and right in chosen:
+                    conflicting = True
+                if template_id == right and left in chosen:
+                    conflicting = True
+            if conflicting:
+                chosen.append(template_id)
+                continue
+            chosen.append(template_id)
         return [template for template in options if template in set(chosen)]
 
     setup_tab, workspace_tab = st.tabs(["Project Setup", "Family Workspace"])
@@ -3377,6 +3429,14 @@ def render_language_family_ui() -> None:
                     return candidate
                 counter += 1
 
+        def _propagate_descendants(language_id: str, notice: str) -> None:
+            if not isinstance(project, dict) or not project_dir:
+                return
+            family_generator.rebuild_subtree(project_dir, language_id)
+            st.session_state["family_languages_cache"] = load_languages_from_project(project, project_dir)
+            if notice:
+                st.session_state["family_notice"] = notice
+
         left_col, main_col, help_col = st.columns([1.3, 2.2, 1.1], gap="large")
 
         with left_col:
@@ -3567,6 +3627,7 @@ def render_language_family_ui() -> None:
                                 "Year (relative to proto timeline)",
                                 value=year_default,
                                 step=10,
+                                key=f"family_child_year_{selected_parent}",
                                 help="Approximate year for the daughter relative to the proto timeline.",
                             )
                             notes = st.text_area(
@@ -3681,29 +3742,48 @@ def render_language_family_ui() -> None:
                         with step_changes:
                             parent_language = languages[selected_parent]
                             parent_inventory = parent_language.get("inventory", {})
+                            parent_year = int(parent_language.get("meta", {}).get("year", 0))
+                            duration_years = max(1, int(child_year) - parent_year)
+                            events_per_1000_years = float(
+                                project.get("family_config", {}).get("events_per_1000_years", 6.0)
+                                if isinstance(project, dict)
+                                else 6.0
+                            )
+                            seed_base = int(project.get("seed", 0))
+                            seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}")) % (2**32)
+                            plan_rng = random.Random(seed_value)
+                            estimated_events, estimated_stages = family_generator.estimate_time_based_plan(
+                                duration_years, events_per_1000_years, plan_rng
+                            )
                             st.markdown("**Sound changes**")
                             help_button("sound_changes")
+                            st.caption(
+                                f"Time span: {duration_years} years → ~{estimated_events} change(s) across "
+                                f"{estimated_stages} stage(s)."
+                            )
                             template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
                             template_key = f"family_template_select_{selected_parent}_{child_id_input}"
                             rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
                             randomize_flag = f"{rule_editor_key}_randomize_flag"
+                            auto_sig_key = f"{rule_editor_key}_auto_sig"
+                            auto_toggle_key = f"{rule_editor_key}_auto_toggle"
 
                             if template_key not in st.session_state:
-                                st.session_state[template_key] = []
+                                st.session_state[template_key] = list(template_options)
                             if rule_editor_key not in st.session_state:
                                 st.session_state[rule_editor_key] = []
 
                             def _apply_template_rules(templates: List[str], seed_salt: str = "") -> None:
                                 if templates:
-                                    seed_base = int(project.get("seed", 0))
-                                    seed_value = abs(hash(f"{seed_base}:{selected_parent}:{child_id_input}:{seed_salt}")) % (
-                                        2**32
-                                    )
+                                    seed_value = abs(
+                                        hash(f"{seed_base}:{selected_parent}:{child_id_input}:{seed_salt}")
+                                    ) % (2**32)
                                     rng = random.Random(seed_value)
-                                    changeset_preview = family_generator.generate_changeset(
+                                    changeset_preview = family_generator.generate_time_based_changeset(
                                         parent_inventory=parent_inventory,
                                         enabled_templates=templates,
-                                        event_count=max(1, len(templates)),
+                                        duration_years=duration_years,
+                                        events_per_1000_years=events_per_1000_years,
                                         rng=rng,
                                         changeset_id=f"chg_{selected_parent}_{child_id_input}",
                                         name=f"{selected_parent}→{child_id_input}",
@@ -3722,7 +3802,11 @@ def render_language_family_ui() -> None:
                                     st.session_state[rule_editor_key] = []
 
                             if st.session_state.pop(randomize_flag, False):
-                                randomized = pick_random_sound_templates(template_options)
+                                randomized = pick_random_sound_templates(
+                                    template_options,
+                                    parent_inventory,
+                                    duration_years,
+                                )
                                 st.session_state[template_key] = randomized
                                 _apply_template_rules(randomized, seed_salt=str(random.random()))
 
@@ -3735,6 +3819,17 @@ def render_language_family_ui() -> None:
                                 help="Pick change templates; they become the auto-generated rules below.",
                             )
 
+                            auto_rules = st.checkbox(
+                                "Auto-generate rules by time span",
+                                value=True,
+                                key=auto_toggle_key,
+                                help="When enabled, changes re-roll automatically when the time span changes.",
+                            )
+                            current_sig = f"{selected_parent}:{child_id_input}:{duration_years}:{','.join(sorted(selected_templates))}"
+                            if auto_rules and st.session_state.get(auto_sig_key) != current_sig:
+                                _apply_template_rules(selected_templates, seed_salt="auto")
+                                st.session_state[auto_sig_key] = current_sig
+
                             template_action_cols = st.columns([1.2, 1.6, 2.2])
                             with template_action_cols[0]:
                                 if st.button(
@@ -3746,9 +3841,9 @@ def render_language_family_ui() -> None:
                                     st.rerun()
                             with template_action_cols[1]:
                                 generate_rules_button = st.button(
-                                    "Generate rules from templates",
+                                    "Re-roll rules (time-based)",
                                     key=f"{rule_editor_key}_generate",
-                                    help="Auto-generate a set of sound-change rules using the selected templates.",
+                                    help="Auto-generate a time-based set of sound-change rules.",
                                 )
                             with template_action_cols[2]:
                                 st.caption("Templates control which kinds of changes are eligible.")
@@ -4431,12 +4526,16 @@ def render_language_family_ui() -> None:
                                     lexicon = []
                                 lexicon.append(entry)
                                 lexicon_model["lexicon"] = lexicon
-                                lexicon_model = rebuild_indices(lexicon_model)
-                                selected_language["lexicon"] = lexicon_model.get("lexicon", [])
-                                save_family_language(selected_language, meta)
-                                st.session_state[preview_key] = None
-                                st.success("Custom entry added to the lexicon.")
-                                st.rerun()
+                            lexicon_model = rebuild_indices(lexicon_model)
+                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                            save_family_language(selected_language, meta)
+                            _propagate_descendants(
+                                selected_id,
+                                "Custom entry added and propagated to descendants.",
+                            )
+                            st.session_state[preview_key] = None
+                            st.success("Custom entry added to the lexicon.")
+                            st.rerun()
 
                             st.divider()
                             st.markdown("**Lexicon overview**")
@@ -4648,14 +4747,18 @@ def render_language_family_ui() -> None:
                                         for entry in lexicon_entries
                                         if str(entry.get("id", "")).strip() not in set(delete_ids)
                                     ]
-                                meta["lexicon_overrides"] = overrides
-                                lexicon_model = rebuild_indices(lexicon_model)
-                                selected_language["meta"] = meta
-                                selected_language["lexicon"] = lexicon_model.get("lexicon", [])
-                                save_family_language(selected_language, meta)
-                                if edit_count or delete_ids:
-                                    st.success("Lexicon updates applied.")
-                                st.rerun()
+                            meta["lexicon_overrides"] = overrides
+                            lexicon_model = rebuild_indices(lexicon_model)
+                            selected_language["meta"] = meta
+                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                            save_family_language(selected_language, meta)
+                            _propagate_descendants(
+                                selected_id,
+                                "Lexicon updates propagated to descendants.",
+                            )
+                            if edit_count or delete_ids:
+                                st.success("Lexicon updates applied.")
+                            st.rerun()
 
                             overview_rerolls = [
                                 str(row.get("Entry", "")).strip()
@@ -4705,12 +4808,16 @@ def render_language_family_ui() -> None:
                                         phonotactic_profile_overrides=lexicon_model.get("phonotactic_profile_overrides"),
                                     )
                                     overrides[entry_id] = find_entry_ipa(lexicon_model, entry_id)
-                                meta["lexicon_overrides"] = overrides
-                                selected_language["meta"] = meta
-                                selected_language["lexicon"] = lexicon_model.get("lexicon", [])
-                                save_family_language(selected_language, meta)
-                                st.success("Re-rolled entries saved.")
-                                st.rerun()
+                            meta["lexicon_overrides"] = overrides
+                            selected_language["meta"] = meta
+                            selected_language["lexicon"] = lexicon_model.get("lexicon", [])
+                            save_family_language(selected_language, meta)
+                            _propagate_descendants(
+                                selected_id,
+                                "Re-rolled entries propagated to descendants.",
+                            )
+                            st.success("Re-rolled entries saved.")
+                            st.rerun()
 
                         with detail_tabs[2]:
                             st.markdown("**Word preview**")

@@ -69,6 +69,43 @@ Presets support weighted segment entries:
 
 Legacy list format (e.g. `"vowels": ["i", "a"]`) still works and is treated as `representation: 1.0` for each segment.
 
+## Source profile sidecars (optional)
+
+You can add an optional sidecar next to any preset:
+
+- `presets/<preset_name>.profile.json`
+
+Sidecars are non-breaking: if a sidecar is missing, generation falls back to current inventory-derived behavior.
+
+Supported sidecar schema:
+
+```json
+{
+  "version": 1,
+  "provenance": ["Source citation"],
+  "segment_frequency": {
+    "vowel_weights": {"a": 1.2, "i": 0.9},
+    "consonant_weights": {"t": 1.1, "k": 0.8}
+  },
+  "template_weights_by_position": {
+    "single": [["CV", 0.55], ["CVC", 0.45]],
+    "initial": [["CV", 0.6], ["CCV", 0.4]],
+    "medial": [["CV", 0.7], ["VC", 0.3]],
+    "final": [["CVC", 0.65], ["VC", 0.35]]
+  },
+  "slot_class_weights": {"coda": {"nasal": 1.2, "stop": 0.8}},
+  "co_occurrence": {"front_back_harmony_bonus": 1.1},
+  "soft_constraints": {"hiatus_penalty": 0.3},
+  "cluster": {"violation_penalty": 0.25}
+}
+```
+
+Notes:
+
+- Segment maps are normalized to mean `1.0` per class.
+- Template weights are normalized to sum `1.0` per position.
+- Sidecar tendencies are soft/probabilistic; no hard allow/deny constraints are used.
+
 ## PHOIBLE import weighting model
 
 When importing presets from PHOIBLE in the UI:
@@ -80,3 +117,20 @@ When importing presets from PHOIBLE in the UI:
 - Core and marginal slider values act as multipliers on top of this normalized prior.
 
 This keeps the preset JSON format unchanged while avoiding flat `1.0` representations for every segment.
+
+## Build a sidecar from a wordlist
+
+Use the helper script to derive a source profile from IPA wordlist data:
+
+```bash
+python tools/build_source_profile_from_wordlist.py \
+  --input data/japanese_wordlist.tsv \
+  --ipa-column ipa \
+  --delimiter auto \
+  --output presets/japanese_197.profile.json
+```
+
+The script estimates:
+
+- segment frequency weights (vowels/consonants), and
+- syllable template distributions by position (`single`, `initial`, `medial`, `final`).

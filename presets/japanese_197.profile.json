@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "provenance": [
+    "Primary inventory: PHOIBLE Japanese inventory 197",
+    "Profile tuning: Japanese-oriented moraic and open-syllable tendencies"
+  ],
+  "segment_frequency": {
+    "vowel_weights": {
+      "a": 1.2765970652720293,
+      "aː": 1.1030434840104482,
+      "i": 1.287401695308789,
+      "iː": 1.1149573752562192,
+      "ɛ": 1.1412564577295263,
+      "ɔ": 1.1325509197210895,
+      "ɯ": 0.8551920779698865,
+      "ɯː": 0.6250387972827757
+    },
+    "consonant_weights": {
+      "k": 1.257178408844368,
+      "p": 1.2490588420256967,
+      "t": 1.2128197496785733,
+      "s": 1.2094761263124656,
+      "m": 1.267651304190619,
+      "n": 1.2334299774039228,
+      "j": 1.2564199634651136,
+      "w": 1.2421738183054285,
+      "h": 1.18228798087462,
+      "ɾ": 1.057100053210934,
+      "t̠ʃ": 1.1290668186671329,
+      "d̠ʒ": 1.0662618942817563,
+      "ŋ": 1.1995039879949356,
+      "ʔ": 1.1174418363559497,
+      "z": 1.0797969092172979,
+      "kː": 0.7096060281168559,
+      "pː": 0.6681004512016596,
+      "tː": 0.647896256078682,
+      "sː": 0.6860229790422165
+    }
+  },
+  "template_weights_by_position": {
+    "single": [
+      ["CV", 0.66],
+      ["V", 0.15],
+      ["CVC", 0.09],
+      ["CVV", 0.08],
+      ["VC", 0.02]
+    ],
+    "initial": [
+      ["CV", 0.71],
+      ["V", 0.10],
+      ["CVV", 0.09],
+      ["CVC", 0.07],
+      ["CCV", 0.03]
+    ],
+    "medial": [
+      ["CV", 0.58],
+      ["CVV", 0.14],
+      ["VCV", 0.11],
+      ["CVC", 0.09],
+      ["V", 0.05],
+      ["VC", 0.03]
+    ],
+    "final": [
+      ["CV", 0.49],
+      ["V", 0.20],
+      ["CVC", 0.13],
+      ["CVV", 0.10],
+      ["VC", 0.06],
+      ["CVCC", 0.02]
+    ]
+  },
+  "slot_class_weights": {
+    "word_initial_onset": {
+      "nasal": 0.58,
+      "velar_nasal": 0.05,
+      "liquid": 0.76,
+      "glide": 0.88
+    },
+    "coda": {
+      "nasal": 1.24,
+      "liquid": 0.84,
+      "stop": 0.62,
+      "fricative": 0.70
+    },
+    "word_final_coda": {
+      "nasal": 1.28,
+      "liquid": 0.78,
+      "stop": 0.56,
+      "fricative": 0.64
+    }
+  },
+  "co_occurrence": {
+    "enabled": 1.0,
+    "front_back_harmony_bonus": 1.08,
+    "front_back_harmony_penalty": 0.93,
+    "labial_rounded_bonus": 1.10,
+    "palatal_front_bonus": 1.26,
+    "palatal_back_penalty": 0.80
+  },
+  "soft_constraints": {
+    "initial_velar_nasal_penalty": 5.4,
+    "final_complex_coda_penalty": 0.92,
+    "hiatus_penalty": 0.20,
+    "cluster_violation_penalty": 1.40
+  },
+  "cluster": {
+    "max_attempts": 9.0,
+    "violation_penalty": 0.18,
+    "rise_bonus": 1.28,
+    "fall_bonus": 1.28
+  }
+}

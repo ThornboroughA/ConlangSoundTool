@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "provenance": [
+    "Primary inventory: PHOIBLE Korean inventory 1",
+    "Profile tuning: Korean-oriented soft phonotactic tendencies"
+  ],
+  "segment_frequency": {
+    "vowel_weights": {
+      "a": 1.3094114824786656,
+      "e": 1.2520470403248618,
+      "i": 1.3204938412110605,
+      "o": 1.2505951341064352,
+      "u": 1.312330636589323,
+      "ɯ": 0.877174448446615,
+      "ɤ": 0.7377949755550084,
+      "æ": 0.901117208814198,
+      "ø": 0.7582862579188645
+    },
+    "consonant_weights": {
+      "k": 1.3100161590373431,
+      "kʰ": 1.0610738004787275,
+      "kˀ": 0.363799166515715,
+      "p": 1.301555336244005,
+      "pʰ": 1.0574892512068597,
+      "pˀ": 0.32218849982054776,
+      "t": 1.2637931568829885,
+      "tʰ": 0.9940764059338171,
+      "tˀ": 0.22953171847926165,
+      "t̠ʃ": 1.1765201873347906,
+      "t̠ʃʰ": 0.9003944068526063,
+      "t̠ʃˀ": 0.2966654424974883,
+      "s": 1.2603090049054166,
+      "sˀ": 0.34429757771889247,
+      "m": 1.3209292180264065,
+      "n": 1.2852696085717081,
+      "ŋ": 1.2499177491821114,
+      "l": 1.262181736514065,
+      "j": 1.3092258370785976,
+      "w": 1.2943809429634223,
+      "h": 1.2319781732531494,
+      "ʔ": 1.1644066205020829
+    }
+  },
+  "template_weights_by_position": {
+    "single": [
+      ["CV", 0.57],
+      ["CVC", 0.21],
+      ["V", 0.07],
+      ["CVV", 0.09],
+      ["VC", 0.06]
+    ],
+    "initial": [
+      ["CV", 0.63],
+      ["CVC", 0.15],
+      ["CCV", 0.07],
+      ["V", 0.07],
+      ["CVV", 0.08]
+    ],
+    "medial": [
+      ["CV", 0.47],
+      ["CVC", 0.27],
+      ["VC", 0.09],
+      ["VCV", 0.08],
+      ["CVV", 0.09]
+    ],
+    "final": [
+      ["CV", 0.33],
+      ["CVC", 0.30],
+      ["VC", 0.19],
+      ["CVCC", 0.09],
+      ["V", 0.04],
+      ["CVV", 0.05]
+    ]
+  },
+  "slot_class_weights": {
+    "word_initial_onset": {
+      "nasal": 0.62,
+      "velar_nasal": 0.08,
+      "liquid": 0.74,
+      "glide": 0.82
+    },
+    "coda": {
+      "nasal": 1.22,
+      "liquid": 1.06,
+      "stop": 0.78
+    },
+    "word_final_coda": {
+      "nasal": 1.20,
+      "liquid": 1.02,
+      "stop": 0.70
+    }
+  },
+  "co_occurrence": {
+    "enabled": 1.0,
+    "front_back_harmony_bonus": 1.18,
+    "front_back_harmony_penalty": 0.84,
+    "labial_rounded_bonus": 1.22,
+    "dorsal_back_bonus": 1.18,
+    "dorsal_front_penalty": 0.86
+  },
+  "soft_constraints": {
+    "initial_velar_nasal_penalty": 5.0,
+    "final_complex_coda_penalty": 0.52,
+    "hiatus_penalty": 0.30,
+    "cluster_violation_penalty": 1.12
+  },
+  "cluster": {
+    "max_attempts": 12.0,
+    "violation_penalty": 0.25,
+    "rise_bonus": 1.34,
+    "fall_bonus": 1.34
+  }
+}

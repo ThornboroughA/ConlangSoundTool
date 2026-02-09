@@ -22,6 +22,7 @@ import phoible_representation
 import project_io
 import sound_inventory_generator as generator
 import sound_change_engine
+import source_profile
 from sample_text_generator import (
     CONCEPT_LIST_PRESETS,
     DEFAULT_PHONOTACTIC_PROFILE,
@@ -808,7 +809,15 @@ def list_json_names(directory: str) -> List[str]:
     path = Path(directory)
     if not path.exists():
         return []
-    return sorted(file.stem for file in path.glob("*.json") if file.is_file())
+    names: List[str] = []
+    for file in path.glob("*.json"):
+        if not file.is_file():
+            continue
+        # Hide optional sidecar profiles from the preset selection UI.
+        if file.name.endswith(".profile.json"):
+            continue
+        names.append(file.stem)
+    return sorted(names)
 
 
 def default_preset_selection(presets: List[str]) -> List[str]:
@@ -1131,6 +1140,106 @@ def deep_merge_dict(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str
         else:
             merged[key] = value
     return merged
+
+
+def filter_source_profile_components(
+    profile: Dict[str, Any],
+    use_segment_frequency: bool,
+    use_templates: bool,
+    use_co_occurrence: bool,
+) -> Dict[str, Any]:
+    if not isinstance(profile, dict):
+        return {}
+    filtered = dict(profile)
+    if not use_segment_frequency:
+        filtered.pop("segment_frequency", None)
+    if not use_templates:
+        filtered.pop("template_weights_by_position", None)
+    if not use_co_occurrence:
+        filtered.pop("co_occurrence", None)
+    return filtered
+
+
+def build_generation_overrides(
+    latest_inventory: Dict[str, Any],
+    selected_sound_template: str,
+    normalized_source_profile: Dict[str, Any],
+    source_influence: float,
+    use_source_segment_frequency: bool,
+    use_source_templates: bool,
+    use_source_co_occurrence: bool,
+    ui_candidate_count: int,
+    ui_temperature: float,
+    ui_initial_ng_penalty: float,
+    ui_harmony_penalty: float,
+    ui_morph_enabled: bool,
+    ui_prefix_rate: float,
+    ui_noun_suffix_rate: float,
+    ui_verb_suffix_rate: float,
+    advanced_override_dict: Dict[str, Any],
+) -> Dict[str, Any]:
+    sound_template_overrides = resolve_sound_template_overrides(
+        selected_sound_template,
+        latest_inventory if isinstance(latest_inventory, dict) else None,
+    )
+    filtered_source_profile = filter_source_profile_components(
+        normalized_source_profile,
+        use_segment_frequency=use_source_segment_frequency,
+        use_templates=use_source_templates,
+        use_co_occurrence=use_source_co_occurrence,
+    )
+    source_profile_overrides = source_profile.build_phonotactic_overrides_from_source_profile(
+        filtered_source_profile,
+        influence=float(source_influence),
+    )
+    fallback_segment_frequency_overrides = {
+        "segment_frequency": {
+            "enabled": True,
+            "strength": float(source_influence),
+            "vowel_weights": latest_inventory.get("vowels_representation", {})
+            if isinstance(latest_inventory.get("vowels_representation", {}), dict)
+            else {},
+            "consonant_weights": latest_inventory.get("consonants_representation", {})
+            if isinstance(latest_inventory.get("consonants_representation", {}), dict)
+            else {},
+        }
+    }
+    ui_tuning_overrides = {
+        "candidate_selection": {
+            "candidates_per_word": int(ui_candidate_count),
+            "temperature": float(ui_temperature),
+        },
+        "soft_constraints": {
+            "initial_velar_nasal_penalty": float(ui_initial_ng_penalty),
+        },
+        "co_occurrence": {
+            "enabled": True,
+            "harmony_penalty": float(ui_harmony_penalty),
+        },
+        "morphology": {
+            "enabled": bool(ui_morph_enabled),
+            "prefix_rate_by_pos": {
+                "N": float(ui_prefix_rate),
+                "V": float(ui_prefix_rate),
+                "ADJ": float(ui_prefix_rate),
+                "default": float(ui_prefix_rate),
+            },
+            "suffix_rate_by_pos": {
+                "N": float(ui_noun_suffix_rate),
+                "V": float(ui_verb_suffix_rate),
+                "ADJ": float((ui_noun_suffix_rate + ui_verb_suffix_rate) / 2.0),
+                "default": float((ui_noun_suffix_rate + ui_verb_suffix_rate) / 2.0),
+            },
+        },
+    }
+    return source_profile.merge_generation_overrides(
+        sound_template_overrides=sound_template_overrides if isinstance(sound_template_overrides, dict) else {},
+        source_profile_overrides=source_profile_overrides,
+        fallback_segment_frequency_overrides=fallback_segment_frequency_overrides,
+        ui_tuning_overrides=ui_tuning_overrides,
+        advanced_override_dict=advanced_override_dict if isinstance(advanced_override_dict, dict) else {},
+        use_source_segment_frequency=bool(use_source_segment_frequency),
+    )
 
 
 def parse_override_json(raw_text: str) -> Tuple[Dict[str, Any], Optional[str]]:
@@ -1928,6 +2037,36 @@ def render_single_language_ui() -> None:
                 "Generate lexicon-backed word and sentence samples from this inventory. "
                 "The same generated lexicon powers both views."
             )
+            mixed_source_profile = latest_inventory.get("source_profile_mixed", {})
+            if not isinstance(mixed_source_profile, dict):
+                mixed_source_profile = {}
+            normalized_source_profile = source_profile.normalize_source_profile(mixed_source_profile)
+            source_profile_provenance = normalized_source_profile.get("provenance", [])
+            if normalized_source_profile:
+                profile_sections = [
+                    section
+                    for section in (
+                        "segment_frequency",
+                        "template_weights_by_position",
+                        "slot_class_weights",
+                        "co_occurrence",
+                        "soft_constraints",
+                        "cluster",
+                    )
+                    if section in normalized_source_profile
+                ]
+                st.caption(
+                    "Source profile active: "
+                    + (", ".join(profile_sections) if profile_sections else "no explicit sections")
+                    + "."
+                )
+                if source_profile_provenance:
+                    st.caption("Source profile provenance: " + " | ".join(source_profile_provenance[:3]))
+            else:
+                st.caption(
+                    "No source profile sidecar found for selected presets; using inventory-derived "
+                    "segment-frequency fallback."
+                )
 
             style_names = list(STYLE_PRESETS.keys())
             sound_template_names = list(SOUND_TEMPLATES.keys())
@@ -2123,6 +2262,30 @@ def render_single_language_ui() -> None:
                         help="Chance that verbs get a short suffix.",
                     )
 
+                st.markdown("**Source Profile Contributions**")
+                source_toggle_col_1, source_toggle_col_2, source_toggle_col_3 = st.columns(3)
+                with source_toggle_col_1:
+                    ui_source_use_segment_frequency = st.checkbox(
+                        "Use source segment frequencies",
+                        value=True,
+                        key="source_profile_use_segment_frequency",
+                        help="Apply source-profile segment frequency maps before UI overrides.",
+                    )
+                with source_toggle_col_2:
+                    ui_source_use_templates = st.checkbox(
+                        "Use source template tendencies",
+                        value=True,
+                        key="source_profile_use_templates",
+                        help="Apply source-profile template distributions for stronger structural flavor.",
+                    )
+                with source_toggle_col_3:
+                    ui_source_use_co_occurrence = st.checkbox(
+                        "Use source co-occurrence tendencies",
+                        value=True,
+                        key="source_profile_use_co_occurrence",
+                        help="Apply source-profile co-occurrence multipliers.",
+                    )
+
                 advanced_override_text = st.text_area(
                     "Advanced override JSON (optional)",
                     value=st.session_state.get("phon_ui_advanced_override_json", ""),
@@ -2136,60 +2299,27 @@ def render_single_language_ui() -> None:
                     language="json",
                 )
 
-            sound_template_overrides = resolve_sound_template_overrides(
-                selected_sound_template,
-                latest_inventory if isinstance(latest_inventory, dict) else None,
-            )
-            segment_frequency_overrides = {
-                "segment_frequency": {
-                    "enabled": True,
-                    "strength": float(ui_source_influence),
-                    "vowel_weights": latest_inventory.get("vowels_representation", {})
-                    if isinstance(latest_inventory.get("vowels_representation", {}), dict)
-                    else {},
-                    "consonant_weights": latest_inventory.get("consonants_representation", {})
-                    if isinstance(latest_inventory.get("consonants_representation", {}), dict)
-                    else {},
-                }
-            }
-
-            phonotactic_overrides: Dict[str, Any] = deep_merge_dict(
-                sound_template_overrides if isinstance(sound_template_overrides, dict) else {},
-                segment_frequency_overrides,
-            )
-            phonotactic_overrides = deep_merge_dict(phonotactic_overrides, {
-                "candidate_selection": {
-                    "candidates_per_word": int(ui_candidate_count),
-                    "temperature": float(ui_temperature),
-                },
-                "soft_constraints": {
-                    "initial_velar_nasal_penalty": float(ui_initial_ng_penalty),
-                },
-                "co_occurrence": {
-                    "enabled": True,
-                    "harmony_penalty": float(ui_harmony_penalty),
-                },
-                "morphology": {
-                    "enabled": bool(ui_morph_enabled),
-                    "prefix_rate_by_pos": {
-                        "N": float(ui_prefix_rate),
-                        "V": float(ui_prefix_rate),
-                        "ADJ": float(ui_prefix_rate),
-                        "default": float(ui_prefix_rate),
-                    },
-                    "suffix_rate_by_pos": {
-                        "N": float(ui_noun_suffix_rate),
-                        "V": float(ui_verb_suffix_rate),
-                        "ADJ": float((ui_noun_suffix_rate + ui_verb_suffix_rate) / 2.0),
-                        "default": float((ui_noun_suffix_rate + ui_verb_suffix_rate) / 2.0),
-                    },
-                },
-            })
             advanced_override_dict, advanced_override_error = parse_override_json(advanced_override_text)
             if advanced_override_error:
                 st.error(advanced_override_error)
-            else:
-                phonotactic_overrides = deep_merge_dict(phonotactic_overrides, advanced_override_dict)
+            phonotactic_overrides = build_generation_overrides(
+                latest_inventory=latest_inventory if isinstance(latest_inventory, dict) else {},
+                selected_sound_template=selected_sound_template,
+                normalized_source_profile=normalized_source_profile,
+                source_influence=float(ui_source_influence),
+                use_source_segment_frequency=bool(ui_source_use_segment_frequency),
+                use_source_templates=bool(ui_source_use_templates),
+                use_source_co_occurrence=bool(ui_source_use_co_occurrence),
+                ui_candidate_count=int(ui_candidate_count),
+                ui_temperature=float(ui_temperature),
+                ui_initial_ng_penalty=float(ui_initial_ng_penalty),
+                ui_harmony_penalty=float(ui_harmony_penalty),
+                ui_morph_enabled=bool(ui_morph_enabled),
+                ui_prefix_rate=float(ui_prefix_rate),
+                ui_noun_suffix_rate=float(ui_noun_suffix_rate),
+                ui_verb_suffix_rate=float(ui_verb_suffix_rate),
+                advanced_override_dict=advanced_override_dict,
+            )
             st.session_state["phonotactic_overrides"] = phonotactic_overrides
 
             validation_report = validate_generation_config()

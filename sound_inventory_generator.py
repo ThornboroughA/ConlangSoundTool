@@ -21,6 +21,7 @@ import os
 import random
 import csv
 from typing import Dict, List, Any, Tuple
+import source_profile
 
 # Directory constants (relative to script location)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -115,6 +116,11 @@ def load_preset(name: str) -> Dict[str, Any]:
     data["consonants_entries"] = consonants_entries
     data["vowels"] = [entry["segment"] for entry in vowels_entries]
     data["consonants"] = [entry["segment"] for entry in consonants_entries]
+    # Keep source profile pathing in sync with the active preset directory.
+    source_profile.PRESETS_DIR = PRESETS_DIR
+    profile = source_profile.load_source_profile(name)
+    if profile:
+        data["source_profile"] = profile
     return data
 
 
@@ -186,6 +192,7 @@ def mix_inventories(preset_names: List[str], weights: List[float], random_weight
         A dictionary with:
         - 'vowels' / 'consonants': unique generated segments
         - 'vowels_representation' / 'consonants_representation': sampled weight traces
+        - 'source_profile_mixed': weighted source profile tendencies
     """
     if len(preset_names) != len(weights):
         raise ValueError("Number of preset names must equal number of weights.")
@@ -241,11 +248,33 @@ def mix_inventories(preset_names: List[str], weights: List[float], random_weight
     # Consolidate into unique sets
     vowels_set = list(dict.fromkeys(final_vowels))
     consonants_set = list(dict.fromkeys(final_consonants))
+    source_profiles: List[Dict[str, Any]] = []
+    source_profile_shares: List[float] = []
+    for preset, weight in zip(presets, weights):
+        profile = preset.get("source_profile", {})
+        if not isinstance(profile, dict) or not profile:
+            continue
+        share = (float(weight) / total_weight) if total_weight > 0 else 0.0
+        if share <= 0:
+            continue
+        source_profiles.append(profile)
+        source_profile_shares.append(share)
+
+    if random_weight > 0:
+        master_profile = master.get("source_profile", {})
+        if isinstance(master_profile, dict) and master_profile:
+            share = (float(random_weight) / total_weight) if total_weight > 0 else 0.0
+            if share > 0:
+                source_profiles.append(master_profile)
+                source_profile_shares.append(share)
+
+    source_profile_mixed = source_profile.mix_source_profiles(source_profiles, source_profile_shares)
     return {
         "vowels": vowels_set,
         "consonants": consonants_set,
         "vowels_representation": {segment: vowel_representation.get(segment, 1.0) for segment in vowels_set},
         "consonants_representation": {segment: consonant_representation.get(segment, 1.0) for segment in consonants_set},
+        "source_profile_mixed": source_profile_mixed,
     }
 
 
@@ -327,12 +356,16 @@ def apply_rules(inventory: Dict[str, Any], rule_sets: List[str]) -> Dict[str, An
     # Deduplicate while preserving order
     dedup_vowels = list(dict.fromkeys(new_vowels))
     dedup_consonants = list(dict.fromkeys(new_consonants))
-    return {
+    result = {
         "vowels": dedup_vowels,
         "consonants": dedup_consonants,
         "vowels_representation": {segment: vowels_representation.get(segment, 1.0) for segment in dedup_vowels},
         "consonants_representation": {segment: consonants_representation.get(segment, 1.0) for segment in dedup_consonants},
     }
+    mixed_source_profile = inventory.get("source_profile_mixed", {})
+    if isinstance(mixed_source_profile, dict) and mixed_source_profile:
+        result["source_profile_mixed"] = mixed_source_profile
+    return result
 
 
 def save_inventory_as_json(inventory: Dict[str, Any], path: str, name: str) -> None:

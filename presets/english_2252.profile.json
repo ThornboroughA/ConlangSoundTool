@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "provenance": [
+    "Primary inventory: PHOIBLE English (RP) inventory 2252",
+    "Profile tuning: English-oriented coda and cluster tendencies"
+  ],
+  "segment_frequency": {
+    "vowel_weights": {
+      "ə": 1.5690846010282893,
+      "e": 1.8105943568152865,
+      "iː": 1.6537927528562075,
+      "uː": 1.6347690890114077,
+      "ɪ": 1.468402538170985,
+      "ʊ": 1.448677079774506,
+      "æ": 1.3031121679619941,
+      "ɔː": 1.380575652844699,
+      "ʌ": 1.1793887809526564,
+      "aɪ": 0.6822313853668203,
+      "aʊ": 0.6176340222340837,
+      "eɪ": 0.5774077752943557,
+      "ɔɪ": 0.5774077752943557
+    },
+    "consonant_weights": {
+      "n": 1.1330897036025513,
+      "m": 1.1645271047813661,
+      "l": 1.1127355071505864,
+      "s": 1.1110845127683817,
+      "d": 1.0550065863550846,
+      "b": 1.1025372475454944,
+      "w": 1.1411222277643915,
+      "j": 1.154209440408957,
+      "h": 1.086108139386804,
+      "ŋ": 1.1019236139273498,
+      "ɡ": 1.086877067672096,
+      "t̠ʃ": 1.0372165508768576,
+      "d̠ʒ": 0.9795208450319343,
+      "v": 0.9788079357664881,
+      "z": 0.9919547783256981,
+      "ʃ": 1.0228846191373184,
+      "ʒ": 0.9008700642047748,
+      "kʰ": 0.9354393740165959,
+      "pʰ": 0.932279246487771,
+      "tʰ": 0.8763746786244772,
+      "ð": 0.7417218324645166,
+      "θ": 0.7036062905114675,
+      "ɹ": 0.6000555508977763
+    }
+  },
+  "template_weights_by_position": {
+    "single": [
+      ["CV", 0.32],
+      ["CVC", 0.31],
+      ["VC", 0.12],
+      ["CCV", 0.11],
+      ["CVCC", 0.10],
+      ["V", 0.04]
+    ],
+    "initial": [
+      ["CV", 0.35],
+      ["CVC", 0.23],
+      ["CCV", 0.20],
+      ["VC", 0.07],
+      ["CVCC", 0.10],
+      ["V", 0.05]
+    ],
+    "medial": [
+      ["CV", 0.27],
+      ["CVC", 0.30],
+      ["VC", 0.11],
+      ["CCV", 0.12],
+      ["CVCC", 0.15],
+      ["VCV", 0.05]
+    ],
+    "final": [
+      ["CV", 0.19],
+      ["CVC", 0.34],
+      ["VC", 0.18],
+      ["CVCC", 0.22],
+      ["CCV", 0.05],
+      ["V", 0.02]
+    ]
+  },
+  "slot_class_weights": {
+    "word_initial_onset": {
+      "nasal": 0.54,
+      "velar_nasal": 0.06,
+      "liquid": 0.86,
+      "glide": 0.90
+    },
+    "coda": {
+      "nasal": 1.18,
+      "liquid": 1.12,
+      "fricative": 1.06,
+      "stop": 0.86
+    },
+    "word_final_coda": {
+      "nasal": 1.16,
+      "liquid": 1.10,
+      "fricative": 1.02,
+      "stop": 0.82
+    }
+  },
+  "co_occurrence": {
+    "enabled": 1.0,
+    "front_back_harmony_bonus": 1.02,
+    "front_back_harmony_penalty": 0.97,
+    "palatal_front_bonus": 1.12,
+    "dorsal_back_bonus": 1.10,
+    "labial_rounded_bonus": 1.06
+  },
+  "soft_constraints": {
+    "initial_velar_nasal_penalty": 4.4,
+    "final_complex_coda_penalty": 0.34,
+    "cluster_violation_penalty": 0.86,
+    "hiatus_penalty": 0.42
+  },
+  "cluster": {
+    "max_attempts": 18.0,
+    "violation_penalty": 0.30,
+    "rise_bonus": 1.42,
+    "fall_bonus": 1.40
+  }
+}

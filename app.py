@@ -1748,6 +1748,8 @@ def render_single_language_ui() -> None:
         romanization_profile = DEFAULT_ROMANIZATION_PROFILE
 
     preset_names = list_json_names(generator.PRESETS_DIR)
+    starter_source_profiles = source_profile.list_starter_source_profiles()
+    starter_source_profile_names = [entry.get("name", "") for entry in starter_source_profiles if entry.get("name")]
 
     if not preset_names:
         st.error("No preset files found. Add JSON files to presets/ and reload.")
@@ -1837,6 +1839,27 @@ def render_single_language_ui() -> None:
                 help="Source inventory used when random weight is above zero.",
             )
 
+            st.markdown("**Source profile fallback**")
+            use_starter_profile_fallback = st.checkbox(
+                "Use starter profile when a preset has no sidecar",
+                value=True,
+                help="Applies a generic starter profile to sources that do not have <preset>.profile.json.",
+            )
+            fallback_default_index = 0
+            if source_profile.DEFAULT_STARTER_SOURCE_PROFILE_NAME in starter_source_profile_names:
+                fallback_default_index = starter_source_profile_names.index(source_profile.DEFAULT_STARTER_SOURCE_PROFILE_NAME)
+            selected_starter_profile_name = st.selectbox(
+                "Starter profile preset",
+                options=starter_source_profile_names if starter_source_profile_names else [""],
+                index=fallback_default_index if starter_source_profile_names else 0,
+                disabled=not bool(starter_source_profile_names) or not use_starter_profile_fallback,
+                help="Used only for missing sidecars; real sidecars still take priority.",
+            )
+            if starter_source_profile_names:
+                starter_description = source_profile.get_starter_source_profile_description(selected_starter_profile_name)
+                if starter_description:
+                    st.caption(starter_description)
+
             st.caption("Sound-change rules are handled in the Language Family workflow.")
 
         with run_col:
@@ -1910,6 +1933,13 @@ def render_single_language_ui() -> None:
                         weights=weights,
                         random_weight=random_weight,
                         master_preset_name=master_preset,
+                        source_profile_fallback=(
+                            source_profile.get_starter_source_profile(selected_starter_profile_name)
+                            if use_starter_profile_fallback and selected_starter_profile_name
+                            else {}
+                        ),
+                        source_profile_fallback_label=selected_starter_profile_name,
+                        apply_fallback_to_missing_profiles=bool(use_starter_profile_fallback),
                     )
 
                     output_dir = resolve_output_dir(output_dir_value)
@@ -2039,6 +2069,10 @@ def render_single_language_ui() -> None:
                 mixed_source_profile = {}
             normalized_source_profile = source_profile.normalize_source_profile(mixed_source_profile)
             source_profile_provenance = normalized_source_profile.get("provenance", [])
+            source_profile_mix_details_raw = latest_inventory.get("source_profile_mix_details", [])
+            source_profile_mix_details = (
+                source_profile_mix_details_raw if isinstance(source_profile_mix_details_raw, list) else []
+            )
             if normalized_source_profile:
                 profile_sections = [
                     section
@@ -2064,6 +2098,74 @@ def render_single_language_ui() -> None:
                     "No source profile sidecar found for selected presets; using inventory-derived "
                     "segment-frequency fallback."
                 )
+
+            with st.expander("Source profile mix debug", expanded=False):
+                if source_profile_mix_details:
+                    debug_rows: List[Dict[str, str]] = []
+                    for entry in source_profile_mix_details:
+                        if not isinstance(entry, dict):
+                            continue
+                        share = 0.0
+                        try:
+                            share = float(entry.get("share", 0.0))
+                        except (TypeError, ValueError):
+                            share = 0.0
+                        sections = entry.get("profile_sections", [])
+                        provenance_items = entry.get("provenance", [])
+                        debug_rows.append(
+                            {
+                                "Source": str(entry.get("source", "")),
+                                "Share": f"{share * 100.0:.1f}%",
+                                "Profile origin": str(entry.get("profile_origin", "none")),
+                                "Used profile": "yes" if bool(entry.get("profile_used", False)) else "no",
+                                "Sections": ", ".join(str(item) for item in sections) if isinstance(sections, list) else "",
+                                "Provenance": " | ".join(str(item) for item in provenance_items[:2])
+                                if isinstance(provenance_items, list)
+                                else "",
+                            }
+                        )
+                    if debug_rows:
+                        st.dataframe(debug_rows, hide_index=True, use_container_width=True)
+
+                segment_frequency_debug = normalized_source_profile.get("segment_frequency", {})
+                if isinstance(segment_frequency_debug, dict):
+                    vowel_weights_debug = segment_frequency_debug.get("vowel_weights", {})
+                    consonant_weights_debug = segment_frequency_debug.get("consonant_weights", {})
+                    if isinstance(vowel_weights_debug, dict) and vowel_weights_debug:
+                        top_vowels = sorted(vowel_weights_debug.items(), key=lambda item: float(item[1]), reverse=True)[:8]
+                        st.caption(
+                            "Top merged vowel weights: "
+                            + ", ".join(f"{segment} {float(weight):.2f}" for segment, weight in top_vowels)
+                        )
+                    if isinstance(consonant_weights_debug, dict) and consonant_weights_debug:
+                        top_consonants = sorted(
+                            consonant_weights_debug.items(),
+                            key=lambda item: float(item[1]),
+                            reverse=True,
+                        )[:10]
+                        st.caption(
+                            "Top merged consonant weights: "
+                            + ", ".join(f"{segment} {float(weight):.2f}" for segment, weight in top_consonants)
+                        )
+
+                template_debug = normalized_source_profile.get("template_weights_by_position", {})
+                if isinstance(template_debug, dict) and template_debug:
+                    for position in ("single", "initial", "medial", "final"):
+                        pairs = template_debug.get(position, [])
+                        if not isinstance(pairs, list) or not pairs:
+                            continue
+                        top_pairs = sorted(
+                            [
+                                (str(label), float(weight))
+                                for label, weight in pairs
+                            ],
+                            key=lambda item: item[1],
+                            reverse=True,
+                        )[:5]
+                        st.caption(
+                            f"{position.title()} templates: "
+                            + ", ".join(f"{label} {weight:.2f}" for label, weight in top_pairs)
+                        )
 
             style_names = list(STYLE_PRESETS.keys())
             sound_template_names = list(SOUND_TEMPLATES.keys())

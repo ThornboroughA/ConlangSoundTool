@@ -321,6 +321,211 @@ def normalize_source_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
+def _build_starter_source_profile_library() -> Dict[str, Dict[str, Any]]:
+    base_profile: Dict[str, Any] = {
+        "version": SOURCE_PROFILE_VERSION,
+        "segment_frequency": {
+            "vowel_weights": {"a": 1.0, "e": 1.0, "i": 1.0, "o": 1.0, "u": 1.0},
+            "consonant_weights": {"p": 1.0, "t": 1.0, "k": 1.0, "m": 1.0, "n": 1.0, "s": 1.0},
+        },
+        "template_weights_by_position": {
+            "single": [("CV", 0.48), ("CVC", 0.28), ("V", 0.12), ("VC", 0.12)],
+            "initial": [("CV", 0.54), ("CVC", 0.22), ("V", 0.08), ("CCV", 0.08), ("CVV", 0.08)],
+            "medial": [("CV", 0.42), ("CVC", 0.24), ("VCV", 0.14), ("VC", 0.10), ("CVV", 0.10)],
+            "final": [("CVC", 0.36), ("VC", 0.22), ("CV", 0.26), ("V", 0.10), ("CVCC", 0.06)],
+        },
+        "slot_class_weights": {
+            "word_initial_onset": {"nasal": 0.68, "liquid": 0.84, "glide": 0.82},
+            "coda": {"nasal": 1.12, "liquid": 1.04, "stop": 0.86},
+        },
+        "co_occurrence": {
+            "enabled": 1.0,
+            "front_back_harmony_bonus": 1.05,
+            "front_back_harmony_penalty": 0.95,
+            "labial_rounded_bonus": 1.06,
+        },
+        "soft_constraints": {
+            "initial_velar_nasal_penalty": 4.0,
+            "cluster_violation_penalty": 1.0,
+            "final_complex_coda_penalty": 0.42,
+            "hiatus_penalty": 0.32,
+        },
+        "cluster": {
+            "max_attempts": 12.0,
+            "violation_penalty": 0.22,
+            "rise_bonus": 1.32,
+            "fall_bonus": 1.32,
+        },
+    }
+    variant_specs: Dict[str, Dict[str, Any]] = {
+        "Balanced Global": {
+            "description": "General-purpose, moderate profile with mixed CV/CVC structure.",
+            "overrides": {},
+        },
+        "Open Syllable": {
+            "description": "More open syllables and lighter codas.",
+            "overrides": {
+                "template_weights_by_position": {
+                    "single": [("CV", 0.56), ("V", 0.22), ("CVV", 0.14), ("CVC", 0.05), ("VC", 0.03)],
+                    "final": [("CV", 0.52), ("V", 0.24), ("CVV", 0.14), ("VC", 0.06), ("CVC", 0.04)],
+                },
+                "soft_constraints": {"final_complex_coda_penalty": 0.95, "hiatus_penalty": 0.18},
+                "cluster": {"violation_penalty": 0.14},
+            },
+        },
+        "Coda Heavy": {
+            "description": "Stronger codas and heavier word-final closure.",
+            "overrides": {
+                "template_weights_by_position": {
+                    "single": [("CVC", 0.42), ("CV", 0.30), ("VC", 0.18), ("CVCC", 0.10)],
+                    "final": [("CVC", 0.44), ("VC", 0.24), ("CVCC", 0.20), ("CV", 0.12)],
+                },
+                "slot_class_weights": {"word_final_coda": {"nasal": 1.2, "liquid": 1.12, "stop": 0.92}},
+                "soft_constraints": {"final_complex_coda_penalty": 0.25},
+            },
+        },
+        "Cluster Rich": {
+            "description": "Allows denser clusters while keeping soft penalties.",
+            "overrides": {
+                "template_weights_by_position": {
+                    "single": [("CCV", 0.20), ("CVCC", 0.20), ("CVC", 0.28), ("CV", 0.22), ("VC", 0.10)],
+                    "initial": [("CCV", 0.24), ("CV", 0.36), ("CVC", 0.24), ("CCCV", 0.08), ("VC", 0.08)],
+                },
+                "cluster": {"max_attempts": 20.0, "violation_penalty": 0.42, "rise_bonus": 1.42, "fall_bonus": 1.42},
+                "soft_constraints": {"cluster_violation_penalty": 0.72, "final_complex_coda_penalty": 0.24},
+            },
+        },
+        "Harmony Leaning": {
+            "description": "Biases vowel harmony and compatible consonant-vowel patterns.",
+            "overrides": {
+                "co_occurrence": {
+                    "enabled": 1.0,
+                    "front_back_harmony_bonus": 1.35,
+                    "front_back_harmony_penalty": 0.72,
+                    "palatal_front_bonus": 1.22,
+                    "palatal_back_penalty": 0.84,
+                    "dorsal_back_bonus": 1.18,
+                    "dorsal_front_penalty": 0.88,
+                    "labial_rounded_bonus": 1.14,
+                },
+                "soft_constraints": {"hiatus_penalty": 0.24},
+            },
+        },
+        "Sonorant Flow": {
+            "description": "Favors sonorants and smoother transitions.",
+            "overrides": {
+                "slot_class_weights": {
+                    "word_initial_onset": {"nasal": 0.82, "liquid": 1.08, "glide": 1.04},
+                    "medial": {"nasal": 1.14, "liquid": 1.18, "glide": 1.08},
+                    "coda": {"nasal": 1.2, "liquid": 1.16, "stop": 0.72},
+                },
+                "template_weights_by_position": {
+                    "single": [("CV", 0.52), ("VCV", 0.18), ("CVC", 0.20), ("V", 0.10)],
+                },
+            },
+        },
+        "Stop Leaning": {
+            "description": "Sharper stop-heavy profile with clipped cadence.",
+            "overrides": {
+                "segment_frequency": {
+                    "consonant_weights": {"p": 1.15, "t": 1.22, "k": 1.25, "m": 0.92, "n": 0.92, "s": 0.98},
+                    "vowel_weights": {"a": 1.06, "e": 0.96, "i": 0.94, "o": 1.02, "u": 1.02},
+                },
+                "template_weights_by_position": {
+                    "single": [("CVC", 0.40), ("CV", 0.34), ("VC", 0.16), ("CVCC", 0.10)],
+                },
+            },
+        },
+        "Fricative Leaning": {
+            "description": "Higher fricative presence and smoother codas.",
+            "overrides": {
+                "segment_frequency": {
+                    "consonant_weights": {"s": 1.32, "p": 0.92, "t": 0.96, "k": 0.92, "m": 0.94, "n": 0.94},
+                },
+                "slot_class_weights": {
+                    "onset": {"fricative": 1.14, "stop": 0.9},
+                    "coda": {"fricative": 1.12, "stop": 0.78},
+                },
+                "template_weights_by_position": {
+                    "final": [("CVC", 0.34), ("VC", 0.28), ("CV", 0.24), ("V", 0.14)],
+                },
+            },
+        },
+        "Moraic Light": {
+            "description": "Mora-like rhythm with simple shapes and light codas.",
+            "overrides": {
+                "template_weights_by_position": {
+                    "single": [("CV", 0.64), ("V", 0.16), ("CVV", 0.12), ("CVC", 0.08)],
+                    "initial": [("CV", 0.68), ("V", 0.12), ("CVV", 0.12), ("CVC", 0.08)],
+                    "final": [("CV", 0.52), ("V", 0.24), ("CVV", 0.16), ("CVC", 0.08)],
+                },
+                "soft_constraints": {"cluster_violation_penalty": 1.36, "final_complex_coda_penalty": 0.84},
+                "cluster": {"violation_penalty": 0.12, "max_attempts": 8.0},
+            },
+        },
+        "Compact Mix": {
+            "description": "Short compact roots with moderate cluster pressure.",
+            "overrides": {
+                "template_weights_by_position": {
+                    "single": [("CV", 0.34), ("CVC", 0.36), ("VC", 0.16), ("CCV", 0.10), ("V", 0.04)],
+                    "medial": [("CV", 0.30), ("CVC", 0.34), ("VC", 0.14), ("CVCC", 0.12), ("VCV", 0.10)],
+                },
+                "cluster": {"max_attempts": 14.0, "violation_penalty": 0.28},
+                "soft_constraints": {"cluster_violation_penalty": 0.92, "hiatus_penalty": 0.46},
+            },
+        },
+    }
+    library: Dict[str, Dict[str, Any]] = {}
+    for name, spec in variant_specs.items():
+        raw_profile = deep_merge_dict(base_profile, spec.get("overrides", {}))
+        raw_profile["provenance"] = [f"Starter profile: {name}"]
+        normalized = normalize_source_profile(raw_profile)
+        if not normalized:
+            continue
+        library[name] = {
+            "description": str(spec.get("description", "")).strip(),
+            "profile": normalized,
+        }
+    return library
+
+
+STARTER_SOURCE_PROFILE_LIBRARY = _build_starter_source_profile_library()
+DEFAULT_STARTER_SOURCE_PROFILE_NAME = (
+    "Balanced Global"
+    if "Balanced Global" in STARTER_SOURCE_PROFILE_LIBRARY
+    else (next(iter(STARTER_SOURCE_PROFILE_LIBRARY.keys()), ""))
+)
+
+
+def list_starter_source_profiles() -> List[Dict[str, str]]:
+    """Return available built-in starter source profiles."""
+    return [
+        {
+            "name": name,
+            "description": str(entry.get("description", "")),
+        }
+        for name, entry in STARTER_SOURCE_PROFILE_LIBRARY.items()
+    ]
+
+
+def get_starter_source_profile(name: str) -> Dict[str, Any]:
+    """Return a normalized starter source profile by name."""
+    key = str(name).strip()
+    if key not in STARTER_SOURCE_PROFILE_LIBRARY:
+        key = DEFAULT_STARTER_SOURCE_PROFILE_NAME
+    if not key or key not in STARTER_SOURCE_PROFILE_LIBRARY:
+        return {}
+    return deepcopy(STARTER_SOURCE_PROFILE_LIBRARY[key].get("profile", {}))
+
+
+def get_starter_source_profile_description(name: str) -> str:
+    """Return starter profile description by name."""
+    key = str(name).strip()
+    if key not in STARTER_SOURCE_PROFILE_LIBRARY:
+        return ""
+    return str(STARTER_SOURCE_PROFILE_LIBRARY[key].get("description", ""))
+
+
 def mix_source_profiles(profiles: List[Dict[str, Any]], shares: List[float]) -> Dict[str, Any]:
     """Mix source profiles using preset contribution shares."""
     if not profiles or not shares:

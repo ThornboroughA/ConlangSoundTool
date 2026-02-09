@@ -77,6 +77,37 @@ You can add an optional sidecar next to any preset:
 
 Sidecars are non-breaking: if a sidecar is missing, generation falls back to current inventory-derived behavior.
 
+Practical starting points:
+
+- Authoring guide: `docs/source_profile_guide.md`
+- Reusable template: `presets/source_profile_template.profile.json`
+- Auto-bootstrap script: `tools/build_source_profile_from_wordlist.py`
+- Build-tab starter presets (built in): pick one as fallback when selected sources have no sidecar.
+
+Built-in starter profile options include:
+
+- `Balanced Global`
+- `Open Syllable`
+- `Coda Heavy`
+- `Cluster Rich`
+- `Harmony Leaning`
+- `Sonorant Flow`
+- `Stop Leaning`
+- `Fricative Leaning`
+- `Moraic Light`
+- `Compact Mix`
+
+Quick workflow:
+
+1. Copy `presets/source_profile_template.profile.json` to `presets/<preset_name>.profile.json`.
+2. Replace the `provenance` text and tune `template_weights_by_position` first.
+3. Tune `segment_frequency` second.
+4. Optionally tune `co_occurrence`, `soft_constraints`, and `cluster`.
+5. Generate samples and iterate.
+
+When mixing presets, the Build tab can apply a chosen starter profile only to sources that lack
+`<preset>.profile.json`. Existing sidecars still take priority.
+
 Supported sidecar schema:
 
 ```json

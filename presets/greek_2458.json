@@ -1,0 +1,132 @@
+{
+  "name": "Greek Greek (Standard) (2458)",
+  "vowels": [
+    {
+      "segment": "e̞",
+      "representation": 1.0
+    },
+    {
+      "segment": "i",
+      "representation": 1.0
+    },
+    {
+      "segment": "o̞",
+      "representation": 1.0
+    },
+    {
+      "segment": "u",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɐ",
+      "representation": 1.0
+    }
+  ],
+  "consonants": [
+    {
+      "segment": "b",
+      "representation": 1.0
+    },
+    {
+      "segment": "c",
+      "representation": 1.0
+    },
+    {
+      "segment": "d̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "f",
+      "representation": 1.0
+    },
+    {
+      "segment": "k",
+      "representation": 1.0
+    },
+    {
+      "segment": "l",
+      "representation": 1.0
+    },
+    {
+      "segment": "m",
+      "representation": 1.0
+    },
+    {
+      "segment": "n",
+      "representation": 1.0
+    },
+    {
+      "segment": "p",
+      "representation": 1.0
+    },
+    {
+      "segment": "s̠",
+      "representation": 1.0
+    },
+    {
+      "segment": "t̪",
+      "representation": 1.0
+    },
+    {
+      "segment": "v",
+      "representation": 1.0
+    },
+    {
+      "segment": "x",
+      "representation": 1.0
+    },
+    {
+      "segment": "z̠",
+      "representation": 1.0
+    },
+    {
+      "segment": "ç",
+      "representation": 1.0
+    },
+    {
+      "segment": "ð",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɟ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɡ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɣ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɲ̟",
+      "representation": 1.0
+    },
+    {
+      "segment": "ɾ̠",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʎ",
+      "representation": 1.0
+    },
+    {
+      "segment": "ʝ",
+      "representation": 1.0
+    },
+    {
+      "segment": "θ",
+      "representation": 1.0
+    }
+  ],
+  "phoible": {
+    "inventory_id": "2458",
+    "language_name": "Greek",
+    "specific_dialect": "Greek (Standard)",
+    "glottocode": "mode1248",
+    "iso": "ell",
+    "source": "ea",
+    "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv"
+  }
+}

@@ -178,8 +178,15 @@ def sample_from_entries(entries: List[Dict[str, Any]], n: int) -> List[str]:
     return random.choices(segments, weights=weights, k=n)
 
 
-def mix_inventories(preset_names: List[str], weights: List[float], random_weight: float,
-                    master_preset_name: str) -> Dict[str, Any]:
+def mix_inventories(
+    preset_names: List[str],
+    weights: List[float],
+    random_weight: float,
+    master_preset_name: str,
+    source_profile_fallback: Any = None,
+    source_profile_fallback_label: str = "",
+    apply_fallback_to_missing_profiles: bool = False,
+) -> Dict[str, Any]:
     """Mix multiple language inventories according to weights and add a random component.
 
     Args:
@@ -193,6 +200,7 @@ def mix_inventories(preset_names: List[str], weights: List[float], random_weight
         - 'vowels' / 'consonants': unique generated segments
         - 'vowels_representation' / 'consonants_representation': sampled weight traces
         - 'source_profile_mixed': weighted source profile tendencies
+        - 'source_profile_mix_details': per-source profile contribution details
     """
     if len(preset_names) != len(weights):
         raise ValueError("Number of preset names must equal number of weights.")
@@ -248,23 +256,70 @@ def mix_inventories(preset_names: List[str], weights: List[float], random_weight
     # Consolidate into unique sets
     vowels_set = list(dict.fromkeys(final_vowels))
     consonants_set = list(dict.fromkeys(final_consonants))
+    fallback_profile_normalized = source_profile.normalize_source_profile(
+        source_profile_fallback if isinstance(source_profile_fallback, dict) else {}
+    )
+    fallback_enabled = bool(apply_fallback_to_missing_profiles and fallback_profile_normalized)
+    fallback_label = str(source_profile_fallback_label).strip() or source_profile.DEFAULT_STARTER_SOURCE_PROFILE_NAME
+
     source_profiles: List[Dict[str, Any]] = []
     source_profile_shares: List[float] = []
+    source_profile_mix_details: List[Dict[str, Any]] = []
     for preset, weight in zip(presets, weights):
-        profile = preset.get("source_profile", {})
-        if not isinstance(profile, dict) or not profile:
-            continue
         share = (float(weight) / total_weight) if total_weight > 0 else 0.0
         if share <= 0:
+            continue
+        profile = preset.get("source_profile", {})
+        origin = "sidecar"
+        if not isinstance(profile, dict) or not profile:
+            if fallback_enabled:
+                profile = fallback_profile_normalized
+                origin = f"starter:{fallback_label}"
+            else:
+                profile = {}
+                origin = "none"
+        source_profile_mix_details.append(
+            {
+                "source": str(preset.get("name", "")).strip() or str(preset.get("id", "")).strip() or "preset",
+                "preset_name": str(preset.get("name", "")).strip() or "",
+                "share": float(share),
+                "profile_used": bool(profile),
+                "profile_origin": origin,
+                "profile_sections": sorted([key for key in profile.keys() if key != "version"]) if isinstance(profile, dict) else [],
+                "provenance": list(profile.get("provenance", [])) if isinstance(profile, dict) else [],
+            }
+        )
+        if not isinstance(profile, dict) or not profile:
             continue
         source_profiles.append(profile)
         source_profile_shares.append(share)
 
     if random_weight > 0:
         master_profile = master.get("source_profile", {})
-        if isinstance(master_profile, dict) and master_profile:
-            share = (float(random_weight) / total_weight) if total_weight > 0 else 0.0
-            if share > 0:
+        share = (float(random_weight) / total_weight) if total_weight > 0 else 0.0
+        if share > 0:
+            origin = "sidecar"
+            if not isinstance(master_profile, dict) or not master_profile:
+                if fallback_enabled:
+                    master_profile = fallback_profile_normalized
+                    origin = f"starter:{fallback_label}"
+                else:
+                    master_profile = {}
+                    origin = "none"
+            source_profile_mix_details.append(
+                {
+                    "source": f"random::{master_preset_name}",
+                    "preset_name": str(master_preset_name),
+                    "share": float(share),
+                    "profile_used": bool(master_profile),
+                    "profile_origin": origin,
+                    "profile_sections": sorted([key for key in master_profile.keys() if key != "version"])
+                    if isinstance(master_profile, dict)
+                    else [],
+                    "provenance": list(master_profile.get("provenance", [])) if isinstance(master_profile, dict) else [],
+                }
+            )
+            if isinstance(master_profile, dict) and master_profile:
                 source_profiles.append(master_profile)
                 source_profile_shares.append(share)
 
@@ -275,6 +330,7 @@ def mix_inventories(preset_names: List[str], weights: List[float], random_weight
         "vowels_representation": {segment: vowel_representation.get(segment, 1.0) for segment in vowels_set},
         "consonants_representation": {segment: consonant_representation.get(segment, 1.0) for segment in consonants_set},
         "source_profile_mixed": source_profile_mixed,
+        "source_profile_mix_details": source_profile_mix_details,
     }
 
 
@@ -365,6 +421,9 @@ def apply_rules(inventory: Dict[str, Any], rule_sets: List[str]) -> Dict[str, An
     mixed_source_profile = inventory.get("source_profile_mixed", {})
     if isinstance(mixed_source_profile, dict) and mixed_source_profile:
         result["source_profile_mixed"] = mixed_source_profile
+    source_profile_mix_details = inventory.get("source_profile_mix_details", [])
+    if isinstance(source_profile_mix_details, list) and source_profile_mix_details:
+        result["source_profile_mix_details"] = source_profile_mix_details
     return result
 
 

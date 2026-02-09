@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "provenance": [
+    "Template profile: replace with your sources"
+  ],
+  "segment_frequency": {
+    "vowel_weights": {
+      "a": 1.0,
+      "i": 1.0,
+      "u": 1.0
+    },
+    "consonant_weights": {
+      "p": 1.0,
+      "t": 1.0,
+      "k": 1.0,
+      "m": 1.0,
+      "n": 1.0,
+      "s": 1.0
+    }
+  },
+  "template_weights_by_position": {
+    "single": [
+      [
+        "CV",
+        0.50
+      ],
+      [
+        "CVC",
+        0.30
+      ],
+      [
+        "V",
+        0.10
+      ],
+      [
+        "VC",
+        0.10
+      ]
+    ],
+    "initial": [
+      [
+        "CV",
+        0.55
+      ],
+      [
+        "CVC",
+        0.25
+      ],
+      [
+        "V",
+        0.08
+      ],
+      [
+        "CCV",
+        0.12
+      ]
+    ],
+    "medial": [
+      [
+        "CV",
+        0.45
+      ],
+      [
+        "CVC",
+        0.25
+      ],
+      [
+        "VCV",
+        0.15
+      ],
+      [
+        "VC",
+        0.15
+      ]
+    ],
+    "final": [
+      [
+        "CVC",
+        0.40
+      ],
+      [
+        "VC",
+        0.25
+      ],
+      [
+        "CV",
+        0.25
+      ],
+      [
+        "V",
+        0.10
+      ]
+    ]
+  },
+  "slot_class_weights": {
+    "word_initial_onset": {
+      "nasal": 0.70,
+      "liquid": 0.85,
+      "glide": 0.80
+    },
+    "coda": {
+      "nasal": 1.15,
+      "liquid": 1.05,
+      "stop": 0.85
+    }
+  },
+  "co_occurrence": {
+    "enabled": 1.0,
+    "front_back_harmony_bonus": 1.05,
+    "front_back_harmony_penalty": 0.95,
+    "labial_rounded_bonus": 1.05
+  },
+  "soft_constraints": {
+    "initial_velar_nasal_penalty": 4.0,
+    "cluster_violation_penalty": 1.0,
+    "final_complex_coda_penalty": 0.4,
+    "hiatus_penalty": 0.3
+  },
+  "cluster": {
+    "max_attempts": 12.0,
+    "violation_penalty": 0.22,
+    "rise_bonus": 1.3,
+    "fall_bonus": 1.3
+  }
+}

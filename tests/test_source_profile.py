@@ -178,6 +178,60 @@ class TestSourceProfile(unittest.TestCase):
         japanese_single = dict(japanese_profile.get("template_weights_by_position", {}).get("single", []))
         self.assertGreater(japanese_single.get("CV", 0.0), english_single.get("CV", 0.0))
 
+    def test_starter_source_profiles_available(self):
+        starters = source_profile.list_starter_source_profiles()
+        self.assertGreaterEqual(len(starters), 8)
+        names = [entry.get("name") for entry in starters if isinstance(entry, dict)]
+        self.assertIn(source_profile.DEFAULT_STARTER_SOURCE_PROFILE_NAME, names)
+        starter_profile = source_profile.get_starter_source_profile(source_profile.DEFAULT_STARTER_SOURCE_PROFILE_NAME)
+        self.assertIn("template_weights_by_position", starter_profile)
+        self.assertIn("segment_frequency", starter_profile)
+
+    def test_mix_inventories_uses_starter_fallback_for_missing_sidecars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            preset_payload = {
+                "name": "NoSidecar",
+                "vowels": [{"segment": "a", "representation": 1.0}, {"segment": "i", "representation": 1.0}],
+                "consonants": [{"segment": "t", "representation": 1.0}, {"segment": "k", "representation": 1.0}],
+            }
+            random_master_payload = {
+                "name": "RandomMaster",
+                "vowels": [{"segment": "u", "representation": 1.0}],
+                "consonants": [{"segment": "m", "representation": 1.0}],
+            }
+            (tmp_path / "nosidecar.json").write_text(json.dumps(preset_payload), encoding="utf-8")
+            (tmp_path / "random_master.json").write_text(json.dumps(random_master_payload), encoding="utf-8")
+
+            old_presets_dir = sig.PRESETS_DIR
+            old_source_presets_dir = source_profile.PRESETS_DIR
+            try:
+                sig.PRESETS_DIR = str(tmp_path)
+                source_profile.PRESETS_DIR = str(tmp_path)
+                fallback_name = source_profile.DEFAULT_STARTER_SOURCE_PROFILE_NAME
+                fallback_profile = source_profile.get_starter_source_profile(fallback_name)
+                mixed = sig.mix_inventories(
+                    preset_names=["nosidecar"],
+                    weights=[1.0],
+                    random_weight=0.0,
+                    master_preset_name="random_master",
+                    source_profile_fallback=fallback_profile,
+                    source_profile_fallback_label=fallback_name,
+                    apply_fallback_to_missing_profiles=True,
+                )
+            finally:
+                sig.PRESETS_DIR = old_presets_dir
+                source_profile.PRESETS_DIR = old_source_presets_dir
+
+            mixed_profile = mixed.get("source_profile_mixed", {})
+            self.assertTrue(isinstance(mixed_profile, dict) and mixed_profile)
+            mix_details = mixed.get("source_profile_mix_details", [])
+            self.assertTrue(isinstance(mix_details, list) and mix_details)
+            first_entry = mix_details[0] if mix_details else {}
+            self.assertEqual(first_entry.get("profile_origin"), f"starter:{fallback_name}")
+            self.assertTrue(bool(first_entry.get("profile_used", False)))
+            self.assertGreater(float(first_entry.get("share", 0.0)), 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

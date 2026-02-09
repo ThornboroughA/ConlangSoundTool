@@ -176,6 +176,6 @@
     "representation_scope": "cross-inventory segment prevalence (typological prior; not within-language token frequency)",
     "representation_inventory_count": 3020,
     "core_multiplier": 1.0,
-    "marginal_multiplier": 0.15
+    "marginal_multiplier": 0.1
   }
 }

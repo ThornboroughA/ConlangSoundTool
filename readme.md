@@ -68,3 +68,15 @@ Presets support weighted segment entries:
 `representation` controls how likely a segment is to be sampled when mixing. Larger values make a segment more likely to appear in generated inventories. Values are relative and do not need to sum to 1.
 
 Legacy list format (e.g. `"vowels": ["i", "a"]`) still works and is treated as `representation: 1.0` for each segment.
+
+## PHOIBLE import weighting model
+
+When importing presets from PHOIBLE in the UI:
+
+- PHOIBLE CSV does not provide within-language token frequency values.
+- The importer uses a typological prior based on cross-inventory prevalence per `GlyphID`.
+- Base score: `log1p(prevalence_count)`.
+- Scores are normalized separately for vowels and consonants so each class has mean `1.0`.
+- Core and marginal slider values act as multipliers on top of this normalized prior.
+
+This keeps the preset JSON format unchanged while avoiding flat `1.0` representations for every segment.

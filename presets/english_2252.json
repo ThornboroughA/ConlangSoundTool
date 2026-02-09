@@ -1,0 +1,197 @@
+{
+  "name": "English English (RP) (2252)",
+  "vowels": [
+    {
+      "segment": "aɪ",
+      "representation": 0.6822313853668203
+    },
+    {
+      "segment": "aʊ",
+      "representation": 0.6176340222340837
+    },
+    {
+      "segment": "e",
+      "representation": 1.8105943568152865
+    },
+    {
+      "segment": "eə",
+      "representation": 0.431451640413889
+    },
+    {
+      "segment": "eɪ",
+      "representation": 0.5774077752943557
+    },
+    {
+      "segment": "iː",
+      "representation": 1.6537927528562075
+    },
+    {
+      "segment": "uː",
+      "representation": 1.6347690890114077
+    },
+    {
+      "segment": "æ",
+      "representation": 1.3031121679619941
+    },
+    {
+      "segment": "ɑː",
+      "representation": 1.120663159303269
+    },
+    {
+      "segment": "ɒ",
+      "representation": 0.9859089393017015
+    },
+    {
+      "segment": "ɔɪ",
+      "representation": 0.5774077752943557
+    },
+    {
+      "segment": "ɔː",
+      "representation": 1.380575652844699
+    },
+    {
+      "segment": "ə",
+      "representation": 1.5690846010282893
+    },
+    {
+      "segment": "əʊ",
+      "representation": 0.431451640413889
+    },
+    {
+      "segment": "ɜː",
+      "representation": 0.431451640413889
+    },
+    {
+      "segment": "ɪ",
+      "representation": 1.468402538170985
+    },
+    {
+      "segment": "ɪə",
+      "representation": 0.431451640413889
+    },
+    {
+      "segment": "ʊ",
+      "representation": 1.448677079774506
+    },
+    {
+      "segment": "ʊə",
+      "representation": 0.264543362133828
+    },
+    {
+      "segment": "ʌ",
+      "representation": 1.1793887809526564
+    }
+  ],
+  "consonants": [
+    {
+      "segment": "b",
+      "representation": 1.1025372475454944
+    },
+    {
+      "segment": "d",
+      "representation": 1.0550065863550846
+    },
+    {
+      "segment": "d̠ʒ",
+      "representation": 0.9795208450319343
+    },
+    {
+      "segment": "f",
+      "representation": 1.050047082291264
+    },
+    {
+      "segment": "h",
+      "representation": 1.086108139386804
+    },
+    {
+      "segment": "j",
+      "representation": 1.154209440408957
+    },
+    {
+      "segment": "kʰ",
+      "representation": 0.9354393740165959
+    },
+    {
+      "segment": "l",
+      "representation": 1.1127355071505864
+    },
+    {
+      "segment": "m",
+      "representation": 1.1645271047813661
+    },
+    {
+      "segment": "n",
+      "representation": 1.1330897036025513
+    },
+    {
+      "segment": "pʰ",
+      "representation": 0.932279246487771
+    },
+    {
+      "segment": "s",
+      "representation": 1.1110845127683817
+    },
+    {
+      "segment": "tʰ",
+      "representation": 0.8763746786244772
+    },
+    {
+      "segment": "t̠ʃ",
+      "representation": 1.0372165508768576
+    },
+    {
+      "segment": "v",
+      "representation": 0.9788079357664881
+    },
+    {
+      "segment": "w",
+      "representation": 1.1411222277643915
+    },
+    {
+      "segment": "z",
+      "representation": 0.9919547783256981
+    },
+    {
+      "segment": "ð",
+      "representation": 0.7417218324645166
+    },
+    {
+      "segment": "ŋ",
+      "representation": 1.1019236139273498
+    },
+    {
+      "segment": "ɡ",
+      "representation": 1.086877067672096
+    },
+    {
+      "segment": "ɹ",
+      "representation": 0.6000555508977763
+    },
+    {
+      "segment": "ʃ",
+      "representation": 1.0228846191373184
+    },
+    {
+      "segment": "ʒ",
+      "representation": 0.9008700642047748
+    },
+    {
+      "segment": "θ",
+      "representation": 0.7036062905114675
+    }
+  ],
+  "phoible": {
+    "inventory_id": "2252",
+    "language_name": "English",
+    "specific_dialect": "English (RP)",
+    "glottocode": "stan1293",
+    "iso": "eng",
+    "source": "ea",
+    "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv",
+    "representation_model": "phoible_prevalence_log1p_mean1_v1",
+    "representation_scope": "cross-inventory segment prevalence (typological prior; not within-language token frequency)",
+    "representation_inventory_count": 3020,
+    "core_multiplier": 1.0,
+    "marginal_multiplier": 0.1
+  }
+}

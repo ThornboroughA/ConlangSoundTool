@@ -1,0 +1,181 @@
+{
+  "name": "Korean (1)",
+  "vowels": [
+    {
+      "segment": "a",
+      "representation": 1.3094114824786656
+    },
+    {
+      "segment": "aː",
+      "representation": 1.1313967757937624
+    },
+    {
+      "segment": "e",
+      "representation": 1.2520470403248618
+    },
+    {
+      "segment": "eː",
+      "representation": 1.0764472976493273
+    },
+    {
+      "segment": "i",
+      "representation": 1.3204938412110605
+    },
+    {
+      "segment": "iː",
+      "representation": 1.1436169088510872
+    },
+    {
+      "segment": "o",
+      "representation": 1.2505951341064352
+    },
+    {
+      "segment": "oː",
+      "representation": 1.0746217490965153
+    },
+    {
+      "segment": "u",
+      "representation": 1.312330636589323
+    },
+    {
+      "segment": "uː",
+      "representation": 1.1304618242108635
+    },
+    {
+      "segment": "y",
+      "representation": 0.8609602441072707
+    },
+    {
+      "segment": "æ",
+      "representation": 0.901117208814198
+    },
+    {
+      "segment": "æː",
+      "representation": 0.7233063248900046
+    },
+    {
+      "segment": "ø",
+      "representation": 0.7582862579188645
+    },
+    {
+      "segment": "ɤ",
+      "representation": 0.7377949755550084
+    },
+    {
+      "segment": "ɤː",
+      "representation": 0.49883268026633587
+    },
+    {
+      "segment": "ɯ",
+      "representation": 0.877174448446615
+    },
+    {
+      "segment": "ɯː",
+      "representation": 0.6411051696897972
+    }
+  ],
+  "consonants": [
+    {
+      "segment": "h",
+      "representation": 1.2319781732531494
+    },
+    {
+      "segment": "j",
+      "representation": 1.3092258370785976
+    },
+    {
+      "segment": "k",
+      "representation": 1.3100161590373431
+    },
+    {
+      "segment": "kʰ",
+      "representation": 1.0610738004787275
+    },
+    {
+      "segment": "kˀ",
+      "representation": 0.363799166515715
+    },
+    {
+      "segment": "l",
+      "representation": 1.262181736514065
+    },
+    {
+      "segment": "m",
+      "representation": 1.3209292180264065
+    },
+    {
+      "segment": "n",
+      "representation": 1.2852696085717081
+    },
+    {
+      "segment": "p",
+      "representation": 1.301555336244005
+    },
+    {
+      "segment": "pʰ",
+      "representation": 1.0574892512068597
+    },
+    {
+      "segment": "pˀ",
+      "representation": 0.32218849982054776
+    },
+    {
+      "segment": "s",
+      "representation": 1.2603090049054166
+    },
+    {
+      "segment": "sˀ",
+      "representation": 0.34429757771889247
+    },
+    {
+      "segment": "t",
+      "representation": 1.2637931568829885
+    },
+    {
+      "segment": "tʰ",
+      "representation": 0.9940764059338171
+    },
+    {
+      "segment": "tˀ",
+      "representation": 0.22953171847926165
+    },
+    {
+      "segment": "t̠ʃ",
+      "representation": 1.1765201873347906
+    },
+    {
+      "segment": "t̠ʃʰ",
+      "representation": 0.9003944068526063
+    },
+    {
+      "segment": "t̠ʃˀ",
+      "representation": 0.2966654424974883
+    },
+    {
+      "segment": "w",
+      "representation": 1.2943809429634223
+    },
+    {
+      "segment": "ŋ",
+      "representation": 1.2499177491821114
+    },
+    {
+      "segment": "ʔ",
+      "representation": 1.1644066205020829
+    }
+  ],
+  "phoible": {
+    "inventory_id": "1",
+    "language_name": "Korean",
+    "specific_dialect": "",
+    "glottocode": "kore1280",
+    "iso": "kor",
+    "source": "spa",
+    "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv",
+    "representation_model": "phoible_prevalence_log1p_mean1_v1",
+    "representation_scope": "cross-inventory segment prevalence (typological prior; not within-language token frequency)",
+    "representation_inventory_count": 3020,
+    "core_multiplier": 1.0,
+    "marginal_multiplier": 0.15
+  }
+}

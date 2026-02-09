@@ -3,157 +3,157 @@
   "vowels": [
     {
       "segment": "a",
-      "representation": 1.0
+      "representation": 1.2765970652720293
     },
     {
       "segment": "aː",
-      "representation": 1.0
+      "representation": 1.1030434840104482
     },
     {
       "segment": "i",
-      "representation": 1.0
+      "representation": 1.287401695308789
     },
     {
       "segment": "iː",
-      "representation": 1.0
+      "representation": 1.1149573752562192
     },
     {
       "segment": "ɔ",
-      "representation": 1.0
+      "representation": 1.1325509197210895
     },
     {
       "segment": "ɔː",
-      "representation": 1.0
+      "representation": 0.9307593128461381
     },
     {
       "segment": "ɛ",
-      "representation": 1.0
+      "representation": 1.1412564577295263
     },
     {
       "segment": "ɛː",
-      "representation": 1.0
+      "representation": 0.9384546641552728
     },
     {
       "segment": "ɯ",
-      "representation": 1.0
+      "representation": 0.8551920779698865
     },
     {
       "segment": "ɯː",
-      "representation": 1.0
+      "representation": 0.6250387972827757
     },
     {
       "segment": "ɯ̃",
-      "representation": 1.0
+      "representation": 0.5947481504478234
     }
   ],
   "consonants": [
     {
       "segment": "b",
-      "representation": 1.0
+      "representation": 1.2001719616755333
     },
     {
       "segment": "d",
-      "representation": 1.0
+      "representation": 1.1484322431239606
     },
     {
       "segment": "d̠ʒ",
-      "representation": 1.0
+      "representation": 1.0662618942817563
     },
     {
       "segment": "h",
-      "representation": 1.0
+      "representation": 1.18228798087462
     },
     {
       "segment": "j",
-      "representation": 1.0
+      "representation": 1.2564199634651136
     },
     {
       "segment": "k",
-      "representation": 1.0
+      "representation": 1.257178408844368
     },
     {
       "segment": "kː",
-      "representation": 1.0
+      "representation": 0.7096060281168559
     },
     {
       "segment": "m",
-      "representation": 1.0
+      "representation": 1.267651304190619
     },
     {
       "segment": "n",
-      "representation": 1.0
+      "representation": 1.2334299774039228
     },
     {
       "segment": "p",
-      "representation": 1.0
+      "representation": 1.2490588420256967
     },
     {
       "segment": "pː",
-      "representation": 1.0
+      "representation": 0.6681004512016596
     },
     {
       "segment": "s",
-      "representation": 1.0
+      "representation": 1.2094761263124656
     },
     {
       "segment": "sː",
-      "representation": 1.0
+      "representation": 0.6860229790422165
     },
     {
       "segment": "t",
-      "representation": 1.0
+      "representation": 1.2128197496785733
     },
     {
       "segment": "tsː",
-      "representation": 1.0
+      "representation": 0.41933038922554766
     },
     {
       "segment": "tː",
-      "representation": 1.0
+      "representation": 0.647896256078682
     },
     {
       "segment": "t̠ʃ",
-      "representation": 1.0
+      "representation": 1.1290668186671329
     },
     {
       "segment": "t̠ʃː",
-      "representation": 1.0
+      "representation": 0.5900643395174977
     },
     {
       "segment": "w",
-      "representation": 1.0
+      "representation": 1.2421738183054285
     },
     {
       "segment": "z",
-      "representation": 1.0
+      "representation": 1.0797969092172979
     },
     {
       "segment": "çː",
-      "representation": 1.0
+      "representation": 0.2557300361313993
     },
     {
       "segment": "ŋ",
-      "representation": 1.0
+      "representation": 1.1995039879949356
     },
     {
       "segment": "ɡ",
-      "representation": 1.0
+      "representation": 1.1831250012751566
     },
     {
       "segment": "ɾ",
-      "representation": 1.0
+      "representation": 1.057100053210934
     },
     {
       "segment": "ʃ",
-      "representation": 1.0
+      "representation": 1.113465728845691
     },
     {
       "segment": "ʃː",
-      "representation": 1.0
+      "representation": 0.6183869149369843
     },
     {
       "segment": "ʔ",
-      "representation": 1.0
+      "representation": 1.1174418363559497
     }
   ],
   "phoible": {
@@ -163,6 +163,11 @@
     "glottocode": "nucl1643",
     "iso": "jpn",
     "source": "spa",
-    "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv"
+    "source_url": "https://raw.githubusercontent.com/phoible/dev/refs/heads/master/data/phoible.csv",
+    "representation_model": "phoible_prevalence_log1p_mean1_v1",
+    "representation_scope": "cross-inventory segment prevalence (typological prior; not within-language token frequency)",
+    "representation_inventory_count": 3020,
+    "core_multiplier": 1.0,
+    "marginal_multiplier": 0.1
   }
 }

@@ -106,17 +106,15 @@ Notes:
 - Template weights are normalized to sum `1.0` per position.
 - Sidecar tendencies are soft/probabilistic; no hard allow/deny constraints are used.
 
-## PHOIBLE import weighting model
+## PHOIBLE import representation defaults
 
 When importing presets from PHOIBLE in the UI:
 
-- PHOIBLE CSV does not provide within-language token frequency values.
-- The importer uses a typological prior based on cross-inventory prevalence per `GlyphID`.
-- Base score: `log1p(prevalence_count)`.
-- Scores are normalized separately for vowels and consonants so each class has mean `1.0`.
-- Core and marginal slider values act as multipliers on top of this normalized prior.
+- Imported core segments default to `representation: 1.0`.
+- Imported marginal segments use the marginal multiplier.
+- You can adjust both with the importer sliders, then manually edit `representation` values later in preset JSON files.
 
-This keeps the preset JSON format unchanged while avoiding flat `1.0` representations for every segment.
+This keeps the preset JSON format unchanged and makes PHOIBLE import behavior deterministic and easy to tune.
 
 ## Build a sidecar from a wordlist
 

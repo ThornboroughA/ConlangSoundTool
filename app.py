@@ -18,7 +18,6 @@ import streamlit as st
 
 import family_generator
 import language_diff
-import phoible_representation
 import project_io
 import sound_inventory_generator as generator
 import sound_change_engine
@@ -837,15 +836,13 @@ def _clean_phoible_value(value: Any) -> str:
 @st.cache_data(show_spinner=True)
 def load_phoible_index(
     url: str,
-) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, str]]], Dict[str, int], int]:
+) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, str]]]]:
     inventories: Dict[str, Dict[str, Any]] = {}
     rows_by_inventory: Dict[str, List[Dict[str, str]]] = {}
-    all_rows: List[Dict[str, str]] = []
 
     with urllib.request.urlopen(url) as response:  # nosec - user controlled URL in UI
         reader = csv.DictReader(io.TextIOWrapper(response, encoding="utf-8"))
         for row in reader:
-            all_rows.append(row)
             inventory_id = _clean_phoible_value(row.get("InventoryID", ""))
             if not inventory_id:
                 continue
@@ -881,8 +878,7 @@ def load_phoible_index(
         inventories.values(),
         key=lambda item: (item.get("language_name", "").lower(), item.get("inventory_id", "")),
     )
-    glyph_inventory_counts, total_inventory_count = phoible_representation.build_glyph_inventory_counts(all_rows)
-    return inventory_list, rows_by_inventory, glyph_inventory_counts, total_inventory_count
+    return inventory_list, rows_by_inventory
 
 
 def filter_phoible_inventories(inventories: List[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
@@ -906,43 +902,46 @@ def build_phoible_preset(
     include_tones: bool,
     core_weight: float,
     marginal_weight: float,
-    glyph_inventory_counts: Dict[str, int],
-    total_inventory_count: int,
     meta: Dict[str, Any],
 ) -> Dict[str, Any]:
-    vowels_raw, consonants_raw = phoible_representation.build_prevalence_weighted_entries(
-        rows=rows,
-        include_marginal=include_marginal,
-        include_tones=include_tones,
-        glyph_inventory_counts=glyph_inventory_counts,
-        core_multiplier=core_weight,
-        marginal_multiplier=marginal_weight,
-    )
+    vowels_raw: List[Dict[str, Any]] = []
+    consonants_raw: List[Dict[str, Any]] = []
+    for row in rows:
+        segment = _clean_phoible_value(row.get("Phoneme", ""))
+        if not segment:
+            continue
+
+        segment_class = _clean_phoible_value(row.get("SegmentClass", "")).lower()
+        is_marginal = _clean_phoible_value(row.get("Marginal", "")).upper() == "TRUE"
+        if is_marginal and not include_marginal:
+            continue
+
+        representation = float(marginal_weight if is_marginal else core_weight)
+        output_entry = {"segment": segment, "representation": representation}
+
+        if segment_class == "vowel":
+            vowels_raw.append(output_entry)
+        elif segment_class == "consonant":
+            consonants_raw.append(output_entry)
+        elif segment_class == "tone" and include_tones:
+            consonants_raw.append(output_entry)
 
     vowels_entries = generator._normalize_segment_entries(vowels_raw)
     consonants_entries = generator._normalize_segment_entries(consonants_raw)
-    merged_meta = dict(meta)
-    merged_meta.update(
-        phoible_representation.build_representation_meta(
-            total_inventory_count=total_inventory_count,
-            core_multiplier=core_weight,
-            marginal_multiplier=marginal_weight,
-        )
-    )
 
     return {
         "name": name,
         "vowels": vowels_entries,
         "consonants": consonants_entries,
-        "phoible": merged_meta,
+        "phoible": dict(meta),
     }
 
 
 def render_phoible_importer() -> None:
     with st.expander("Import preset from PHOIBLE", expanded=False):
         st.caption(
-            "Pull inventories directly from PHOIBLE. PHOIBLE does not provide within-language token frequencies; "
-            "representation values use a cross-inventory prevalence prior (typological proxy), then apply multipliers."
+            "Pull inventories directly from PHOIBLE. Imported segments default to representation 1.0 for core rows "
+            "and use the marginal multiplier for rows marked marginal."
         )
         enable_phoible = st.checkbox(
             "Enable PHOIBLE search",
@@ -961,7 +960,7 @@ def render_phoible_importer() -> None:
         )
 
         try:
-            inventories, rows_by_inventory, glyph_inventory_counts, total_inventory_count = load_phoible_index(url)
+            inventories, rows_by_inventory = load_phoible_index(url)
         except Exception as exc:  # pragma: no cover - network safety net
             st.error(f"Could not load PHOIBLE data: {exc}")
             return
@@ -1020,22 +1019,22 @@ def render_phoible_importer() -> None:
             help="Include tone markers in the consonant list.",
         )
         core_weight = st.slider(
-            "Core segment multiplier over PHOIBLE prevalence prior",
+            "Core segment representation multiplier",
             min_value=0.2,
             max_value=2.0,
             value=PHOIBLE_CORE_WEIGHT_DEFAULT,
             step=0.05,
             key="phoible_core_weight",
-            help="Multiplier applied to non-marginal segment prevalence scores.",
+            help="Multiplier applied to non-marginal segments.",
         )
         marginal_weight = st.slider(
-            "Marginal segment multiplier over PHOIBLE prevalence prior",
+            "Marginal segment representation multiplier",
             min_value=0.05,
             max_value=1.0,
             value=PHOIBLE_MARGINAL_WEIGHT_DEFAULT,
             step=0.05,
             key="phoible_marginal_weight",
-            help="Multiplier applied to marginal segment prevalence scores.",
+            help="Multiplier applied to segments marked marginal.",
         )
 
         default_display_name = selected_entry["language_name"]
@@ -1101,8 +1100,6 @@ def render_phoible_importer() -> None:
                 include_tones=include_tones,
                 core_weight=core_weight,
                 marginal_weight=marginal_weight,
-                glyph_inventory_counts=glyph_inventory_counts,
-                total_inventory_count=total_inventory_count,
                 meta=meta,
             )
 

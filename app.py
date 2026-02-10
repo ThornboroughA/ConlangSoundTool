@@ -3752,6 +3752,31 @@ def render_language_family_ui() -> None:
             if notice:
                 st.session_state["family_notice"] = notice
 
+        def _clamp(value: int, minimum: int, maximum: int) -> int:
+            return max(minimum, min(maximum, value))
+
+        def _tree_depth(root: str, child_map: Dict[str, List[str]]) -> int:
+            if not root:
+                return 1
+            depth = 1
+            queue = [(root, 1)]
+            visited = set()
+            while queue:
+                node_id, level = queue.pop(0)
+                if node_id in visited:
+                    continue
+                visited.add(node_id)
+                depth = max(depth, level)
+                for child_id in child_map.get(node_id, []):
+                    queue.append((child_id, level + 1))
+            return depth
+
+        def _shorten_label(name: str, limit: int = 28) -> str:
+            cleaned = " ".join(str(name).split())
+            if len(cleaned) <= limit:
+                return cleaned
+            return cleaned[: max(0, limit - 3)].rstrip() + "..."
+
         left_col, main_col, help_col = st.columns([1.3, 2.2, 1.1], gap="large")
 
         with left_col:
@@ -3766,6 +3791,7 @@ def render_language_family_ui() -> None:
                     help="Re-read language files from disk.",
                 ):
                     _load_languages(force=True)
+                graph_slot = st.container()
                 languages = _load_languages()
                 if not languages:
                     st.info("No languages found in this project yet.")
@@ -3775,53 +3801,6 @@ def render_language_family_ui() -> None:
                     selected_id = st.session_state.get("family_selected_id") or root_id
                     if selected_id not in languages:
                         selected_id = root_id if root_id in languages else list(languages.keys())[0]
-
-                    path_ids = family_generator.path_to_root(languages, selected_id)
-                    path_set = set(path_ids)
-
-                    if AGRAPH_AVAILABLE:
-                        nodes = []
-                        edges = []
-                        for language_id, language in languages.items():
-                            meta = language.get("meta", {})
-                            label = f"{meta.get('name', language_id)}\n{meta.get('year', '?')}"
-                            size = 26 if language_id == root_id else 18
-                            color = "#1f7a5a" if language_id == root_id else "#5b8bd1"
-                            if language_id == selected_id:
-                                color = "#d65b5b"
-                            elif language_id in path_set:
-                                color = "#f0a202"
-                            nodes.append(Node(id=language_id, label=label, size=size, color=color))
-                        for parent_id, children in child_map.items():
-                            for child_id in children:
-                                edge_color = "#f0a202" if parent_id in path_set and child_id in path_set else "#a7b6bd"
-                                edges.append(Edge(source=parent_id, target=child_id, color=edge_color))
-                        config = Config(
-                            width="100%",
-                            height=520,
-                            directed=True,
-                            physics=True,
-                            hierarchical=False,
-                            nodeHighlightBehavior=True,
-                        )
-                        selected = agraph(nodes=nodes, edges=edges, config=config)
-                        if selected:
-                            if isinstance(selected, str):
-                                selected_id = selected
-                            elif isinstance(selected, dict) and "id" in selected:
-                                selected_id = str(selected["id"])
-                    else:
-                        st.info("Install streamlit-agraph for interactive tree. Showing static graph instead.")
-                        dot_lines = ["digraph G {", "rankdir=LR;"]
-                        for language_id, language in languages.items():
-                            meta = language.get("meta", {})
-                            label = f"{meta.get('name', language_id)} ({meta.get('year', '?')})".replace('"', "'")
-                            dot_lines.append(f'"{language_id}" [label="{label}"];')
-                        for parent_id, children in child_map.items():
-                            for child_id in children:
-                                dot_lines.append(f'"{parent_id}" -> "{child_id}";')
-                        dot_lines.append("}")
-                        st.graphviz_chart("\n".join(dot_lines))
 
                     available_ids = list(languages.keys())
                     available_ids.sort(key=lambda lang_id: str(languages[lang_id].get("meta", {}).get("year", "")))
@@ -3837,9 +3816,7 @@ def render_language_family_ui() -> None:
 
                     selected_meta = languages.get(selected_id, {}).get("meta", {})
                     parent_id = selected_meta.get("parent_id")
-                    path_ids = list(reversed(family_generator.path_to_root(languages, selected_id)))
-                    if path_ids:
-                        st.caption("Path: " + " → ".join(path_ids))
+                    path_caption = st.empty()
 
                     nav_cols = st.columns(2)
                     with nav_cols[0]:
@@ -3849,7 +3826,7 @@ def render_language_family_ui() -> None:
                             help="Jump to the immediate ancestor language.",
                         ):
                             st.session_state["family_selected_id"] = parent_id
-                            st.rerun()
+                            selected_id = parent_id
                     with nav_cols[1]:
                         root_id = project.get("root_language_id")
                         if root_id and st.button(
@@ -3858,7 +3835,117 @@ def render_language_family_ui() -> None:
                             help="Jump to the proto/root language.",
                         ):
                             st.session_state["family_selected_id"] = root_id
-                            st.rerun()
+                            selected_id = root_id
+                    path_ids = list(reversed(family_generator.path_to_root(languages, selected_id)))
+                    if path_ids:
+                        path_caption.caption("Path: " + " → ".join(path_ids))
+                    path_set = set(path_ids)
+
+                    with graph_slot:
+                        if AGRAPH_AVAILABLE:
+                            tree_depth = _tree_depth(root_id, child_map)
+                            graph_height = _clamp(220 + tree_depth * 80, 360, 820)
+                            graph_caption = st.empty()
+                            nodes = []
+                            edges = []
+                            palette = {
+                                "root": {"bg": "#d1fae5", "border": "#0f766e"},
+                                "selected": {"bg": "#fee2e2", "border": "#b91c1c"},
+                                "path": {"bg": "#fef3c7", "border": "#b45309"},
+                                "default": {"bg": "#e0ecff", "border": "#1d4ed8"},
+                            }
+                            for language_id, language in languages.items():
+                                meta = language.get("meta", {})
+                                name = str(meta.get("name", language_id))
+                                year = meta.get("year", "?")
+                                label = f"{_shorten_label(name)}\n{year}"
+                                title = f"{name} ({language_id}, {year})"
+                                style_key = "default"
+                                if language_id == root_id:
+                                    style_key = "root"
+                                if language_id in path_set:
+                                    style_key = "path"
+                                if language_id == selected_id:
+                                    style_key = "selected"
+                                style = palette[style_key]
+                                nodes.append(
+                                    Node(
+                                        id=language_id,
+                                        label=label,
+                                        title=title,
+                                        shape="box",
+                                        margin=8,
+                                        borderWidth=1,
+                                        shadow=True,
+                                        font={"face": "Sora", "size": 13, "color": "#1f2937"},
+                                        color={
+                                            "background": style["bg"],
+                                            "border": style["border"],
+                                            "highlight": {"background": style["bg"], "border": style["border"]},
+                                            "hover": {"background": style["bg"], "border": style["border"]},
+                                        },
+                                    )
+                                )
+                            for parent_id, children in child_map.items():
+                                for child_id in children:
+                                    edge_color = (
+                                        "#f0a202" if parent_id in path_set and child_id in path_set else "#a7b6bd"
+                                    )
+                                    edges.append(
+                                        Edge(
+                                            source=parent_id,
+                                            target=child_id,
+                                            color=edge_color,
+                                            width=1.6,
+                                            smooth={
+                                                "enabled": True,
+                                                "type": "cubicBezier",
+                                                "forceDirection": "horizontal",
+                                            },
+                                        )
+                                    )
+                            graph_interaction = {
+                                "dragView": True,
+                                "zoomView": False,
+                                "minZoom": 0.45,
+                                "maxZoom": 1.8,
+                                "hover": True,
+                                "navigationButtons": True,
+                            }
+                            config = Config(
+                                width="100%",
+                                height=graph_height,
+                                directed=True,
+                                physics=False,
+                                hierarchical=True,
+                                nodeHighlightBehavior=True,
+                                interaction=graph_interaction,
+                                direction="LR",
+                                levelSeparation=170,
+                                nodeSpacing=120,
+                                treeSpacing=220,
+                                sortMethod="directed",
+                            )
+                            selected = agraph(nodes=nodes, edges=edges, config=config)
+                            graph_caption.caption("Scroll zoom disabled; use the graph's +/- and fit buttons.")
+                            if selected:
+                                if isinstance(selected, str):
+                                    selected_id = selected
+                                elif isinstance(selected, dict) and "id" in selected:
+                                    selected_id = str(selected["id"])
+                                st.session_state["family_selected_id"] = selected_id
+                        else:
+                            st.info("Install streamlit-agraph for interactive tree. Showing static graph instead.")
+                            dot_lines = ["digraph G {", "rankdir=LR;"]
+                            for language_id, language in languages.items():
+                                meta = language.get("meta", {})
+                                label = f"{meta.get('name', language_id)} ({meta.get('year', '?')})".replace('"', "'")
+                                dot_lines.append(f'"{language_id}" [label="{label}"];')
+                            for parent_id, children in child_map.items():
+                                for child_id in children:
+                                    dot_lines.append(f'"{parent_id}" -> "{child_id}";')
+                            dot_lines.append("}")
+                            st.graphviz_chart("\n".join(dot_lines))
 
         with main_col:
             if not isinstance(project, dict) or not project_dir:
@@ -4079,7 +4166,6 @@ def render_language_family_ui() -> None:
                             template_options = list(project_io.DEFAULT_FAMILY_CONFIG["sound_change_templates_enabled"])
                             template_key = f"family_template_select_{selected_parent}_{child_id_input}"
                             rule_editor_key = f"family_rules_{selected_parent}_{child_id_input}"
-                            randomize_flag = f"{rule_editor_key}_randomize_flag"
                             auto_sig_key = f"{rule_editor_key}_auto_sig"
                             auto_toggle_key = f"{rule_editor_key}_auto_toggle"
 
@@ -4116,7 +4202,7 @@ def render_language_family_ui() -> None:
                                 else:
                                     st.session_state[rule_editor_key] = []
 
-                            if st.session_state.pop(randomize_flag, False):
+                            def _randomize_templates() -> None:
                                 randomized = pick_random_sound_templates(
                                     template_options,
                                     parent_inventory,
@@ -4124,6 +4210,7 @@ def render_language_family_ui() -> None:
                                 )
                                 st.session_state[template_key] = randomized
                                 _apply_template_rules(randomized, seed_salt=str(random.random()))
+                                st.session_state[auto_sig_key] = ""
 
                             selected_templates = st.multiselect(
                                 "Templates",
@@ -4147,13 +4234,12 @@ def render_language_family_ui() -> None:
 
                             template_action_cols = st.columns([1.2, 1.6, 2.2])
                             with template_action_cols[0]:
-                                if st.button(
+                                st.button(
                                     "Randomize templates",
                                     key=f"{rule_editor_key}_randomize",
                                     help="Pick a balanced mix of vowel + consonant changes, then auto-generate rules.",
-                                ):
-                                    st.session_state[randomize_flag] = True
-                                    st.rerun()
+                                    on_click=_randomize_templates,
+                                )
                             with template_action_cols[1]:
                                 generate_rules_button = st.button(
                                     "Re-roll rules (time-based)",

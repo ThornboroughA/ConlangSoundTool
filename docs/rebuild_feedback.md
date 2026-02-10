@@ -69,4 +69,4 @@ Think of “language” as a layered system with explicit interfaces rather than
 
 - Draft a minimal language schema for phonology, phonotactics, lexicon, morphology, orthography, etymology.
 - Sketch a sound-change DSL and a timeline representation.
-- Outline a UI/UX flow that reflects the new pipeline.
+- Outline a UI/UX flow that reflects the new pipeline (see `docs/uiux_family_first_flow.md`).
